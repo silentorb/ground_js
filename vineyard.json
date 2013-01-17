@@ -1,0 +1,52 @@
+{
+  "trellises": {
+    "vineyard_trellis": {
+      "plural": "vineyard_trellises",
+      "properties": {
+        "id": {
+          "type": "int"
+        },
+        "name": {
+          "type": "string"
+        },
+        "plural": {
+          "type": "string"
+        },
+        "primary_key": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "list",
+          "trellis": "vineyard_property"
+        }
+      }
+    },
+    "vineyard_property": {
+      "plural": "vineyard_properties",
+      "properties": {
+        "id": {
+          "type": "int"
+        },
+        "name": {
+          "type": "string"
+        },
+         "type": {
+          "type": "string"
+        },
+        "trellis": {
+          "type": "int"
+        },
+         "readonly": {
+          "type": "bool"
+        },
+        "insert_trellis": {
+          "type": "bool"
+        },
+        "trellis": {
+          "type": "reference",
+          "trellis": "vineyard_trellis"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "int" : {
+    "field_type" : "INT",
+    "default" : 0
+  },
+  "string" : {
+    "field_type" : "VARCHAR(255)",
+    "default" : ""
+  },
+  "text" : {
+    "field_type" : "TEXT",
+    "default" : ""
+  },
+  "bool" : {
+    "field_type" : "BIT",
+    "default" : true
+  },
+  "reference" : {
+    "field_type" : "INT",
+    "default" : null
+  },
+  "datetime" : {
+    "field_type" : "INT(11)",
+    "default" : 0
+  },
+  "created": {
+    "parent": "datetime",
+    "readonly": "true"
+  },
+  "modified": {
+    "parent": "datetime",
+    "readonly": "true"
+  },
+  "type": {
+    "parent": "string"
+  }
+}
