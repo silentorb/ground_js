@@ -10,7 +10,7 @@ Update = Meta_Object.subclass 'Update',
     if ground == undefined
       ground = null
     @seed = seed 
-    if undefined(trellis)
+    if is_string(trellis)
       if ground
         @trellis = ground.trellises[trellis]
         
@@ -21,7 +21,7 @@ Update = Meta_Object.subclass 'Update',
     else
       @trellis = trellis 
 
-    @main_table = this.undefined() 
+    @main_table = this.get_table_name() 
     if ground
       @ground = ground 
 
@@ -29,22 +29,22 @@ Update = Meta_Object.subclass 'Update',
       @ground = @ground 
 
     @db = ground.db 
-    this.undefined(@ground, 'ground', 'query') 
+    this.connect(@ground, 'ground', 'query') 
 
   generate_sql: (trellis)->
     duplicate = '' 
     id = @seed 
     if id && id != 0
-      return this.undefined(trellis)
+      return this.create_record(trellis)
 
     else
-      primary_key = trellis.undefined() 
-      sql = 'SELECT $primary_key FROM ' + trellis.undefined() + ' WHERE $primary_key = $id' 
-      id = this.undefined(sql) 
+      primary_key = trellis.query_primary_key() 
+      sql = 'SELECT $primary_key FROM ' + trellis.get_table_name() + ' WHERE $primary_key = $id' 
+      id = this.query_value(sql) 
       if id && id != 0
-        return this.undefined(trellis)
+        return this.create_record(trellis)
 
-      return this.undefined(trellis, id)
+      return this.update_record(trellis, id)
 
   create_record: (trellis)->
     fields = [] 
@@ -54,18 +54,18 @@ Update = Meta_Object.subclass 'Update',
         fields 
         values 
 
-    field_string = undefined(', ', fields) 
-    value_string = undefined(', ', values) 
-    sql = 'INSERT INTO ' + trellis.undefined() + ' ($field_string) VALUES ($value_string);\n' 
-    this.undefined('created', @seed, trellis) 
+    field_string = implode(', ', fields) 
+    value_string = implode(', ', values) 
+    sql = 'INSERT INTO ' + trellis.get_table_name() + ' ($field_string) VALUES ($value_string);\n' 
+    this.invoke('created', @seed, trellis) 
     console.log sql
-    this.undefined(sql) 
+    this.query(sql) 
     # Hard coding conversion to int is a quick fix hack.  Eventually
     
         
     # I should convert it based on the type of trellis property.
-    @seed = id = parseInt(this.undefined(trellis.primary_key)) 
-    this.undefined(trellis, id, true) 
+    @seed = id = parseInt(this.last_insert_id(trellis.primary_key)) 
+    this.update_links(trellis, id, true) 
     return sql
 
   update_record: (trellis, id)->
@@ -77,16 +77,16 @@ Update = Meta_Object.subclass 'Update',
 
       if @seed[property.name] != undefined || property.insert_trellis
         field = '`' + property.name + '`' 
-        value = this.undefined(property) 
+        value = this.get_field_value(property) 
         updates 
 
     # Check if there's nothing to add.
-    if undefined(updates) == 0
+    if count(updates) == 0
       return ''
 
-    update_list_string = undefined(', ', updates) 
-    table_name = trellis.undefined() 
-    primary_key = trellis.undefined() 
+    update_list_string = implode(', ', updates) 
+    table_name = trellis.get_table_name() 
+    primary_key = trellis.query_primary_key() 
     sql = """
 UPDATE #{table_name}
 SET #{update_list_string}
@@ -95,9 +95,9 @@ WHERE #{primary_key} = #{id}
 
 """
  
-    this.undefined(sql) 
-    this.undefined(trellis, id) 
-    this.undefined('updated', @seed, trellis) 
+    this.query(sql) 
+    this.update_links(trellis, id) 
+    this.invoke('updated', @seed, trellis) 
     return sql
 
   get_field_value: (property)->
@@ -108,26 +108,26 @@ WHERE #{primary_key} = #{id}
     else
       value = @seed 
 
-    if undefined(value)
-      value = undefined(''', '\\'', value)
+    if is_string(value)
+      value = str_replace(''', '\\'', value)
       
 
     if property.type == 'string' || property.type == 'text'
-      value = ''' + undefined('/[\r\n]+/', '\n', value) + ''' 
+      value = ''' + preg_replace("/ [  \  r  \  n  ]  +  /", '\n', value) + ''' 
 
     if property.type == 'created'
-      value = undefined() 
+      value = time() 
 
     if property.type == 'modified'
-      value = undefined() 
+      value = time() 
 
     if property.type == 'reference'
       # !!! Eventually I'll need to check the to see if the other property is
       
             
       # using a primary key other than 'id', but this will work for the moment.
-      if undefined(value)
-        if undefined(value.id)
+      if is_object(value)
+        if isset(value.id)
           value = value.id 
 
         else
@@ -136,10 +136,10 @@ WHERE #{primary_key} = #{id}
     else if value == null
       value = 'NULL' 
 
-    if undefined(value)
+    if is_object(value)
       throw Exception.create('Property $property_name cannot be an object.')
 
-    if undefined(value)
+    if is_array(value)
       throw Exception.create('Property $property_name cannot be an array.')
 
     return value
@@ -156,20 +156,20 @@ WHERE #{primary_key} = #{id}
       if list
         continue
 
-      join = Link_Trellis.create(link.undefined(), trellis.undefined()) 
+      join = Link_Trellis.create(link.get_primary_property(), trellis.get_primary_property()) 
       currently_in_table = [] 
       if create
-        rows = join.undefined(id) 
+        rows = join.query_rows(id) 
         for other_id of rows
-          if undefined(other_id, list)
-            this.undefined(join.undefined(id, other_id)) 
+          if in_array(other_id, list)
+            this.query(join.delete_row(id, other_id)) 
 
           else
             currently_in_table 
 
       for other_id of list
-        if undefined(other_id, currently_in_table)
-          this.undefined(join.undefined(id, other_id)) 
+        if in_array(other_id, currently_in_table)
+          this.query(join.generate_insert(id, other_id)) 
 
   run: (return_sql)->
     if return_sql == undefined
@@ -177,7 +177,7 @@ WHERE #{primary_key} = #{id}
     result = {} 
     # JOINED tables will require multiple generate_sqls...
     trellis = @trellis 
-    tree = trellis.undefined() 
+    tree = trellis.get_tree() 
     # The sql is only collected for debugging purpose.
     
         
@@ -193,7 +193,7 @@ WHERE #{primary_key} = #{id}
     # a transaction.
     sql = '' 
     for trellis of tree
-      sql += this.undefined(trellis) 
+      sql += this.generate_sql(trellis) 
 
     if return_sql
       result.sql = sql

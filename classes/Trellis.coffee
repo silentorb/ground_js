@@ -1,3 +1,6 @@
+MetaHub = require 'metahub'
+Meta_Object = MetaHub.Meta_Object
+
 Bloom_Property = Meta_Object.subclass 'Bloom_Property',
   name: ''
   parent: ''
@@ -10,25 +13,15 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
     names = source 
     for key, item of names
       if this[key] != undefined
-        this = source 
+        this[key] = source[key] 
 
     @name = name 
     @field_name = name 
     #
-    
-
     #    if ($this->type == 'reference') {
-    
-
     #      $this->field_name = $name . '_' . $parent->primary_key;
-    
-
     #    }
-    
-
     #    else {
-    
-
     #    }
     @parent = parent 
 
@@ -51,14 +44,14 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
     return result
 
   get_field_type: ->
-    property_type = this.get_property_type() 
+    property_type = @get_property_type() 
     if property_type
       return property_type.field_type
 
     return null
 
   get_default: ->
-    type = this.get_property_type() 
+    type = @get_property_type() 
     return type.default
 
   get_property_type: ->
@@ -69,8 +62,8 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
     return null
 
   query: ->
-    return this.get_table_name() + '.' + @name
- Trellis = Meta_Object.subclass 'Trellis',
+    return @get_table_name() + '.' + @name
+ module.exports = Meta_Object.subclass 'Trellis',
   plural: ''
   parent: ''
   ground: ''
@@ -87,8 +80,6 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
     @ground = ground 
     @name = name 
     #    $this->update_core_properties();
-    
-    
 
   check_primary_key: ->
     if @properties[@primary_key] && @parent
@@ -99,17 +90,13 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
     result = {} 
     for name, property of @properties
       # Primary keys should be null, not the default value.
-      
-            
       # This informs both ground and any SQL inserts that the primary key
-      
-            
       # is not set and still needs to be assigned a value.
       if name == @primary_key
-        result = null 
+        result[name] = null 
 
       else
-        result = property.get_default() 
+        result[name] = property.get_default() 
 
     return result
 
@@ -142,7 +129,7 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
     return null
 
   get_object_id: (object)->
-    return object
+    return object[@primary_key]
 
   get_plural: ->
     if @plural
@@ -186,8 +173,8 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
   load_from_object: (source)->
     names = source 
     for name, item of names
-      if name != 'name' && name != 'properties' && this[name] != undefined && source != null
-        this = source 
+      if name != 'name' && name != 'properties' && this[name] != undefined && source[name] != null
+        this[name] = source[name] 
 
     for key, property of source.properties
       @properties[key] = Bloom_Property.create(key, property, this) 
@@ -201,10 +188,10 @@ Bloom_Property = Meta_Object.subclass 'Bloom_Property',
       parent.parent_query(query) 
 
   query_primary_key: ->
-    return this.get_table_name() + '.' + @primary_key
+    return @get_table_name() + '.' + @primary_key
 
   query_property: (property)->
-    return this.get_table_name() + '.' + property
+    return @get_table_name() + '.' + property
 
   update_core_properties: ->
     @core_properties = [] 

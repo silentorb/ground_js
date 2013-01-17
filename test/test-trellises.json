@@ -1,0 +1,61 @@
+{
+  "tables": {
+    "warrior": {
+      "indexes": {
+       "test_index": {
+         "fields": [
+          "race",
+          "age"
+         ]
+       }
+      }
+    },
+    "base" : {
+      "table_name": "base_objects"
+    }
+  },
+  "trellises": {
+    "warrior": {
+      "parent": "base",
+      "properties": {
+        "id": {
+          "type": "int"
+        },
+        "race": {
+          "type": "string"
+        },
+        "age": {
+          "type": "int"
+        },
+        "inventory": {
+          "type": "list",
+          "trellis": "character_item"
+        }
+      }
+    },
+    "base": {
+      "properties": {
+        "id": {
+          "type": "int"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "character_item": {
+      "properties": {
+        "id": {
+          "type": "int"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "reference",
+          "trellis": "warrior"
+        }
+      }
+    }
+  }
+}

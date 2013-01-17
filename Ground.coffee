@@ -1,14 +1,22 @@
+MetaHub = require 'metahub'
+Meta_Object = MetaHub.Meta_Object
+Query = require './classes/Query.coffee'
+Trellis = require './classes/Trellis.coffee'
+Database = require './node_modules/ground_db/Ground_Database.coffee'
+Table = require './node_modules/ground_db/Ground_Database.coffee'
+fs = require 'fs'
+
 Property_Type = Meta_Object.subclass 'Property_Type',
   name: ''
   property_class: ''
   field_type: ''
-  default: null
+  'default': null
   initialize: (name, info, types)->
     # Transferring parent properties is done before any other assignment
     
         
     # so the MetaHub::extend() can be overridden.
-    if isset(info.parent)
+    if info.parent
       parent = types[info.parent] 
       MetaHub.extend(this, parent) 
       @parent = parent 
@@ -18,9 +26,10 @@ Property_Type = Meta_Object.subclass 'Property_Type',
 
     @name = name 
     @property_class = 'Bloom_Property' 
-    if isset(info.default)
-      @default = info.default 
- Ground = Meta_Object.subclass 'Ground',
+    if info['default']
+      this['default'] = info['default']
+
+module.exports = Meta_Object.subclass 'Ground',
   trellises: []
   map: []
   queries: []
@@ -35,11 +44,10 @@ Property_Type = Meta_Object.subclass 'Property_Type',
       @db = Ground_Database.create() 
       @connect(database) 
 
-    path = drupal_get_path('module', 'ground_php') 
-    @load_schema_from_file(path + '/vineyard.json') 
+    @load_schema_from_file('./vineyard.json')
     @listen(this, 'connect.query', 'on_connect_query') 
-    json = file_get_contents(path + '/property_types.json') 
-    property_types = json_decode(json) 
+    json = fs.readFileSync('./property_types.json', "ascii")
+    property_types = JSON.parse(json)
     for name, info of property_types
       type = Property_Type.create(name, info, @property_types) 
       @property_types[name] = type 
@@ -63,31 +71,31 @@ Property_Type = Meta_Object.subclass 'Property_Type',
       all = subset
       
 
-    for object of subset
+    for object in subset
       # Convert a string reference into a direct reference to the actual object
       if object.parent
         object.parent = all[object.parent] 
-        @check_primary_key() 
+        object.check_primary_key() 
 
-    for object of subset
-      @update_core_properties() 
+    for object in subset
+      object.update_core_properties() 
 
   load_schema_from_file: (schema_file)->
-    json = file_get_contents(schema_file) 
+    json = fs.readFileSync(schema_file, "ascii")
     if json == false
-      throw Exception.create('Could not find schema file: ' + schema_file)
+      throw new Error('Could not find schema file: ' + schema_file)
 
-    data = json_decode(json) 
-    if is_object(data)
-      throw Exception.create('Invalid JSON in file $schema_file.')
+    data = JSON.parse(json)
+    if !data || typeof data != 'object'
+      throw new Error('Invalid JSON in file $schema_file.')
 
     @parse_schema(data) 
 
   parse_schema: (data)->
-    if isset(data.trellises)
+    if data.trellises
       @load_trellises(data.trellises) 
 
-    if isset(data.tables)
+    if data.tables
       @load_tables(data.tables) 
 
   load_schema_from_database: ->
@@ -117,7 +125,7 @@ WHERE property.trellis = ?
       properties = @query_objects(sql, [row.id]) 
       row.properties = [] 
       if row.plural
-        unset(row.plural)
+        delete row.plural
         
 
       for property of properties
@@ -131,16 +139,16 @@ WHERE property.trellis = ?
           
 
       trellis = Trellis.create(row.name, this) 
-      @load_from_object(row) 
+      trellis.load_from_object(row) 
       trellises[row.name] = trellis 
 
-    @trellises = array_merge(@trellises, trellises) 
+    @trellises = MetaHub.extend(@trellises, trellises) 
     @initialize_trellises(trellises, @trellises) 
 
   load_map: (map_file)->
     json = file_get_contents(map_file) 
     data = json_decode(json) 
-    if isset(data.map)
+    if data.map
       for key, map of data.map
         trellis = @trellises[key] 
         if trellis
@@ -152,34 +160,31 @@ WHERE property.trellis = ?
   load_tables: (tables)->
     for key, object of tables
       table = Table.create(key, this) 
-      @load_from_schema(object) 
+      table.load_from_schema(object) 
       @tables[key] = table 
 
   load_trellises: (trellises)->
     for key, object of trellises
       trellis = Trellis.create(key, this) 
-      @load_from_object(object) 
-      if isset(trellis.id)
+      trellis.load_from_object(object) 
+      if trellis.id
         trellis.id = count(@trellises) 
 
       @trellises[key] = trellis 
 
-    @initialize_trellises(@trellises, @trellises) 
-    if isset(data.maps)
-      @maps = data.maps
-      
+    @initialize_trellises(@trellises, @trellises)
 
   create_query: (trellis, include_links)->
     if include_links == undefined
       include_links = true
     if is_string(trellis)
       if @trellises[trellis]
-        throw Exception.create('Class '' + trellis + '' does not exist')
+        throw Exception.create('Class ' + trellis + ' does not exist')
 
       trellis = @trellises[trellis] 
 
     for key, query of @queries
-      if @is_a(key)
+      if trellis.is_a(key)
         return new query(trellis, include_links)
 
     return Query.create(trellis, include_links)
@@ -194,16 +199,16 @@ WHERE property.trellis = ?
     switch type
       when 'int'
         return parseInt(value)
-        break 
+        break
       when 'string', 'text', 'reference'
         return value
-        break 
+        break
       when 'bool'
         return str_to_bool(value)
-        break 
+        break
       when 'double'
         return parseFloat(value)
-        break 
+        break
 
     return null
 
@@ -211,10 +216,15 @@ WHERE property.trellis = ?
     result = {} 
     result.trellises = [] 
     for key, trellis of @trellises
-      result.trellises[key] = @get_data() 
+      result.trellises[key] = trellis.get_data() 
 
     return result
 
   to_json: ->
     result = @prepare_for_serialization() 
     return JSON.stringify(result)
+
+ module.exports.import_into = (target)->
+   target.MetaHub = MetaHub
+   target.Meta_Object = Meta_Object
+   target.Ground = module.exports

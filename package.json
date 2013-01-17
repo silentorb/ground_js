@@ -2,7 +2,7 @@
   "name": "ground_js",
   "version": "0.0.0",
   "description": "Ground Libraries for Node.js",
-  "main": "index.js",
+  "main": "Ground.coffee",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
