@@ -49,7 +49,7 @@ module.exports = Meta_Object.subclass 'Ground',
     json = fs.readFileSync('./property_types.json', "ascii")
     property_types = JSON.parse(json)
     for name, info of property_types
-      type = Property_Type.create(name, info, @property_types) 
+      type = Property_Type.create(name, info, @property_types)
       @property_types[name] = type 
 
   add_module: (name)->
@@ -228,3 +228,4 @@ WHERE property.trellis = ?
    target.MetaHub = MetaHub
    target.Meta_Object = Meta_Object
    target.Ground = module.exports
+   target.Property_Type = Property_Type
