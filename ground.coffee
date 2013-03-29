@@ -8,38 +8,35 @@ Ground_Database = require 'ground_db'
 #Table = require './node_modules/ground_db/Ground_Database.coffee'
 #fs = require 'fs'
 
-#Property_Type = Meta_Object.subclass 'Property_Type',
-#  name: ''
-#  property_class: ''
-#  field_type: ''
-#  'default': null
-#  initialize: (name, info, types)->
-#    # Transferring parent properties is done before any other assignment
-#    
-#        
-#    # so the MetaHub::extend() can be overridden.
-#    if info.parent
-#      parent = types[info.parent] 
-#      MetaHub.extend(this, parent) 
-#      @parent = parent 
-#
-#    else
-#      @field_type = info.field_type 
-#
-#    @name = name 
-#    @property_class = 'Bloom_Property' 
-#    if info['default']
-#      this['default'] = info['default']
+Property_Type = Meta_Object.subclass 'Property_Type',
+  name: ''
+  property_class: ''
+  field_type: ''
+  'default': null
+  initialize: (name, info, types)->
+    # Transferring parent properties is done before any other assignment
+    
+        
+    # so the MetaHub::extend() can be overridden.
+    if info.parent
+      parent = types[info.parent] 
+      MetaHub.extend(this, parent) 
+      @parent = parent 
+
+    else
+      @field_type = info.field_type 
+
+    @name = name 
+    @property_class = 'Bloom_Property' 
+    if info['default']
+      this['default'] = info['default']
 
 module.exports = Meta_Object.subclass 'Ground',
-  
   trellises: []
-
 #  map: []
 #  queries: []
-#  property_types: []
-#  db: ''
-#  # Eventually Ground MetaHub will support optimize_getter()
+  property_types: []
+  db: ''
 #  modules: []
 #  initialize: (database)->
 #    if database == undefined
@@ -234,4 +231,4 @@ module.exports = Meta_Object.subclass 'Ground',
 #   target.Ground = module.exports
 #   target.Property_Type = Property_Type
 
-module.exports.Ground_Database = Ground_Database
+module.exports.Database = Ground_Database
