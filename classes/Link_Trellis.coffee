@@ -5,7 +5,7 @@ Link_Trellis = Meta_Object.subclass 'Link_Trellis',
   id_suffix: ''
   initialize: (first_property, second_property, ground)->
     @ground = ground 
-    @db = ground.db 
+    @ground = ground.db
     other_table = second_property.get_table_name() 
     temp = [other_table, first_property.get_table_name()] 
     sort(temp) 
