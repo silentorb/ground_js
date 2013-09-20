@@ -3,10 +3,7 @@
  * User: Chris Johnson
  * Date: 9/18/13
  */
-/// <reference path="Ground.ts"/>
-/// <reference path="Property.ts"/>
-/// <reference path="db/Table.ts"/>
-
+/// <reference path="references.ts"/>
 module Ground_JS {
   export class Trellis {
     plural:string;

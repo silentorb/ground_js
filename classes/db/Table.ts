@@ -2,8 +2,7 @@
  * User: Chris Johnson
  * Date: 9/19/13
  */
-/// <reference path="../Ground.ts"/>
-/// <reference path="../Trellis.ts"/>
+/// <reference path="../references.ts"/>
 
 module Ground_JS {
   export class Table {

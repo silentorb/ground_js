@@ -8,7 +8,7 @@ config["My tests"] = {
 //        "lib/**/*.js"      // Glob patterns supported
     ],
     tests: [
-        "test/tests/*-test.coffee"
+        "test/tests/*-test.js"
     ]
 };
 

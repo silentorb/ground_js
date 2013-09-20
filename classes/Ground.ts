@@ -5,9 +5,7 @@
  */
 /// <reference path="../../../defs/node.d.ts"/>
 /// <reference path="../../metahub/metahub.ts"/>
-/// <reference path="db/Database.ts"/>
-/// <reference path="db/Table.ts"/>
-/// <reference path="Trellis.ts"/>
+/// <reference path="references.ts"/>
 
 import fs = require('fs');
 

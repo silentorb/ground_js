@@ -4,10 +4,10 @@
  * Date: 9/18/13
  * Time: 5:40 PM
  */
- /// <reference path="Trellis.ts"/>
+  /// <reference path="references.ts"/>
 
 module Ground_JS{
-export  class Property {
+  export class Property {
     public name:string;
     public parent:Trellis;
     public type:string;
@@ -19,13 +19,12 @@ export  class Property {
     public is_private:boolean = false;
     public is_virtual:boolean = false;
 
-    constructor(name:string, source, trellis:Trellis) {
-//      MetaHub.extend(this, source);
+    constructor(name:string, source, trellis) {
+      MetaHub.extend(this, source);
 
       this.name = name;
       this.parent = trellis;
     }
-
 
   }
 }

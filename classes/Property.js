@@ -4,7 +4,7 @@
 * Date: 9/18/13
 * Time: 5:40 PM
 */
-/// <reference path="Trellis.ts"/>
+/// <reference path="references.ts"/>
 var Ground_JS;
 (function (Ground_JS) {
     var Property = (function () {
@@ -12,7 +12,8 @@ var Ground_JS;
             this.is_readonly = false;
             this.is_private = false;
             this.is_virtual = false;
-            //      MetaHub.extend(this, source);
+            MetaHub.extend(this, source);
+
             this.name = name;
             this.parent = trellis;
         }

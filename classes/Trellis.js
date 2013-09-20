@@ -3,9 +3,7 @@
 * User: Chris Johnson
 * Date: 9/18/13
 */
-/// <reference path="Ground.ts"/>
-/// <reference path="Property.ts"/>
-/// <reference path="db/Table.ts"/>
+/// <reference path="../Ground_JS.ts"/>
 var Ground_JS;
 (function (Ground_JS) {
     var Trellis = (function () {
@@ -20,7 +18,7 @@ var Ground_JS;
             this.name = name;
         }
         Trellis.prototype.add_property = function (name, source) {
-            var property = new Ground_JS.Property(name, source, this);
+            var property = new Property(name, source, this);
             this.properties[name] = property;
             this.all_properties[name] = property;
             return property;
@@ -43,7 +41,20 @@ else
             if (this.plural)
                 return this.plural;
 
-            return this.name + '';
+            return this.name + 's';
+        };
+
+        Trellis.prototype.load_from_object = function (source) {
+            for (var name in source) {
+                var self = this;
+                if (name != 'name' && name != 'properties' && self.hasOwnProperty(name) && source[name] !== undefined) {
+                    this[name] = source[name];
+                }
+            }
+
+            for (name in source.properties) {
+                this.add_property(name, source.properties[name]);
+            }
         };
         return Trellis;
     })();

@@ -1,0 +1,1 @@
+tsc Ground_JS.ts Ground.ts Trellis.ts --out output.js --declaration --module commonjs

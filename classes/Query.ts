@@ -3,8 +3,8 @@
  * User: Chris Johnson
  * Date: 9/18/13
  */
-/// <reference path="Trellis.ts"/>
-/// <reference path="Ground.ts"/>
+/// <reference path="references.ts"/>
+
 module Ground_JS {
   class Query {
     ground:Ground;
@@ -36,3 +36,4 @@ module Ground_JS {
         this.base_path = this.trellis.name;
     }
   }
+}
