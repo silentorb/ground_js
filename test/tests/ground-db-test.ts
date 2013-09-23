@@ -2,30 +2,30 @@
  * User: Chris Johnson
  * Date: 9/19/13
  */
-/// <reference path="../Fixture.ts"/>
+/// <reference path="../Ground_Test.ts"/>
 /// <reference path="../../../../defs/buster.d.ts"/>
+import Ground_Test = require('../Ground_Test');
 
-var buster, db, fixture, settings;
-
-buster = require("buster");
-
-settings = {
-  "test": {
-    host: "192.168.1.100",
-    user: "root",
-    password: "",
-    database: "ground_test"
-  }
-};
+var buster = require("buster");
+//var assert = buster.assert;
 
 buster.testCase("Database test", {
+
   setUp: function (done) {
-    var fixture = new Ground_Test.Fixture('test', settings);
-    db.drop_all_tables()
-      .then(done);
+    var fixture = new Ground_Test.Fixture('test');
+    this.db = fixture.ground.db;
+    var stack = new Error().stack
+    console.log( stack )
+    this.db.drop_all_tables()
+      .then(()=>{console.log('finished');done()});
   },
-  "test query rows": function (done) {
-    done()
+//  "test drop all tables": function (done) {
+//    this.db.get_tables().then(done((tables) => {
+//      console.log('b');
+//      assert.equals(tables.length,0);
+//    }));
+//  }
+    "a": function() {
+    assert(true);
   }
 });
-

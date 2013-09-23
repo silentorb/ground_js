@@ -3,12 +3,14 @@
  * User: Chris Johnson
  * Date: 9/18/13
  */
+
 /// <reference path="references.ts"/>
-module Ground_JS {
+
+module Ground {
   export class Trellis {
     plural:string;
     parent:Trellis;
-    ground:Ground;
+    ground:Core;
     table:Table;
     name:string;
     primary_key:string = 'id';
@@ -18,7 +20,7 @@ module Ground_JS {
     all_properties:Array<Property> = new Array<Property>();
     is_virtual:boolean = false;
 
-    constructor(name:string, ground:Ground) {
+    constructor(name:string, ground:Core) {
       this.ground = ground;
       this.name = name;
     }

@@ -3,9 +3,9 @@
 * User: Chris Johnson
 * Date: 9/18/13
 */
-/// <reference path="../Ground_JS.ts"/>
-var Ground_JS;
-(function (Ground_JS) {
+/// <reference path="references.ts"/>
+var Ground;
+(function (Ground) {
     var Trellis = (function () {
         function Trellis(name, ground) {
             this.primary_key = 'id';
@@ -18,7 +18,7 @@ var Ground_JS;
             this.name = name;
         }
         Trellis.prototype.add_property = function (name, source) {
-            var property = new Property(name, source, this);
+            var property = new Ground.Property(name, source, this);
             this.properties[name] = property;
             this.all_properties[name] = property;
             return property;
@@ -58,6 +58,6 @@ else
         };
         return Trellis;
     })();
-    Ground_JS.Trellis = Trellis;
-})(Ground_JS || (Ground_JS = {}));
+    Ground.Trellis = Trellis;
+})(Ground || (Ground = {}));
 //# sourceMappingURL=Trellis.js.map

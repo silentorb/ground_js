@@ -3,8 +3,7 @@
 * User: Chris Johnson
 * Date: 9/18/13
 */
-/// <reference path="Trellis.ts"/>
-/// <reference path="Ground.ts"/>
+/// <reference path="references.ts"/>
 var Ground;
 (function (Ground) {
     var Query = (function () {
@@ -19,6 +18,7 @@ var Ground;
             this.include_links = true;
             this.fields = [];
             this.arguments = [];
+            this.expansions = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
             this.expansions = this.ground.expansions;
@@ -26,8 +26,8 @@ var Ground;
             this.main_table = trellis.get_table_name();
             if (base_path)
                 this.base_path = base_path;
-else {
-            }
+else
+                this.base_path = this.trellis.name;
         }
         Query.log_queries = false;
         return Query;

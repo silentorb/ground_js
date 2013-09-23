@@ -3,8 +3,9 @@
 * Date: 9/19/13
 */
 /// <reference path="../references.ts"/>
-var Ground_JS;
-(function (Ground_JS) {
+/// <reference path="../../../metahub/metahub.ts"/>
+var Ground;
+(function (Ground) {
     var Table = (function () {
         function Table(name, ground) {
             this.properties = [];
@@ -20,6 +21,6 @@ var Ground_JS;
         };
         return Table;
     })();
-    Ground_JS.Table = Table;
-})(Ground_JS || (Ground_JS = {}));
+    Ground.Table = Table;
+})(Ground || (Ground = {}));
 //# sourceMappingURL=Table.js.map

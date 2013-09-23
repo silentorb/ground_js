@@ -3,13 +3,14 @@
  * User: Chris Johnson
  * Date: 9/18/13
  */
-/// <reference path="../../../defs/node.d.ts"/>
-/// <reference path="../../metahub/metahub.ts"/>
+
+/// <reference path="require.ts"/>
 /// <reference path="references.ts"/>
+/// <reference path="db/Database.ts"/>
+/// <reference path="Trellis.ts"/>
+/// <reference path="../defs/node.d.ts"/>
 
-import fs = require('fs');
-
-module Ground_JS {
+module Ground {
 
   export class Property_Type {
     name:string;
@@ -37,16 +38,16 @@ module Ground_JS {
     }
   }
 
-  export class Ground extends MetaHub.Meta_Object {
+  export class Core {
     trellises:Trellis[] = [];
     tables:Table[] = [];
-    views:Array = [];
+    views:Array<any> = [];
     property_types:Property_Type[] = [];
     db:Database;
-    expansions:Array = []
+    expansions:any[] = []
 
     constructor(config, db_name:string) {
-      super();
+//      super();
       this.db = new Database(config, db_name);
     }
 
@@ -71,13 +72,14 @@ module Ground_JS {
     }
 
     static load_json_from_file(filename:string) {
+      var fs = require('fs')
       var json = fs.readFileSync(filename, 'ascii');
       if (!json)
         throw new Error('Could not find schmea file: ' + filename)
     }
 
     load_schema_from_file(filename:string) {
-      var data = Ground.load_json_from_file(filename);
+      var data = Core.load_json_from_file(filename);
       this.parse_schema(data);
     }
 
@@ -93,6 +95,7 @@ module Ground_JS {
     }
 
     load_property_types(filename:string) {
+      var fs = require('fs');
       var json = fs.readFileSync(filename, 'ascii');
       var property_types = JSON.parse(json);
       for (var name in property_types) {
@@ -101,7 +104,7 @@ module Ground_JS {
       }
     }
 
-    load_tables(tables:Array) {
+    load_tables(tables:Array<any>) {
       for (var name in tables) {
         var table = new Table(name, this);
         table.load_from_schema(tables[name]);
@@ -120,3 +123,5 @@ module Ground_JS {
     }
   }
 }
+
+module.exports = Ground

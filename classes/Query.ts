@@ -5,9 +5,9 @@
  */
 /// <reference path="references.ts"/>
 
-module Ground_JS {
+module Ground {
   class Query {
-    ground:Ground;
+    ground:Core;
     private trellises:Array = [];
     main_table:string;
     joins:Array = [];
@@ -22,6 +22,7 @@ module Ground_JS {
     fields:Array = [];
     base_path:string;
     arguments:Array = [];
+    expansions:any[] = []
     static log_queries:boolean = false;
 
     constructor(trellis:Trellis, base_path:string = null) {

@@ -1,0 +1,1 @@
+tsc Ground_Test.ts --declaration --module commonjs

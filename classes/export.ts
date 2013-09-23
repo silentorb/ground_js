@@ -4,6 +4,3 @@
  */
 /// <reference path="references.ts"/>
 
-export module Ground_JS {
-
-}
