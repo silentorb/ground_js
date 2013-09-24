@@ -10,9 +10,9 @@ var Ground;
         function Trellis(name, ground) {
             this.primary_key = 'id';
             // Property that are specific to this trellis and not inherited from a parent trellis
-            this.properties = new Array();
+            this.properties = [];
             // Every property including inherited properties
-            this.all_properties = new Array();
+            this.all_properties = [];
             this.is_virtual = false;
             this.ground = ground;
             this.name = name;
@@ -22,6 +22,34 @@ var Ground;
             this.properties[name] = property;
             this.all_properties[name] = property;
             return property;
+        };
+
+        Trellis.prototype.check_primary_key = function () {
+            if (!this.properties[this.primary_key] && this.parent) {
+                var property = this.parent.properties[this.parent.primary_key];
+                this.properties[this.primary_key] = new Ground.Property(this.primary_key, property, this);
+            }
+        };
+
+        Trellis.prototype.clone_property = function (property_name, target_trellis) {
+            if (this.properties[property_name] === undefined)
+                throw new Error(this.name + ' does not have a property named ' + property_name + '.');
+
+            target_trellis.add_property(property_name, this.properties[property_name]);
+        };
+
+        Trellis.prototype.get_core_properties = function () {
+            var result = [];
+            for (var i in this.properties) {
+                var property = this.properties[i];
+                if (property.type != 'list')
+                    result[i] = property;
+            }
+
+            return result;
+            //      return Enumerable.From(this.properties).Where(
+            //        (p) => p.type != 'list'
+            //      );
         };
 
         Trellis.prototype.get_table_name = function () {
@@ -46,8 +74,7 @@ else
 
         Trellis.prototype.load_from_object = function (source) {
             for (var name in source) {
-                var self = this;
-                if (name != 'name' && name != 'properties' && self.hasOwnProperty(name) && source[name] !== undefined) {
+                if (name != 'name' && name != 'properties' && this[name] !== undefined && source[name] !== undefined) {
                     this[name] = source[name];
                 }
             }
@@ -55,6 +82,16 @@ else
             for (name in source.properties) {
                 this.add_property(name, source.properties[name]);
             }
+        };
+
+        Trellis.prototype.set_parent = function (parent) {
+            this.parent = parent;
+
+            if (!parent.primary_key)
+                throw new Error(parent.name + ' needs a primary key when being inherited by ' + this.name + '.');
+
+            parent.clone_property(parent.primary_key, this);
+            this.primary_key = parent.primary_key;
         };
         return Trellis;
     })();

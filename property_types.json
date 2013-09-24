@@ -12,7 +12,7 @@
     "default" : ""
   },
   "bool" : {
-    "field_type" : "BIT",
+    "field_type" : "TINYINT(4)",
     "default" : true
   },
   "reference" : {
@@ -21,7 +21,24 @@
   },
   "datetime" : {
     "field_type" : "INT(11)",
+    "default" : 0,
+    "parent" : "int"
+  },
+  "date" : {
+    "parent" : "datetime"
+  },
+  "float": {
+    "field_type" : "FLOAT",
     "default" : 0
+  },
+  "decimal": {
+    "parent" : "float",
+    "field_type" : "DECIMAL",
+    "default" : 0
+  },
+  "money": {
+    "parent": "float",
+    "field_type" : "DECIMAL(19,2)"
   },
   "created": {
     "parent": "datetime",

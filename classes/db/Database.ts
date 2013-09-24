@@ -2,7 +2,7 @@
  * User: Chris Johnson
  * Date: 9/19/13
  */
-/// <reference path="../require.ts"/>
+/// <reference path="../references.ts"/>
 /// <reference path="../../defs/deferred.d.ts"/>
 /// <reference path="../../defs/mysql.d.ts"/>
 
@@ -18,29 +18,33 @@ module Ground {
       this.database = database;
     }
 
+    create_table(trellis:Trellis):Promise {
+      if (!trellis)
+        throw new Error('Empty object was passed to create_table().');
+
+      var table = Table.create_from_trellis(trellis);
+      var sql = table.create_sql_from_trellis(trellis);
+      return this.query(sql).then(()=>table);
+    }
+
     drop_all_tables():Promise {
       return this.query('SET foreign_key_checks = 0')
         .then(this.get_tables()
-            .map((table) => {
-              console.log('table', table);
-              return this.query('DROP TABLE IF EXISTS ' + table);
-            }))
-        .then(this.query('SET foreign_key_checks = 1'));
+          .map((table) => {
+            console.log('table', table);
+            return this.query('DROP TABLE IF EXISTS ' + table);
+          }))
+        .then(()=> this.query('SET foreign_key_checks = 1'));
     }
 
     get_tables():Promise {
-      var def = new deferred();
-      console.log('a')
-      this.query('SHOW TABLES')
-        .then((tables) => def.resolve(tables.map((row) => {
-          console.log('test')
+      return this.query('SHOW TABLES')
+        .map((row) => {
           for (var i in row)
             return row[i];
 
           return null;
-        })));
-
-      return def.promise;
+        });
     }
 
     query(sql:string):any {
@@ -49,14 +53,16 @@ module Ground {
       connection = mysql.createConnection(this.settings[this.database]);
       connection.connect();
       connection.query(sql, (err, rows, fields) => {
-        if (err)
+        if (err) {
+          console.log(sql);
           throw err;
-
-        console.log(sql, rows)
+        }
+//        console.log(sql, rows)
         def.resolve(rows, fields);
 
         return null;
       });
+      connection.end();
 
       return def.promise;
     }

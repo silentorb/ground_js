@@ -15,9 +15,9 @@ module Ground {
     name:string;
     primary_key:string = 'id';
     // Property that are specific to this trellis and not inherited from a parent trellis
-    properties:Array<Property> = new Array<Property>();
+    properties:Property[] = [];
     // Every property including inherited properties
-    all_properties:Array<Property> = new Array<Property>();
+    all_properties:Property[] = [];
     is_virtual:boolean = false;
 
     constructor(name:string, ground:Core) {
@@ -30,6 +30,34 @@ module Ground {
       this.properties[name] = property;
       this.all_properties[name] = property;
       return property;
+    }
+
+    check_primary_key() {
+      if (!this.properties[this.primary_key] && this.parent) {
+        var property = this.parent.properties[this.parent.primary_key];
+        this.properties[this.primary_key] = new Property(this.primary_key, property, this);
+      }
+    }
+
+    clone_property(property_name:string, target_trellis:Trellis) {
+      if (this.properties[property_name] === undefined)
+        throw new Error(this.name + ' does not have a property named ' + property_name + '.');
+
+      target_trellis.add_property(property_name, this.properties[property_name]);
+    }
+
+    get_core_properties():Property[] {
+      var result = []
+      for (var i in this.properties) {
+        var property = this.properties[i];
+        if (property.type != 'list')
+          result[i] = property;
+      }
+
+      return result;
+//      return Enumerable.From(this.properties).Where(
+//        (p) => p.type != 'list'
+//      );
     }
 
     get_table_name():string {
@@ -55,8 +83,7 @@ module Ground {
 
     load_from_object(source) {
       for (var name in source) {
-        var self = <any> this;
-        if (name != 'name' && name != 'properties' && self.hasOwnProperty(name) && source[name] !== undefined) {
+        if (name != 'name' && name != 'properties' && this[name] !== undefined && source[name] !== undefined) {
           this[name] = source[name];
         }
       }
@@ -64,6 +91,16 @@ module Ground {
       for (name in source.properties) {
         this.add_property(name, source.properties[name]);
       }
+    }
+
+    set_parent(parent:Trellis) {
+      this.parent = parent;
+
+      if (!parent.primary_key)
+        throw new Error(parent.name + ' needs a primary key when being inherited by ' + this.name + '.');
+
+      parent.clone_property(parent.primary_key, this);
+      this.primary_key = parent.primary_key;
     }
   }
 }

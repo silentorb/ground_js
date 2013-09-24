@@ -1,4 +1,4 @@
-/// <reference path="../ground.d.ts" />
+/// <reference path="../classes/references.d.ts" />
 export declare class Fixture {
     public ground: Ground.Core;
     public test;

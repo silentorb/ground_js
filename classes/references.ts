@@ -8,5 +8,8 @@
 ///<reference path="db/Table.ts"/>
 ///<reference path="Property.ts"/>
 
+///<reference path="../defs/linq.d.ts"/>
+
+
 
 

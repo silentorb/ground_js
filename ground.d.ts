@@ -1,12 +1,14 @@
 /// <reference path="defs/deferred.d.ts" />
 /// <reference path="defs/mysql.d.ts" />
 /// <reference path="defs/node.d.ts" />
+/// <reference path="defs/linq.d.ts" />
 declare var deferred;
 declare module Ground {
     class Database {
         public settings: {};
         public database: string;
         constructor(settings: {}, database: string);
+        public create_table(trellis: Ground.Trellis): Promise;
         public drop_all_tables(): Promise;
         public get_tables(): Promise;
         public query(sql: string): any;
@@ -25,8 +27,12 @@ declare module Ground {
         public is_virtual: boolean;
         constructor(name: string, ground: Ground.Core);
         public add_property(name: string, source): Ground.Property;
+        public check_primary_key(): void;
+        public clone_property(property_name: string, target_trellis: Trellis): void;
+        public get_core_properties(): Ground.Property[];
         public get_table_name(): string;
         public load_from_object(source): void;
+        public set_parent(parent: Trellis): void;
     }
 }
 declare module Ground {
@@ -38,6 +44,7 @@ declare module Ground {
         public parent: Property_Type;
         public db: Ground.Database;
         constructor(name: string, info, types: Property_Type[]);
+        public get_field_type();
     }
     class Core {
         public trellises: Ground.Trellis[];
@@ -47,14 +54,14 @@ declare module Ground {
         public db: Ground.Database;
         public expansions: any[];
         constructor(config, db_name: string);
-        public add_trellis(name: string, object, initialize_parent?: boolean): Ground.Trellis;
+        public add_trellis(name: string, source, initialize_parent?: boolean): Ground.Trellis;
         public initialize_trellises(subset: Ground.Trellis[], all?): void;
-        static load_json_from_file(filename: string): void;
-        public load_schema_from_file(filename: string): void;
-        public parse_schema(data): void;
+        static load_json_from_file(filename: string);
         public load_property_types(filename: string): void;
+        public load_schema_from_file(filename: string): void;
         public load_tables(tables: any[]): void;
         public load_trellises(trellises: Ground.Trellis[]): void;
+        public parse_schema(data): void;
     }
 }
 /**
@@ -72,6 +79,8 @@ declare module MetaHub {
     function guid(): string;
     function clone(source, names): {};
     function get_connection(a, b);
+    function map(source, action): {};
+    function map_to_array(source, action): any[];
     class Meta_Object {
         public is_meta_object: boolean;
         private events;
@@ -110,7 +119,14 @@ declare module Ground {
         public ground: Ground.Core;
         public db_name: string;
         public trellis: Ground.Trellis;
+        public primary_keys: any[];
         constructor(name: string, ground: Ground.Core);
+        public connect_trellis(trellis: Ground.Trellis): void;
+        static create_from_trellis(trellis: Ground.Trellis, ground?: Ground.Core): Table;
+        static create_sql_from_array(table_name: string, source: any[], primary_keys?: any[], indexes?: any[]): string;
+        public create_sql_from_trellis(trellis: Ground.Trellis): string;
+        static format_value(value);
+        static generate_index_sql(name: string, index): string;
         public load_from_schema(source): void;
     }
 }
@@ -127,5 +143,9 @@ declare module Ground {
         public is_private: boolean;
         public is_virtual: boolean;
         constructor(name: string, source, trellis: Ground.Trellis);
+        public get_field_name(): string;
+        public get_field_override(create_if_missing?: boolean);
+        public get_field_type();
+        public get_property_type(): Ground.Property_Type;
     }
 }

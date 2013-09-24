@@ -2,7 +2,7 @@
 * User: Chris Johnson
 * Date: 9/19/13
 */
-/// <reference path="../require.ts"/>
+/// <reference path="../references.ts"/>
 /// <reference path="../../defs/deferred.d.ts"/>
 /// <reference path="../../defs/mysql.d.ts"/>
 var deferred = require('deferred');
@@ -14,28 +14,34 @@ var Ground;
             this.settings = settings;
             this.database = database;
         }
+        Database.prototype.create_table = function (trellis) {
+            if (!trellis)
+                throw new Error('Empty object was passed to create_table().');
+
+            var table = Ground.Table.create_from_trellis(trellis);
+            var sql = table.create_sql_from_trellis(trellis);
+            return this.query(sql).then(function () {
+                return table;
+            });
+        };
+
         Database.prototype.drop_all_tables = function () {
             var _this = this;
             return this.query('SET foreign_key_checks = 0').then(this.get_tables().map(function (table) {
                 console.log('table', table);
                 return _this.query('DROP TABLE IF EXISTS ' + table);
-            })).then(this.query('SET foreign_key_checks = 1'));
+            })).then(function () {
+                return _this.query('SET foreign_key_checks = 1');
+            });
         };
 
         Database.prototype.get_tables = function () {
-            var def = new deferred();
-            console.log('a');
-            this.query('SHOW TABLES').then(function (tables) {
-                return def.resolve(tables.map(function (row) {
-                    console.log('test');
-                    for (var i in row)
-                        return row[i];
+            return this.query('SHOW TABLES').map(function (row) {
+                for (var i in row)
+                    return row[i];
 
-                    return null;
-                }));
+                return null;
             });
-
-            return def.promise;
         };
 
         Database.prototype.query = function (sql) {
@@ -44,14 +50,17 @@ var Ground;
             connection = mysql.createConnection(this.settings[this.database]);
             connection.connect();
             connection.query(sql, function (err, rows, fields) {
-                if (err)
+                if (err) {
+                    console.log(sql);
                     throw err;
+                }
 
-                console.log(sql, rows);
+                //        console.log(sql, rows)
                 def.resolve(rows, fields);
 
                 return null;
             });
+            connection.end();
 
             return def.promise;
         };
@@ -71,9 +80,9 @@ var Ground;
         function Trellis(name, ground) {
             this.primary_key = 'id';
             // Property that are specific to this trellis and not inherited from a parent trellis
-            this.properties = new Array();
+            this.properties = [];
             // Every property including inherited properties
-            this.all_properties = new Array();
+            this.all_properties = [];
             this.is_virtual = false;
             this.ground = ground;
             this.name = name;
@@ -83,6 +92,34 @@ var Ground;
             this.properties[name] = property;
             this.all_properties[name] = property;
             return property;
+        };
+
+        Trellis.prototype.check_primary_key = function () {
+            if (!this.properties[this.primary_key] && this.parent) {
+                var property = this.parent.properties[this.parent.primary_key];
+                this.properties[this.primary_key] = new Ground.Property(this.primary_key, property, this);
+            }
+        };
+
+        Trellis.prototype.clone_property = function (property_name, target_trellis) {
+            if (this.properties[property_name] === undefined)
+                throw new Error(this.name + ' does not have a property named ' + property_name + '.');
+
+            target_trellis.add_property(property_name, this.properties[property_name]);
+        };
+
+        Trellis.prototype.get_core_properties = function () {
+            var result = [];
+            for (var i in this.properties) {
+                var property = this.properties[i];
+                if (property.type != 'list')
+                    result[i] = property;
+            }
+
+            return result;
+            //      return Enumerable.From(this.properties).Where(
+            //        (p) => p.type != 'list'
+            //      );
         };
 
         Trellis.prototype.get_table_name = function () {
@@ -107,8 +144,7 @@ else
 
         Trellis.prototype.load_from_object = function (source) {
             for (var name in source) {
-                var self = this;
-                if (name != 'name' && name != 'properties' && self.hasOwnProperty(name) && source[name] !== undefined) {
+                if (name != 'name' && name != 'properties' && this[name] !== undefined && source[name] !== undefined) {
                     this[name] = source[name];
                 }
             }
@@ -116,6 +152,16 @@ else
             for (name in source.properties) {
                 this.add_property(name, source.properties[name]);
             }
+        };
+
+        Trellis.prototype.set_parent = function (parent) {
+            this.parent = parent;
+
+            if (!parent.primary_key)
+                throw new Error(parent.name + ' needs a primary key when being inherited by ' + this.name + '.');
+
+            parent.clone_property(parent.primary_key, this);
+            this.primary_key = parent.primary_key;
         };
         return Trellis;
     })();
@@ -150,6 +196,17 @@ var Ground;
                 this.default_value = info.default;
             }
         }
+        Property_Type.prototype.get_field_type = function () {
+            if (this.field_type) {
+                return this.field_type;
+            }
+
+            if (this.parent) {
+                return this.parent.get_field_type();
+            }
+
+            throw new Error(this.name + " could not find valid field type.");
+        };
         return Property_Type;
     })();
     Ground.Property_Type = Property_Type;
@@ -163,12 +220,15 @@ var Ground;
             this.expansions = [];
             //      super();
             this.db = new Ground.Database(config, db_name);
+            var path = require('path');
+            var filename = path.resolve(__dirname, 'property_types.json');
+            this.load_property_types(filename);
         }
-        Core.prototype.add_trellis = function (name, object, initialize_parent) {
+        Core.prototype.add_trellis = function (name, source, initialize_parent) {
             if (typeof initialize_parent === "undefined") { initialize_parent = true; }
             var trellis = new Ground.Trellis(name, this);
-            if (object)
-                trellis.load_from_object(object);
+            if (source)
+                trellis.load_from_object(source);
 
             this.trellises[name] = trellis;
 
@@ -180,41 +240,38 @@ var Ground;
 
         Core.prototype.initialize_trellises = function (subset, all) {
             if (typeof all === "undefined") { all = null; }
-            if (!all)
-                all = subset;
+            all = all || subset;
+
+            for (var i in subset) {
+                var trellis = subset[i];
+                if (typeof trellis.parent === 'string') {
+                    trellis.set_parent(all[trellis.parent]);
+                    trellis.check_primary_key();
+                }
+            }
         };
 
         Core.load_json_from_file = function (filename) {
             var fs = require('fs');
             var json = fs.readFileSync(filename, 'ascii');
             if (!json)
-                throw new Error('Could not find schmea file: ' + filename);
+                throw new Error('Could not find file: ' + filename);
+
+            return JSON.parse(json);
+        };
+
+        Core.prototype.load_property_types = function (filename) {
+            var property_types = Core.load_json_from_file(filename);
+            for (var name in property_types) {
+                var info = property_types[name];
+                var type = new Property_Type(name, info, this.property_types);
+                this.property_types[name] = type;
+            }
         };
 
         Core.prototype.load_schema_from_file = function (filename) {
             var data = Core.load_json_from_file(filename);
             this.parse_schema(data);
-        };
-
-        Core.prototype.parse_schema = function (data) {
-            if (data.trellises)
-                this.load_trellises(data.trellises);
-
-            if (data.views)
-                this.views = this.views.concat(data.views);
-
-            if (data.tables)
-                this.load_tables(data.tables);
-        };
-
-        Core.prototype.load_property_types = function (filename) {
-            var fs = require('fs');
-            var json = fs.readFileSync(filename, 'ascii');
-            var property_types = JSON.parse(json);
-            for (var name in property_types) {
-                var type = new Property_Type(name, property_types[name], this.property_types);
-                this.property_types[name] = type;
-            }
         };
 
         Core.prototype.load_tables = function (tables) {
@@ -233,6 +290,17 @@ var Ground;
             }
 
             this.initialize_trellises(subset, this.trellises);
+        };
+
+        Core.prototype.parse_schema = function (data) {
+            if (data.trellises)
+                this.load_trellises(data.trellises);
+
+            if (data.views)
+                this.views = this.views.concat(data.views);
+
+            if (data.tables)
+                this.load_tables(data.tables);
         };
         return Core;
     })();
@@ -350,6 +418,25 @@ else
         return null;
     }
     MetaHub.get_connection = get_connection;
+
+    function map(source, action) {
+        var result = {};
+        for (var key in source) {
+            result[key] = action(source[key], key, source);
+        }
+
+        return result;
+    }
+    MetaHub.map = map;
+
+    function map_to_array(source, action) {
+        var result = [];
+        for (var key in source) {
+            result.push(action(source[key], key, source));
+        }
+        return result;
+    }
+    MetaHub.map_to_array = map_to_array;
 
     //  function get_variables(source) {
     //    var result = {};
@@ -723,6 +810,142 @@ var Ground;
             this.name = name;
             this.ground = ground;
         }
+        Table.prototype.connect_trellis = function (trellis) {
+            this.trellis = trellis;
+            trellis.table = this;
+        };
+
+        Table.create_from_trellis = function (trellis, ground) {
+            if (typeof ground === "undefined") { ground = null; }
+            if (trellis.table)
+                return trellis.table;
+
+            ground = ground || trellis.ground;
+
+            var table = new Table(trellis.get_table_name(), ground);
+            table.connect_trellis(trellis);
+            return table;
+        };
+
+        Table.create_sql_from_array = function (table_name, source, primary_keys, indexes) {
+            if (typeof primary_keys === "undefined") { primary_keys = []; }
+            if (typeof indexes === "undefined") { indexes = []; }
+            var fields = MetaHub.map_to_array(source, function (field, index) {
+                var name = field.name || index;
+                var type = field.type;
+
+                if (!type)
+                    throw new Error('Field ' + name + 'is missing a type.');
+
+                var field_sql = '`' + name + '` ' + type;
+                if (primary_keys.indexOf(name) > -1) {
+                    if (type.search(/INT/) > -1 && primary_keys[0] == name)
+                        field_sql += ' AUTO_INCREMENT';
+                }
+                if (field.default !== undefined)
+                    field_sql += ' DEFAULT ' + Table.format_value(field.default);
+
+                return field_sql;
+            });
+
+            if (fields.length == 0) {
+                if (source.length > 0)
+                    throw new Error('None of the field arguments for creating ' + table_name + ' have a type.');
+else
+                    throw new Error('Cannot creat a table without fields: ' + table_name + '.');
+            }
+
+            var primary_fields = MetaHub.map_to_array(primary_keys, function (key) {
+                return '`' + key + '`';
+            });
+            fields.push('PRIMARY KEY (' + primary_fields.join(', ') + ")\n");
+            fields = fields.concat(MetaHub.map_to_array(indexes, function (index, key) {
+                return Table.generate_index_sql(key, index);
+            }));
+            var sql = 'CREATE TABLE IF NOT EXISTS `' + table_name + "` (\n";
+            sql += fields.join(",\n") + "\n";
+            sql += ");\n";
+            return sql;
+        };
+
+        Table.prototype.create_sql_from_trellis = function (trellis) {
+            var primary_keys;
+            if (!trellis) {
+                if (!this.trellis)
+                    throw new Error('No valid trellis to generate sql from.');
+
+                trellis = this.trellis;
+            }
+
+            var core_properties = trellis.get_core_properties();
+            if (Object.keys(core_properties).length === 0)
+                throw new Error('Cannot create a table for ' + trellis.name + '. It does not have any core properties.');
+
+            var fields = [];
+            for (var name in core_properties) {
+                var property = core_properties[name];
+                var field_test = this.properties[property.name];
+
+                if (field_test && field_test.share)
+                    continue;
+
+                var field = {
+                    name: property.get_field_name(),
+                    type: property.get_field_type(),
+                    default: undefined
+                };
+
+                if (property.default !== undefined)
+                    field.default = property.default;
+
+                fields.push(field);
+            }
+
+            if (this.primary_keys && this.primary_keys.length > 0) {
+                primary_keys = MetaHub.map(this.primary_keys, function (name) {
+                    if (!trellis.properties[name])
+                        throw new Error('Error creating ' + trellis.name + '; it does not have a primary key named ' + name + '.');
+
+                    return trellis.properties[name].get_field_name();
+                });
+            } else {
+                primary_keys = [trellis.properties[trellis.primary_key].get_field_name()];
+            }
+
+            return Table.create_sql_from_array(this.name, fields, primary_keys, this.indexes);
+        };
+
+        Table.format_value = function (value) {
+            if (typeof value === 'string')
+                return "'" + value + "'";
+
+            if (value === null)
+                return 'NULL';
+
+            if (value === true)
+                return 'TRUE';
+
+            if (value === false)
+                return 'FALSE';
+
+            return value;
+        };
+
+        Table.generate_index_sql = function (name, index) {
+            var name_string, index_fields = index.fields.join('`, `');
+            var result = '';
+
+            if (index.unique) {
+                result += 'UNIQUE ';
+                name_string = '';
+            } else {
+                name_string = '`' + name + '`';
+            }
+
+            result += "KEY " + name_string + ' (`' + index_fields + "`)\n";
+            return result;
+        };
+
         Table.prototype.load_from_schema = function (source) {
             MetaHub.extend(this, source);
             if (this.ground.trellises[this.name]) {
@@ -748,10 +971,59 @@ var Ground;
             this.is_readonly = false;
             this.is_private = false;
             this.is_virtual = false;
-            //      MetaHub.extend(this, source);
+            MetaHub.extend(this, source);
+
             this.name = name;
             this.parent = trellis;
         }
+        Property.prototype.get_field_name = function () {
+            var field = this.get_field_override();
+            if (field) {
+                if (field.name)
+                    return field.name;
+
+                if (field.share)
+                    return field.share;
+            }
+
+            return this.name;
+        };
+
+        Property.prototype.get_field_override = function (create_if_missing) {
+            if (typeof create_if_missing === "undefined") { create_if_missing = false; }
+            var table = this.parent.table;
+            if (!table) {
+                if (!create_if_missing)
+                    return null;
+
+                table = Ground.Table.create_from_trellis(this.parent);
+            }
+
+            if (table.properties[this.name] === undefined) {
+                if (!create_if_missing)
+                    return null;
+
+                table.properties[this.name] = {};
+            }
+
+            return table.properties[this.name];
+        };
+
+        Property.prototype.get_field_type = function () {
+            var property_type = this.get_property_type();
+            if (property_type)
+                return property_type.get_field_type();
+            console.log('types:', Object.keys(this.parent.ground.property_types));
+            throw new Error(this.name + ' could not find valid field type: ' + this.type);
+        };
+
+        Property.prototype.get_property_type = function () {
+            var types = this.parent.ground.property_types;
+            if (types[this.type] !== undefined)
+                return types[this.type];
+
+            return null;
+        };
         return Property;
     })();
     Ground.Property = Property;

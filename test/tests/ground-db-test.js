@@ -10,24 +10,25 @@ var buster = require("buster");
 
 //var assert = buster.assert;
 buster.testCase("Database test", {
-    setUp: function (done) {
+    setUp: function () {
         var fixture = new Ground_Test.Fixture('test');
+        this.ground = fixture.ground;
         this.db = fixture.ground.db;
-        var stack = new Error().stack;
-        console.log(stack);
-        this.db.drop_all_tables().then(function () {
-            console.log('finished');
-            done();
+
+        //    var stack = new Error().stack
+        //    console.log( new Error().stack )
+        return this.db.drop_all_tables();
+    },
+    "drop all tables": function () {
+        return this.db.get_tables().then(function (tables) {
+            assert.equals(tables.length, 0);
         });
     },
-    //  "test drop all tables": function (done) {
-    //    this.db.get_tables().then(done((tables) => {
-    //      console.log('b');
-    //      assert.equals(tables.length,0);
-    //    }));
-    //  }
-    "a": function () {
-        assert(true);
+    "create table": function () {
+        this.ground.load_schema_from_file('test-trellises.json');
+        return this.db.create_table(this.ground.trellises['warrior']).then(this.db.get_tables().then(function (tables) {
+            assert.equals(tables.length, 1);
+        }));
     }
 });
 
