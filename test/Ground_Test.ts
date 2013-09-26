@@ -2,7 +2,7 @@
  * User: Chris Johnson
  * Date: 9/19/13
  */
-  /// <reference path="../classes/references.ts"/>
+/// <reference path="../lib/references.ts"/>
 
 var settings = {
   "test": {
@@ -27,13 +27,28 @@ export class Fixture {
     }
   }
 
-  prepare_database() {
-    var db = this.ground.db;
-    db.drop_all_tables();
-//      db.create_tables(this.ground.trellises);
+  load_schema() {
+    this.ground.load_schema_from_file('test-trellises.json');
   }
 
-  insert_object(trellis, data) {
-//      this.ground.insert_object(trellis, data);
+  prepare_database():Promise {
+    var db = this.ground.db;
+    this.load_schema();
+    return db.drop_all_tables()
+      .then(()=>  db.create_tables(this.ground.trellises))
+  }
+
+  populate():Promise {
+    var db = this.ground.db;
+    return when.resolve(1)
+//    return this.insert_object('warrior', {
+//      name: 'Bob',
+//      race: 'legendary',
+//      age: 31
+//    });
+  }
+
+  insert_object(trellis, data):Promise {
+    return this.ground.insert_object(trellis, data);
   }
 }

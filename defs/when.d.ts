@@ -11,4 +11,6 @@ interface Promise {
 declare module "when" {
 
   function defer(): Deferred;
+  function map(list, action);
+  function all(list);
 }

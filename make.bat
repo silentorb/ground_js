@@ -1,1 +1,1 @@
-tsc classes/export.ts --out ground.js --declaration --module commonjs
+tsc lib/export.ts --out ground.js --declaration --module commonjs
