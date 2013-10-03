@@ -42,6 +42,25 @@ module Ground {
       this.parent = trellis;
     }
 
+    get_data():IProperty_Source {
+      var result:IProperty_Source = {
+        type: this.type
+      };
+      if (this.other_trellis_name)
+        result.trellis = this.other_trellis_name;
+
+      if (this.is_readonly)
+        result.is_readonly = this.is_readonly;
+
+      if (this.is_private)
+        result.is_private = this.is_private;
+
+      if (this.insert)
+        result.insert = this.insert;
+
+      return result;
+    }
+
     get_field_name():string {
       var field = this.get_field_override();
       if (field) {
@@ -82,6 +101,22 @@ module Ground {
       return property_type.get_field_type();
     }
 
+    static get_field_value_sync(value) {
+      if (typeof value === 'string') {
+        value = value.replace(/'/g, "\\'", value);
+        value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
+//        console.log('value', value)
+      }
+      else if (value === true)
+        value = 'TRUE';
+      else if (value === false)
+        value = 'FALSE';
+      if (value === null || value === undefined)
+        value = 'NULL';
+
+      return value;
+    }
+
     get_field_value(value, as_service:boolean = false):Promise {
       if (typeof value === 'string')
         value = value.replace(/'/g, "\\'", value);
@@ -93,12 +128,12 @@ module Ground {
       if (value === null || value === undefined)
         value = 'NULL';
       else if (this.type == 'string' || this.type == 'text') {
-        value = "'" + value.replace(/[\r\n]+/, "\n");
+        value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
       }
-      else if (this.type == 'reference') {
-        var trellis = value.other_trellis || this.other_trellis;
+      else if (this.type == 'reference' && typeof value === 'object') {
+//        console.log(value.other_trellis, this.other_trellis.name)
+        var trellis = this.other_trellis;
         var ground = this.parent.ground;
-        trellis = ground.trellises[trellis];
 
         return ground.update_object(trellis, value, as_service)
           .then((entity)=> {
@@ -152,7 +187,7 @@ module Ground {
       var attributes:IProperty_Source = <IProperty_Source>{}
       attributes.type = 'list';
       attributes.trellis = this.parent.name;
-      return new Property(this.other_trellis.name, attributes, this.other_trellis);
+      return new Property('_' + this.other_trellis.name, attributes, this.other_trellis);
     }
 
     get_property_type():Property_Type {
@@ -161,6 +196,10 @@ module Ground {
         return types[this.type];
 
       return null;
+    }
+
+    get_referenced_trellis():Trellis {
+      return this.other_trellis;
     }
 
     get_relationship():Relationships {
@@ -180,6 +219,10 @@ module Ground {
           return Relationships.one_to_many;
       }
       return Relationships.one_to_one;
+    }
+
+    query():string {
+      return this.parent.get_table_name() + '.' + this.get_field_name();
     }
 
 //    get_referenced_trellis():Trellis {

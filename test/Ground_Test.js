@@ -37,13 +37,18 @@ var Fixture = (function () {
     };
 
     Fixture.prototype.populate = function () {
+        var _this = this;
         var db = this.ground.db;
-        return when.resolve(1);
-        //    return this.insert_object('warrior', {
-        //      name: 'Bob',
-        //      race: 'legendary',
-        //      age: 31
-        //    });
+        return this.insert_object('warrior', {
+            name: 'Bob',
+            race: 'legendary',
+            age: 31
+        }).then(function (object) {
+            return _this.insert_object('character_item', {
+                name: 'sword',
+                owner: object.id
+            });
+        });
     };
 
     Fixture.prototype.insert_object = function (trellis, data) {
@@ -52,5 +57,21 @@ var Fixture = (function () {
     return Fixture;
 })();
 exports.Fixture = Fixture;
+
+var Test = (function () {
+    function Test() {
+        this.timeout = 1000;
+    }
+    return Test;
+})();
+exports.Test = Test;
+
+function setup(test) {
+    var fixture = test.fixture = new Fixture('test');
+    test.ground = fixture.ground;
+    test.timeout = 1000;
+    test.db = fixture.ground.db;
+}
+exports.setup = setup;
 
 //# sourceMappingURL=Ground_Test.js.map

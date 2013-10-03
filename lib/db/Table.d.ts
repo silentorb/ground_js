@@ -14,6 +14,7 @@ declare module Ground {
         public db_name: string;
         public trellis: Ground.Trellis;
         public primary_keys: any[];
+        public query: string;
         constructor(name: string, ground: Ground.Core);
         public connect_trellis(trellis: Ground.Trellis): void;
         static create_from_trellis(trellis: Ground.Trellis, ground?: Ground.Core): Table;

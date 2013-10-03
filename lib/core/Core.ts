@@ -17,11 +17,14 @@
 module Ground {
 
   export interface IProperty_Source {
-    name:string;
+    name?:string;
     type:string;
-    property:string;
-    is_virtual:boolean;
-    trellis:string;
+    insert?:string;
+    is_virtual?:boolean;
+    is_readonly?:boolean;
+    is_private?:boolean;
+    property?:string;
+    trellis?:string;
   }
 
   export interface ITrellis_Source {
@@ -35,6 +38,12 @@ module Ground {
 
   export interface ISeed {
     _deleted?;
+  }
+
+  interface ISchema_Source {
+    trellises?:any[];
+    tables?:any[];
+    views?:any[];
   }
 
   export class Property_Type {
@@ -75,7 +84,7 @@ module Ground {
     }
   }
 
-  export class Core extends MetaHub.Meta_Object{
+  export class Core extends MetaHub.Meta_Object {
     trellises:Trellis[] = [];
     tables:Table[] = [];
     views:Array<any> = [];
@@ -104,6 +113,49 @@ module Ground {
       return trellis;
     }
 
+    convert_value(value, type) {
+      if (!value) {
+        if (type == 'bool')
+          return false;
+
+        return null;
+      }
+
+      var property_type = this.property_types[type];
+
+      if (property_type && property_type.parent)
+        return this.convert_value(value, property_type.parent.name);
+
+      switch (type) {
+        case 'list':
+        case 'reference':
+          return value;
+        case 'int':
+          return Math.round(value);
+        case 'string':
+        case 'text':
+          return value;
+        case 'bool':
+          return Core.to_bool(value);
+        case 'float':
+        case 'double':
+        case 'money':
+          return parseFloat(value.toString());
+      }
+
+      return null;
+    }
+
+//    create_query(trellis:Trellis, base_path = '') {
+//      return new Query(trellis, base_path);
+//    }
+
+    create_query(trellis_name:string, base_path = ''):Query {
+      var trellis = this.sanitize_trellis_argument(trellis_name);
+
+      return new Query(trellis, base_path);
+    }
+
     delete_object(trellis:Trellis, seed:ISeed):Promise {
       var trellis = this.sanitize_trellis_argument(trellis);
       var del = new Delete();
@@ -118,11 +170,12 @@ module Ground {
         if (typeof trellis.parent === 'string') {
           trellis.set_parent(all[trellis.parent]);
           trellis.check_primary_key();
-          for (var j in trellis.properties) {
-            var property = trellis.properties[j];
-            if (property.other_trellis_name)
-              property.other_trellis = this.trellises[property.other_trellis_name];
-          }
+        }
+
+        for (var j in trellis.properties) {
+          var property:Property = trellis.properties[j];
+          if (property.other_trellis_name)
+            property.other_trellis = this.trellises[property.other_trellis_name];
         }
       }
     }
@@ -179,6 +232,13 @@ module Ground {
 
     load_tables(tables:Array<any>) {
       for (var name in tables) {
+        var table_name;
+//        var trellis = this.trellises[name];
+//        if (trellis)
+//          table_name = trellis.get_table_name();
+//        else
+//          table_name = name;
+
         var table = new Table(name, this);
         table.load_from_schema(tables[name]);
         this.tables[name] = table;
@@ -195,7 +255,7 @@ module Ground {
       this.initialize_trellises(subset, this.trellises);
     }
 
-    parse_schema(data) {
+    private parse_schema(data:ISchema_Source) {
       if (data.trellises)
         this.load_trellises(data.trellises);
 
@@ -227,6 +287,14 @@ module Ground {
       }
 
       return trellis;
+    }
+
+    static to_bool(input) {
+      if (typeof input == 'string') {
+        return input.toLowerCase() == 'true';
+      }
+
+      return !!input;
     }
   }
 }

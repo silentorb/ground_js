@@ -40,15 +40,32 @@ export class Fixture {
 
   populate():Promise {
     var db = this.ground.db;
-    return when.resolve(1)
-//    return this.insert_object('warrior', {
-//      name: 'Bob',
-//      race: 'legendary',
-//      age: 31
-//    });
+    return this.insert_object('warrior', {
+      name: 'Bob',
+      race: 'legendary',
+      age: 31
+    })
+      .then((object)=> this.insert_object('character_item', {
+        name: 'sword',
+        owner: object.id
+      }))
   }
 
   insert_object(trellis, data):Promise {
     return this.ground.insert_object(trellis, data);
   }
+}
+
+export class Test {
+  fixture:Fixture;
+  ground:Ground.Core;
+  timeout = 1000;
+  db:Ground.Database;
+}
+
+export function setup(test) {
+  var fixture = test.fixture = new Fixture('test');
+  test.ground = fixture.ground;
+  test.timeout = 1000;
+  test.db = fixture.ground.db;
 }

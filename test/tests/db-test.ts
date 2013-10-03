@@ -8,13 +8,12 @@ import Ground_Test = require('../Ground_Test');
 
 var buster = require("buster");
 //var assert = buster.assert;
+var when = require("when")
 
 buster.testCase("Database test", {
 
   setUp: function () {
-    var fixture = this.fixture = new Ground_Test.Fixture('test');
-    this.ground = fixture.ground;
-    this.db = fixture.ground.db;
+    Ground_Test.setup(this);
 //    var stack = new Error().stack
 //    console.log( new Error().stack )
   },
@@ -30,6 +29,11 @@ buster.testCase("Database test", {
 //      .then(() => this.db.get_tables())
 //      .then((tables) => assert.equals(1, tables.length))
 //  },
+  "map table name": function () {
+    return this.fixture.prepare_database()
+      .then(()=> this.db.query('SELECT * FROM base_objects'))
+      .then((rows)=>assert(true))
+  },
   "populate": function () {
     return this.fixture.prepare_database()
       .then(()=>this.fixture.populate())

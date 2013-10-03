@@ -9,11 +9,11 @@ var Ground_Test = require('../Ground_Test');
 var buster = require("buster");
 
 //var assert = buster.assert;
+var when = require("when");
+
 buster.testCase("Database test", {
     setUp: function () {
-        var fixture = this.fixture = new Ground_Test.Fixture('test');
-        this.ground = fixture.ground;
-        this.db = fixture.ground.db;
+        Ground_Test.setup(this);
         //    var stack = new Error().stack
         //    console.log( new Error().stack )
     },
@@ -29,6 +29,14 @@ buster.testCase("Database test", {
     //      .then(() => this.db.get_tables())
     //      .then((tables) => assert.equals(1, tables.length))
     //  },
+    "map table name": function () {
+        var _this = this;
+        return this.fixture.prepare_database().then(function () {
+            return _this.db.query('SELECT * FROM base_objects');
+        }).then(function (rows) {
+            return assert(true);
+        });
+    },
     "populate": function () {
         var _this = this;
         return this.fixture.prepare_database().then(function () {
@@ -41,4 +49,4 @@ buster.testCase("Database test", {
     }
 });
 
-//# sourceMappingURL=ground-db-test.js.map
+//# sourceMappingURL=db-test.js.map

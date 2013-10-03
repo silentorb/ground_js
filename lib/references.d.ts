@@ -4,6 +4,7 @@
 /// <reference path="../../metahub/metahub.d.ts" />
 /// <reference path="core/Core.d.ts" />
 /// <reference path="db/Table.d.ts" />
+/// <reference path="db/Link_Trellis.d.ts" />
 /// <reference path="schema/Property.d.ts" />
 /// <reference path="schema/Trellis.d.ts" />
 /// <reference path="operations/Query.d.ts" />

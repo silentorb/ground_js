@@ -46,6 +46,27 @@ var MetaHub;
     }
     MetaHub.S4 = S4;
 
+    function values(source) {
+        return Object.keys(source).map(function (key) {
+            return source[key];
+        });
+    }
+    MetaHub.values = values;
+
+    function concat(destination, source) {
+        var result = {};
+        for (var a in destination) {
+            result[a] = destination[a];
+        }
+
+        for (var b in source) {
+            result[b] = source[b];
+        }
+
+        return result;
+    }
+    MetaHub.concat = concat;
+
     function extend(destination, source, names) {
         if (typeof names === "undefined") { names = null; }
         var info;
@@ -514,7 +535,6 @@ var Ground;
             this.database = database;
         }
         Database.prototype.create_table = function (trellis) {
-            console.log('create table: ', trellis.name);
             if (!trellis)
                 throw new Error('Empty object was passed to create_table().');
 
@@ -542,7 +562,7 @@ var Ground;
             //          }))
             //        .then(()=> this.query('SET foreign_key_checks = 1'));
             return when.map(this.get_tables(), function (table) {
-                console.log('table', table);
+                //        console.log('table', table);
                 return _this.query('DROP TABLE IF EXISTS ' + table);
             });
         };
@@ -561,12 +581,15 @@ var Ground;
             var mysql = require('mysql');
             connection = mysql.createConnection(this.settings[this.database]);
             connection.connect();
+
+            //      console.log('start', sql)
             connection.query(sql, function (err, rows, fields) {
                 if (err) {
-                    console.log(sql);
+                    console.log('error', sql);
                     throw err;
                 }
-                console.log('sql', sql);
+
+                //        console.log('sql', sql)
                 def.resolve(rows, fields);
 
                 return null;
@@ -595,9 +618,9 @@ var Ground;
             this.name = null;
             this.primary_key = 'id';
             // Property that are specific to this trellis and not inherited from a parent trellis
-            this.properties = [];
+            this.properties = {};
             // Every property including inherited properties
-            this.all_properties = [];
+            this.all_properties = {};
             this.is_virtual = false;
             this.ground = ground;
             this.name = name;
@@ -612,7 +635,7 @@ var Ground;
         Trellis.prototype.check_primary_key = function () {
             if (!this.properties[this.primary_key] && this.parent) {
                 var property = this.parent.properties[this.parent.primary_key];
-                this.properties[this.primary_key] = new Ground.Property(this.primary_key, property, this);
+                this.properties[this.primary_key] = new Ground.Property(this.primary_key, property.get_data(), this);
             }
         };
 
@@ -621,6 +644,32 @@ var Ground;
                 throw new Error(this.name + ' does not have a property named ' + property_name + '.');
 
             target_trellis.add_property(property_name, this.properties[property_name]);
+        };
+
+        Trellis.prototype.get_all_links = function (filter) {
+            if (typeof filter === "undefined") { filter = null; }
+            var result = {};
+            var properties = this.get_all_properties();
+            for (var name in properties) {
+                var property = properties[name];
+                if (property.other_trellis && (!filter || filter(property)))
+                    result[property.name] = property;
+            }
+
+            return result;
+        };
+
+        Trellis.prototype.get_all_properties = function () {
+            var result = {};
+            var tree = this.get_tree();
+            for (var i = 0; i < tree.length; ++i) {
+                var trellis = tree[i];
+                for (var name in trellis.properties) {
+                    var property = trellis.properties[name];
+                    result[property.name] = property;
+                }
+            }
+            return result;
         };
 
         Trellis.prototype.get_core_properties = function () {
@@ -637,6 +686,13 @@ var Ground;
             //      );
         };
 
+        Trellis.prototype.get_join = function (main_table) {
+            if (!this.parent)
+                return null;
+
+            return 'JOIN  ' + this.parent.get_table_query() + ' ON ' + this.parent.query_primary_key() + ' = ' + main_table + '.' + this.properties[this.primary_key].get_field_name();
+        };
+
         Trellis.prototype.get_links = function () {
             var result = [];
             for (var name in this.properties) {
@@ -645,6 +701,10 @@ var Ground;
                     result.push(property);
             }
             return result;
+        };
+
+        Trellis.prototype.get_plural = function () {
+            return this.plural || this.name + 's';
         };
 
         Trellis.prototype.get_table_name = function () {
@@ -665,6 +725,13 @@ else
                 return this.plural;
 
             return this.name + 's';
+        };
+
+        Trellis.prototype.get_table_query = function () {
+            if (this.table && this.table.query)
+                return this.table.query;
+
+            return this.get_table_name();
         };
 
         Trellis.prototype.get_tree = function () {
@@ -688,6 +755,22 @@ else
             for (name in source.properties) {
                 this.add_property(name, source.properties[name]);
             }
+        };
+
+        Trellis.prototype.query_primary_key = function () {
+            return this.get_table_name() + '.' + this.properties[this.primary_key].get_field_name();
+        };
+
+        Trellis.prototype.sanitize_property = function (property) {
+            if (typeof property === 'string') {
+                var properties = this.get_all_properties();
+                if (properties[property] === undefined)
+                    throw new Error(this.name + ' does not contain a property named ' + property + '.');
+
+                return properties[property];
+            }
+
+            return property;
         };
 
         Trellis.prototype.set_parent = function (parent) {
@@ -714,16 +797,14 @@ var Ground;
     var Query = (function () {
         function Query(trellis, base_path) {
             if (typeof base_path === "undefined") { base_path = null; }
-            this.trellises = [];
             this.joins = [];
             this.filters = [];
             this.post_clauses = [];
-            this.sources = [];
-            this.links = [];
             this.include_links = true;
             this.fields = [];
-            this.arguments = [];
+            this.arguments = {};
             this.expansions = [];
+            this.links = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
             this.expansions = this.ground.expansions;
@@ -734,9 +815,339 @@ var Ground;
 else
                 this.base_path = this.trellis.name;
         }
+        Query.prototype.add_arguments = function (args) {
+            for (var a in args) {
+                this.arguments[a] = args[a];
+            }
+        };
+
+        Query.prototype.add_filter = function (clause, arguments) {
+            if (typeof arguments === "undefined") { arguments = null; }
+            this.filters.push(clause);
+            if (arguments)
+                this.add_arguments(arguments);
+        };
+
+        Query.prototype.add_property_filter = function (property, value, like) {
+            if (typeof value === "undefined") { value = null; }
+            if (typeof like === "undefined") { like = false; }
+            property = this.trellis.sanitize_property(property);
+
+            var placeholder = ':' + property.name + '_filter';
+            if (value === 'null' && property.type != 'string') {
+                this.filters.push(property.query() + ' IS NULL');
+                return;
+            }
+
+            if (value !== null)
+                value = this.ground.convert_value(value, property.type);
+
+            if (property.get_relationship() == Ground.Relationships.many_to_many) {
+                this.add_property_join(property, placeholder, true);
+            } else {
+                if (like) {
+                    this.filters.push(property.query() + ' LIKE ' + placeholder);
+                    if (value !== null)
+                        value = '%' + value + '%';
+                } else {
+                    this.filters.push(property.query() + ' = ' + placeholder);
+                }
+            }
+
+            if (value !== null) {
+                var args = {};
+                args[placeholder] = value;
+                this.add_arguments(args);
+            }
+        };
+
+        Query.prototype.add_key_filter = function (value) {
+            this.filters.push(this.trellis.query_primary_key() + ' = :primary_key');
+            this.add_arguments({ ':primary_key': value });
+        };
+
+        Query.prototype.add_field = function (clause, arguments) {
+            if (typeof arguments === "undefined") { arguments = null; }
+            this.fields.push(clause);
+            if (arguments) {
+                this.add_arguments(arguments);
+            }
+        };
+
+        Query.prototype.add_join = function (clause, arguments) {
+            if (typeof arguments === "undefined") { arguments = null; }
+            this.joins.push(clause);
+            if (arguments) {
+                this.add_arguments(arguments);
+            }
+        };
+
+        Query.prototype.add_property_join = function (property, id, reverse) {
+            if (typeof reverse === "undefined") { reverse = false; }
+            var join = new Ground.Link_Trellis(property);
+            var join_sql = join.generate_join(id, reverse);
+            this.add_join(join_sql);
+        };
+
+        Query.prototype.add_post = function (clause, arguments) {
+            if (typeof arguments === "undefined") { arguments = null; }
+            this.post_clauses.push(clause);
+            if (arguments) {
+                this.add_arguments(arguments);
+            }
+        };
+
+        Query.prototype.add_expansion = function (clause) {
+            this.expansions.push(clause);
+        };
+
+        Query.prototype.add_link = function (property) {
+            property = this.trellis.sanitize_property(property);
+            if (this.links[property.name])
+                throw new Error(property.name + ' added twice to query.');
+
+            var link = {
+                other: property.get_referenced_trellis(),
+                property: property
+            };
+
+            this.links[property.name] = link;
+        };
+
+        Query.prototype.generate_pager = function (offset, limit) {
+            if (typeof offset === "undefined") { offset = 0; }
+            if (typeof limit === "undefined") { limit = 0; }
+            offset = Math.round(offset);
+            limit = Math.round(limit);
+            if (!offset) {
+                if (!limit)
+                    return '';
+else
+                    return ' LIMIT ' + limit;
+            } else {
+                if (!limit)
+                    limit = 18446744073709551615;
+
+                return ' LIMIT ' + offset + ', ' + limit;
+            }
+        };
+
+        Query.prototype.generate_sql = function (properties) {
+            var data = this.get_fields_and_joins(properties);
+            var fields = data.fields.concat(this.fields);
+            var joins = data.joins.concat(this.joins);
+
+            if (fields.length == 0)
+                throw new Error('No authorized fields found for trellis ' + this.main_table + '.');
+
+            var sql = 'SELECT ';
+            sql += fields.join(",\n");
+            sql += "\nFROM " + this.main_table;
+            if (joins.length > 0)
+                sql += "\n" + joins.join("\n");
+
+            if (this.filters.length > 0)
+                sql += "\nWHERE " + this.filters.join(" AND ");
+
+            if (this.post_clauses.length > 0)
+                sql += " " + this.post_clauses.join(" ");
+
+            for (var pattern in this.arguments) {
+                var value = this.arguments[pattern];
+                sql = sql.replace(new RegExp(pattern), Ground.Property.get_field_value_sync(value));
+            }
+            return sql;
+        };
+
+        Query.prototype.get_fields_and_joins = function (properties, include_primary_key) {
+            if (typeof include_primary_key === "undefined") { include_primary_key = true; }
+            var name, fields = [];
+            var trellises = {};
+            for (name in properties) {
+                var property = properties[name];
+
+                if (property.type == 'list' || property.is_virtual)
+                    continue;
+
+                if (property.name != this.trellis.primary_key || include_primary_key) {
+                    var field_name = property.get_field_name();
+                    var sql = property.query();
+                    if (field_name != property.name)
+                        sql += ' AS `' + property.name + '`';
+
+                    fields.push(sql);
+                    trellises[property.parent.name] = property.parent;
+                }
+            }
+            var joins = [];
+            for (name in trellises) {
+                var trellis = trellises[name];
+                var join = trellis.get_join(this.main_table);
+                if (join)
+                    joins.push(join);
+            }
+
+            return {
+                fields: fields,
+                joins: joins
+            };
+        };
+
+        Query.prototype.get_many_list = function (id, property, relationship) {
+            var other_property = property.get_other_property();
+            var query = new Query(other_property.parent, this.get_path(property.name));
+            query.include_links = false;
+            query.expansions = this.expansions;
+            if (relationship === Ground.Relationships.many_to_many)
+                query.add_property_join(property, id);
+else if (relationship === Ground.Relationships.one_to_many)
+                query.add_property_filter(other_property, id);
+
+            return query.run();
+        };
+
+        Query.prototype.get_path = function () {
+            var args = [];
+            for (var _i = 0; _i < (arguments.length - 0); _i++) {
+                args[_i] = arguments[_i + 0];
+            }
+            var items = [];
+            if (this.base_path)
+                items.push(this.base_path);
+
+            items = items.concat(args);
+
+            return items.join('/');
+        };
+
+        Query.prototype.get_reference_object = function (row, property) {
+            var query = new Query(property.other_trellis, this.get_path(property.name));
+            query.include_links = false;
+            query.expansions = this.expansions;
+            query.add_filter(property.other_trellis.query_primary_key() + ' = ' + row[property.name]);
+            return query.run().then(function (rows) {
+                return rows[0];
+            });
+        };
+
+        Query.prototype.has_expansion = function (path) {
+            for (var i = 0; i < this.expansions.length; ++i) {
+                var expansion = this.expansions[i];
+
+                if (expansion[0] == '/' && expansion[expansion.length - 1] == '/') {
+                    if (path.match(new RegExp(expansion)))
+                        return true;
+                } else {
+                    if (path == expansion)
+                        return true;
+                }
+            }
+
+            return false;
+        };
+
+        Query.prototype.process_row = function (row, authorized_properties) {
+            if (typeof authorized_properties === "undefined") { authorized_properties = null; }
+            var _this = this;
+            var name, property, promise, promises = [];
+
+            for (name in this.trellis.properties) {
+                property = this.trellis.properties[name];
+                var field_name = property.get_field_name();
+                if (property.name != field_name && row[field_name] !== undefined) {
+                    row[property] = row[field_name];
+                    delete row[field_name];
+                }
+            }
+
+            if (authorized_properties) {
+                for (name in authorized_properties) {
+                    property = authorized_properties[name];
+                    if (row[property.name] !== undefined)
+                        row[property.name] = this.ground.convert_value(row[property.name], property.type);
+                }
+            }
+
+            var links = this.trellis.get_all_links(function (p) {
+                return !p.is_virtual;
+            });
+
+            for (name in links) {
+                property = links[name];
+
+                var path = this.get_path(property.name);
+                if (authorized_properties && authorized_properties[name] === undefined)
+                    continue;
+
+                if (this.include_links || this.has_expansion(path)) {
+                    var id = row[property.parent.primary_key];
+                    var relationship = property.get_relationship();
+
+                    switch (relationship) {
+                        case Ground.Relationships.one_to_one:
+                            promise = this.get_reference_object(row, property);
+                            break;
+                        case Ground.Relationships.one_to_many:
+                        case Ground.Relationships.many_to_many:
+                            promise = this.get_many_list(id, property, relationship);
+                            break;
+                    }
+
+                    promise = promise.then(function (value) {
+                        return row[name] = value;
+                    });
+                    promises.push(promise);
+                }
+            }
+
+            return when.all(promises).then(function () {
+                return _this.ground.invoke(_this.trellis.name + '.process.row', row, _this, _this.trellis);
+            }).then(function () {
+                return row;
+            });
+        };
+
+        Query.prototype.run = function (args) {
+            if (typeof args === "undefined") { args = {}; }
+            var _this = this;
+            var properties = this.trellis.get_all_properties();
+            var sql = this.generate_sql(properties);
+            sql = sql.replace(/\r/g, "\n");
+            if (Query.log_queries)
+                console.log('query', sql);
+
+            var args = MetaHub.values(this.arguments).concat(args);
+            return this.db.query(sql).then(function (rows) {
+                return when.all(rows.map(function (row) {
+                    return _this.process_row(row, properties);
+                }));
+            });
+        };
+
+        Query.prototype.run_as_service = function (arguments) {
+            if (typeof arguments === "undefined") { arguments = {}; }
+            var _this = this;
+            var properties = this.trellis.get_all_properties();
+            var sql = this.generate_sql(properties);
+            sql = sql.replace(/\r/g, "\n");
+            if (Query.log_queries)
+                console.log('query', sql);
+
+            var args = MetaHub.values(this.arguments).concat(arguments);
+            return this.db.query(sql).then(function (rows) {
+                return when.all(rows.map(function (row) {
+                    return _this.process_row(row, properties);
+                }));
+            }).then(function (rows) {
+                return {
+                    objects: rows
+                };
+            });
+        };
         Query.log_queries = false;
         return Query;
     })();
+    Ground.Query = Query;
 })(Ground || (Ground = {}));
 /**
 * User: Chris Johnson
@@ -795,17 +1206,19 @@ else
             var _this = this;
             var fields = [];
             var values = [];
-            var core_properties = MetaHub.filter(trellis.get_core_properties(), this.is_create_property);
+            var core_properties = trellis.get_core_properties();
             var promises = [];
             for (var name in core_properties) {
                 var property = core_properties[name];
-                if (this.seed[property.name] !== undefined) {
+                if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
+                    //          console.log('field', name, this.seed[property.name])
                     fields.push('`' + property.get_field_name() + '`');
                     var field_promise = this.get_field_value(property).then(function (value) {
                         if (value.length == 0) {
                             throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
                         }
 
+                        //            console.log('  ', name, value)
                         values.push(value);
                     });
 
@@ -820,7 +1233,8 @@ else
                 if (Update.log_queries)
                     console.log(sql);
 
-                return _this.db.query(sql).then(function (err, result) {
+                return _this.db.query(sql).then(function (result) {
+                    //              console.log(arguments)
                     var id;
                     if (_this.seed[trellis.primary_key]) {
                         id = _this.seed[trellis.primary_key];
@@ -1105,6 +1519,49 @@ var Ground;
             return trellis;
         };
 
+        Core.prototype.convert_value = function (value, type) {
+            if (!value) {
+                if (type == 'bool')
+                    return false;
+
+                return null;
+            }
+
+            var property_type = this.property_types[type];
+
+            if (property_type && property_type.parent)
+                return this.convert_value(value, property_type.parent.name);
+
+            switch (type) {
+                case 'list':
+                case 'reference':
+                    return value;
+                case 'int':
+                    return Math.round(value);
+                case 'string':
+                case 'text':
+                    return value;
+                case 'bool':
+                    return Core.to_bool(value);
+                case 'float':
+                case 'double':
+                case 'money':
+                    return parseFloat(value.toString());
+            }
+
+            return null;
+        };
+
+        //    create_query(trellis:Trellis, base_path = '') {
+        //      return new Query(trellis, base_path);
+        //    }
+        Core.prototype.create_query = function (trellis_name, base_path) {
+            if (typeof base_path === "undefined") { base_path = ''; }
+            var trellis = this.sanitize_trellis_argument(trellis_name);
+
+            return new Ground.Query(trellis, base_path);
+        };
+
         Core.prototype.delete_object = function (trellis, seed) {
             var trellis = this.sanitize_trellis_argument(trellis);
             var del = new Ground.Delete();
@@ -1120,11 +1577,12 @@ var Ground;
                 if (typeof trellis.parent === 'string') {
                     trellis.set_parent(all[trellis.parent]);
                     trellis.check_primary_key();
-                    for (var j in trellis.properties) {
-                        var property = trellis.properties[j];
-                        if (property.other_trellis_name)
-                            property.other_trellis = this.trellises[property.other_trellis_name];
-                    }
+                }
+
+                for (var j in trellis.properties) {
+                    var property = trellis.properties[j];
+                    if (property.other_trellis_name)
+                        property.other_trellis = this.trellises[property.other_trellis_name];
                 }
             }
         };
@@ -1181,6 +1639,13 @@ var Ground;
 
         Core.prototype.load_tables = function (tables) {
             for (var name in tables) {
+                var table_name;
+
+                //        var trellis = this.trellises[name];
+                //        if (trellis)
+                //          table_name = trellis.get_table_name();
+                //        else
+                //          table_name = name;
                 var table = new Ground.Table(name, this);
                 table.load_from_schema(tables[name]);
                 this.tables[name] = table;
@@ -1229,6 +1694,14 @@ var Ground;
             }
 
             return trellis;
+        };
+
+        Core.to_bool = function (input) {
+            if (typeof input == 'string') {
+                return input.toLowerCase() == 'true';
+            }
+
+            return !!input;
         };
         return Core;
     })(MetaHub.Meta_Object);
@@ -1387,15 +1860,100 @@ else
         };
 
         Table.prototype.load_from_schema = function (source) {
+            var name = this.name;
             MetaHub.extend(this, source);
-            if (this.ground.trellises[this.name]) {
-                this.trellis = this.ground.trellises[this.name];
+            if (this.ground.trellises[name]) {
+                this.trellis = this.ground.trellises[name];
                 this.trellis.table = this;
+                if (!source.name)
+                    this.name = this.trellis.get_plural();
             }
         };
         return Table;
     })();
     Ground.Table = Table;
+})(Ground || (Ground = {}));
+/**
+* User: Chris Johnson
+* Date: 10/1/13
+*/
+/// <reference path="../references.ts"/>
+var Ground;
+(function (Ground) {
+    var Link_Trellis = (function () {
+        function Link_Trellis(property) {
+            this.id_suffix = '';
+            this.property = property;
+            this.args = this.get_arguments(property);
+        }
+        Link_Trellis.prototype.generate_join = function (id, reverse) {
+            if (typeof reverse === "undefined") { reverse = false; }
+            var sql;
+            if (reverse) {
+                sql = "JOIN %table_name ON %table_name.%second_key = %forward_id" + " AND %table_name.%first_key = " + id + "\n";
+            } else {
+                sql = "JOIN %table_name ON %table_name.%second_key = " + id + " AND %table_name.%first_key = %back_id\n";
+            }
+
+            return Link_Trellis.populate_sql(sql, this.args);
+        };
+        Link_Trellis.prototype.get_arguments = function (property) {
+            var other_property = property.get_other_property();
+            var first_key, second_key;
+
+            // Since we are checking for an ideal cross table name,
+            // Use plural trellis names isntead of any table name overrides.
+            var other_table = other_property.parent.get_plural();
+            var temp = [other_table, property.parent.get_plural()];
+            temp = temp.sort();
+            this.table_name = temp.join('_');
+            var result = {
+                '%first_id': property.query(),
+                '%second_id': other_property.query(),
+                '%back_id': other_property.parent.query_primary_key(),
+                '%forward_id': property.parent.query_primary_key()
+            };
+
+            var ground = property.parent.ground;
+            var table = ground.tables[this.table_name];
+            if (table && Object.keys(table.properties).length >= 2) {
+                for (var name in table.properties) {
+                    var field = table.properties[name];
+                    if (field.trellis === property.trellis)
+                        first_key = name;
+else if (field.trellis === other_property.other_trellis)
+                        second_key = name;
+                }
+
+                if (!first_key || !second_key)
+                    throw new Error('Properties do not line up for cross table: ' + this.table_name + '.');
+
+                MetaHub.extend(result, {
+                    '%table_name': table.name,
+                    '%first_key': first_key,
+                    '%second_key': second_key
+                });
+            } else {
+                MetaHub.extend(result, {
+                    '%table_name': this.table_name,
+                    '%first_key': property.parent.name + this.id_suffix,
+                    '%second_key': other_property.parent.name + this.id_suffix
+                });
+            }
+
+            return result;
+        };
+
+        Link_Trellis.populate_sql = function (sql, args) {
+            var result = sql;
+            for (var a in args) {
+                result = result.replace(new RegExp(a, 'g'), args[a]);
+            }
+            return result;
+        };
+        return Link_Trellis;
+    })();
+    Ground.Link_Trellis = Link_Trellis;
 })(Ground || (Ground = {}));
 /**
 * Created with JetBrains PhpStorm.
@@ -1439,6 +1997,25 @@ var Ground;
             this.name = name;
             this.parent = trellis;
         }
+        Property.prototype.get_data = function () {
+            var result = {
+                type: this.type
+            };
+            if (this.other_trellis_name)
+                result.trellis = this.other_trellis_name;
+
+            if (this.is_readonly)
+                result.is_readonly = this.is_readonly;
+
+            if (this.is_private)
+                result.is_private = this.is_private;
+
+            if (this.insert)
+                result.insert = this.insert;
+
+            return result;
+        };
+
         Property.prototype.get_field_name = function () {
             var field = this.get_field_override();
             if (field) {
@@ -1480,6 +2057,21 @@ var Ground;
             return property_type.get_field_type();
         };
 
+        Property.get_field_value_sync = function (value) {
+            if (typeof value === 'string') {
+                value = value.replace(/'/g, "\\'", value);
+                value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
+                //        console.log('value', value)
+            } else if (value === true)
+                value = 'TRUE';
+else if (value === false)
+                value = 'FALSE';
+            if (value === null || value === undefined)
+                value = 'NULL';
+
+            return value;
+        };
+
         Property.prototype.get_field_value = function (value, as_service) {
             if (typeof as_service === "undefined") { as_service = false; }
             var _this = this;
@@ -1493,11 +2085,11 @@ else if (value === false)
             if (value === null || value === undefined)
                 value = 'NULL';
 else if (this.type == 'string' || this.type == 'text') {
-                value = "'" + value.replace(/[\r\n]+/, "\n");
-            } else if (this.type == 'reference') {
-                var trellis = value.other_trellis || this.other_trellis;
+                value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
+            } else if (this.type == 'reference' && typeof value === 'object') {
+                //        console.log(value.other_trellis, this.other_trellis.name)
+                var trellis = this.other_trellis;
                 var ground = this.parent.ground;
-                trellis = ground.trellises[trellis];
 
                 return ground.update_object(trellis, value, as_service).then(function (entity) {
                     var other_id = _this.get_other_id(value);
@@ -1550,7 +2142,7 @@ else
             var attributes = {};
             attributes.type = 'list';
             attributes.trellis = this.parent.name;
-            return new Property(this.other_trellis.name, attributes, this.other_trellis);
+            return new Property('_' + this.other_trellis.name, attributes, this.other_trellis);
         };
 
         Property.prototype.get_property_type = function () {
@@ -1559,6 +2151,10 @@ else
                 return types[this.type];
 
             return null;
+        };
+
+        Property.prototype.get_referenced_trellis = function () {
+            return this.other_trellis;
         };
 
         Property.prototype.get_relationship = function () {
@@ -1579,7 +2175,29 @@ else
             }
             return Relationships.one_to_one;
         };
+
+        Property.prototype.query = function () {
+            return this.parent.get_table_name() + '.' + this.get_field_name();
+        };
         return Property;
     })();
     Ground.Property = Property;
 })(Ground || (Ground = {}));
+/**
+* User: Chris Johnson
+* Date: 9/19/13
+*/
+/// <reference path="core/require.ts"/>
+/// <reference path="../defs/when.d.ts"/>
+/// <reference path="../defs/linq.d.ts"/>
+/// <reference path="../../metahub/metahub.ts"/>
+/// <reference path="core/Core.ts"/>
+/// <reference path="db/Table.ts"/>
+/// <reference path="db/Link_Trellis.ts"/>
+/// <reference path="schema/Property.ts"/>
+/// <reference path="schema/Trellis.ts"/>
+/// <reference path="operations/Query.ts"/>
+/// <reference path="operations/Update.ts"/>
+/// <reference path="operations/Delete.ts"/>
+require('source-map-support').install();
+//# sourceMappingURL=ground.js.map

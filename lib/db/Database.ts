@@ -18,14 +18,14 @@ module Ground {
     }
 
     create_table(trellis:Trellis):Promise {
-      console.log('create table: ', trellis.name);
+//      console.log('create table: ', trellis.name);
       if (!trellis)
         throw new Error('Empty object was passed to create_table().');
 
       var table = Table.create_from_trellis(trellis);
       var sql = table.create_sql_from_trellis(trellis);
       return this.query(sql)
-        .then(()=>table);
+        .then(()=>table)
     }
 
     create_tables(trellises:Trellis[]):Promise {
@@ -41,7 +41,7 @@ module Ground {
 //          }))
 //        .then(()=> this.query('SET foreign_key_checks = 1'));
       return when.map(this.get_tables(), (table) => {
-        console.log('table', table);
+//        console.log('table', table);
         return this.query('DROP TABLE IF EXISTS ' + table);
       });
     }
@@ -60,12 +60,13 @@ module Ground {
       var mysql = require('mysql')
       connection = mysql.createConnection(this.settings[this.database]);
       connection.connect();
+//      console.log('start', sql)
       connection.query(sql, (err, rows, fields) => {
         if (err) {
-          console.log(sql);
+          console.log('error', sql);
           throw err;
         }
-        console.log('sql', sql)
+//        console.log('sql', sql)
         def.resolve(rows, fields);
 
         return null;

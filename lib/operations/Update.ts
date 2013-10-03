@@ -63,17 +63,19 @@ module Ground {
     private create_record(trellis:Trellis):Promise {
       var fields:string[] = [];
       var values = [];
-      var core_properties = MetaHub.filter(trellis.get_core_properties(), this.is_create_property);
+      var core_properties = trellis.get_core_properties();
       var promises = [];
       for (var name in core_properties) {
         var property = core_properties[name];
-        if (this.seed[property.name] !== undefined) {
+        if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
+//          console.log('field', name, this.seed[property.name])
           fields.push('`' + property.get_field_name() + '`');
           var field_promise = this.get_field_value(property).then((value) => {
             if (value.length == 0) {
               throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
             }
 
+//            console.log('  ', name, value)
             values.push(value);
           });
 
@@ -90,7 +92,8 @@ module Ground {
             console.log(sql);
 
           return this.db.query(sql)
-            .then((err, result) => {
+            .then((result) => {
+//              console.log(arguments)
               var id;
               if (this.seed[trellis.primary_key]) {
                 id = this.seed[trellis.primary_key];
@@ -263,7 +266,7 @@ module Ground {
       return this.ground.update_object(trellis, object);
     }
 
-    public run():Promise {
+    public  run():Promise {
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
 
       var promises = tree.map((trellis:Trellis) => this.generate_sql(trellis));

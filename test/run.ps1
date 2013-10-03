@@ -2,4 +2,4 @@ cls
 cd ..
 ./make
 cd test
-buster-test tests/ground-db-test.js
+buster-test -t tests/query-test.js

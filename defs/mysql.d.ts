@@ -4,6 +4,6 @@ declare module "mysql" {
   interface Connection {
     connect();
     query(sql:string, callback);
-    end();
+    end(callback?);
   }
 }

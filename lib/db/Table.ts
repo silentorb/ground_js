@@ -14,12 +14,13 @@ module Ground {
 
   export class Table {
     name:string;
-    properties:Array<any> = [];
-    indexes:Array<any>;
+    properties:any[] = [];
+    indexes:any[];
     ground:Core;
     db_name:string;
     trellis:Trellis;
     primary_keys:any[];
+    query:string;
 
     constructor(name:string, ground:Core) {
       this.name = name;
@@ -43,7 +44,7 @@ module Ground {
       return table;
     }
 
-    static  create_sql_from_array(table_name:string, source:any[], primary_keys = [], indexes = []):string {
+    static create_sql_from_array(table_name:string, source:any[], primary_keys = [], indexes = []):string {
       var fields = MetaHub.map_to_array(source, (field, index)=> {
         var name = field.name || index;
         var type = field.type;
@@ -162,10 +163,13 @@ module Ground {
     }
 
     load_from_schema(source) {
+      var name = this.name;
       MetaHub.extend(this, source);
-      if (this.ground.trellises[this.name]) {
-        this.trellis = this.ground.trellises[this.name];
+      if (this.ground.trellises[name]) {
+        this.trellis = this.ground.trellises[name];
         this.trellis.table = this;
+        if (!source.name)
+          this.name = this.trellis.get_plural();
       }
     }
   }

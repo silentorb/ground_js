@@ -2,14 +2,20 @@
 /// <reference path="../references.d.ts" />
 /// <reference path="../db/Database.d.ts" />
 /// <reference path="../schema/Trellis.d.ts" />
+/// <reference path="../operations/Query.d.ts" />
+/// <reference path="../operations/Update.d.ts" />
+/// <reference path="../operations/Delete.d.ts" />
 /// <reference path="../../defs/node.d.ts" />
 declare module Ground {
     interface IProperty_Source {
-        name: string;
+        name?: string;
         type: string;
-        property: string;
-        is_virtual: boolean;
-        trellis: string;
+        insert?: string;
+        is_virtual?: boolean;
+        is_readonly?: boolean;
+        is_private?: boolean;
+        property?: string;
+        trellis?: string;
     }
     interface ITrellis_Source {
         plural: string;
@@ -41,6 +47,8 @@ declare module Ground {
         public expansions: any[];
         constructor(config, db_name: string);
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
+        public convert_value(value, type);
+        public create_query(trellis_name: string, base_path?: string): Ground.Query;
         public delete_object(trellis: Ground.Trellis, seed: ISeed): Promise;
         public initialize_trellises(subset: Ground.Trellis[], all?): void;
         public insert_object(trellis, seed?: ISeed): Promise;
@@ -52,8 +60,9 @@ declare module Ground {
         public load_schema_from_file(filename: string): void;
         public load_tables(tables: any[]): void;
         public load_trellises(trellises: ITrellis_Source[]): void;
-        public parse_schema(data): void;
+        private parse_schema(data);
         static remove_fields(object, trellis: Ground.Trellis, filter);
         private sanitize_trellis_argument(trellis);
+        static to_bool(input): boolean;
     }
 }
