@@ -55,13 +55,13 @@ module Ground {
       });
     }
 
-    query(sql:string):Promise {
+    query(sql:string, args:any[] = undefined):Promise {
       var connection, def = when.defer();
       var mysql = require('mysql')
       connection = mysql.createConnection(this.settings[this.database]);
       connection.connect();
 //      console.log('start', sql)
-      connection.query(sql, (err, rows, fields) => {
+      connection.query(sql, args, (err, rows, fields) => {
         if (err) {
           console.log('error', sql);
           throw err;

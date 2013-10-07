@@ -576,14 +576,15 @@ var Ground;
             });
         };
 
-        Database.prototype.query = function (sql) {
+        Database.prototype.query = function (sql, args) {
+            if (typeof args === "undefined") { args = undefined; }
             var connection, def = when.defer();
             var mysql = require('mysql');
             connection = mysql.createConnection(this.settings[this.database]);
             connection.connect();
 
             //      console.log('start', sql)
-            connection.query(sql, function (err, rows, fields) {
+            connection.query(sql, args, function (err, rows, fields) {
                 if (err) {
                     console.log('error', sql);
                     throw err;
@@ -1449,7 +1450,6 @@ var __extends = this.__extends || function (d, b) {
     __.prototype = b.prototype;
     d.prototype = new __();
 };
-/// <reference path="require.ts"/>
 /// <reference path="../references.ts"/>
 /// <reference path="../db/Database.ts"/>
 /// <reference path="../schema/Trellis.ts"/>
@@ -2185,6 +2185,42 @@ else
 })(Ground || (Ground = {}));
 /**
 * User: Chris Johnson
+* Date: 10/3/13
+*/
+/// <reference path="../references.ts"/>
+var Ground;
+(function (Ground) {
+    var Irrigation = (function () {
+        function Irrigation(ground) {
+            this.ground = ground;
+        }
+        Irrigation.prototype.query = function (request) {
+            var trellis = this.ground.sanitize_trellis_argument(request.trellis);
+            var query = new Ground.Query(trellis);
+
+            return query.run();
+        };
+
+        Irrigation.prototype.update = function (request) {
+            var promises = [];
+
+            if (!request.objects)
+                throw new Error('Request requires an objects array.');
+
+            for (var i = 0; i < request.objects.length; ++i) {
+                var object = request.objects[i];
+                var promise = this.ground.update_object(object.trellis, object);
+                promises.push(promise);
+            }
+
+            return when.all(promises);
+        };
+        return Irrigation;
+    })();
+    Ground.Irrigation = Irrigation;
+})(Ground || (Ground = {}));
+/**
+* User: Chris Johnson
 * Date: 9/19/13
 */
 /// <reference path="core/require.ts"/>
@@ -2199,5 +2235,6 @@ else
 /// <reference path="operations/Query.ts"/>
 /// <reference path="operations/Update.ts"/>
 /// <reference path="operations/Delete.ts"/>
+/// <reference path="services/Irrigation.ts"/>
 require('source-map-support').install();
 //# sourceMappingURL=ground.js.map

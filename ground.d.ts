@@ -62,7 +62,7 @@ declare module Ground {
         public create_tables(trellises: Ground.Trellis[]): Promise;
         public drop_all_tables(): Promise;
         public get_tables(): Promise;
-        public query(sql: string): Promise;
+        public query(sql: string, args?: any[]): Promise;
     }
 }
 declare module Ground {
@@ -239,7 +239,7 @@ declare module Ground {
         public load_trellises(trellises: ITrellis_Source[]): void;
         private parse_schema(data);
         static remove_fields(object, trellis: Ground.Trellis, filter);
-        private sanitize_trellis_argument(trellis);
+        public sanitize_trellis_argument(trellis);
         static to_bool(input): boolean;
     }
 }
@@ -318,5 +318,19 @@ declare module Ground {
         public get_referenced_trellis(): Ground.Trellis;
         public get_relationship(): Relationships;
         public query(): string;
+    }
+}
+declare module Ground {
+    interface Query_Request {
+        trellis: string;
+    }
+    interface Update_Request {
+        objects: any[];
+    }
+    class Irrigation {
+        public ground: Ground.Core;
+        constructor(ground: Ground.Core);
+        public query(request: Query_Request): Promise;
+        public update(request: Update_Request): Promise;
     }
 }

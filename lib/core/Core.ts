@@ -4,7 +4,6 @@
  * Date: 9/18/13
  */
 
-/// <reference path="require.ts"/>
 /// <reference path="../references.ts"/>
 /// <reference path="../db/Database.ts"/>
 /// <reference path="../schema/Trellis.ts"/>
@@ -275,7 +274,7 @@ module Ground {
       return object;
     }
 
-    private sanitize_trellis_argument(trellis) {
+    sanitize_trellis_argument(trellis) {
       if (!trellis)
         throw new Error('Trellis is empty');
 
