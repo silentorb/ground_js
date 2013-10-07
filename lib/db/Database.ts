@@ -29,8 +29,9 @@ module Ground {
     }
 
     create_tables(trellises:Trellis[]):Promise {
+//      console.log(Object.keys(trellises));
       var promises = MetaHub.map_to_array(trellises, (trellis:Trellis)=>this.create_table(trellis));
-      return when.all(promises);
+      return when.all(promises)
     }
 
     drop_all_tables():Promise {

@@ -547,6 +547,7 @@ var Ground;
 
         Database.prototype.create_tables = function (trellises) {
             var _this = this;
+            //      console.log(Object.keys(trellises));
             var promises = MetaHub.map_to_array(trellises, function (trellis) {
                 return _this.create_table(trellis);
             });
