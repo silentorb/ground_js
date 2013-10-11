@@ -1,523 +1,9 @@
 /**
-* Created with JetBrains PhpStorm.
 * User: Chris Johnson
-* Date: 9/18/13
+* Date: 10/9/13
 */
-var MetaHub;
-(function (MetaHub) {
-    function remove(array, item) {
-        if (typeof array.indexOf != 'function')
-            return;
-
-        var index = array.indexOf(item);
-        if (index != -1)
-            array.splice(index, 1);
-    }
-    MetaHub.remove = remove;
-
-    function has_properties(obj) {
-        for (var key in obj) {
-            if (obj.hasOwnProperty(key))
-                return true;
-        }
-        return false;
-    }
-    MetaHub.has_properties = has_properties;
-    ;
-
-    function is_array(obj) {
-        return Object.prototype.toString.call(obj) === '[object Array]';
-    }
-    MetaHub.is_array = is_array;
-
-    function size(obj) {
-        var size = 0, key;
-        for (key in obj) {
-            if (obj.hasOwnProperty(key))
-                size++;
-        }
-        return size;
-    }
-    MetaHub.size = size;
-    ;
-
-    function S4() {
-        return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
-    }
-    MetaHub.S4 = S4;
-
-    function values(source) {
-        return Object.keys(source).map(function (key) {
-            return source[key];
-        });
-    }
-    MetaHub.values = values;
-
-    function concat(destination, source) {
-        var result = {};
-        for (var a in destination) {
-            result[a] = destination[a];
-        }
-
-        for (var b in source) {
-            result[b] = source[b];
-        }
-
-        return result;
-    }
-    MetaHub.concat = concat;
-
-    function extend(destination, source, names) {
-        if (typeof names === "undefined") { names = null; }
-        var info;
-
-        if (typeof source == 'object' || typeof source == 'function') {
-            if (names == null)
-                names = Object.getOwnPropertyNames(source);
-
-            for (var k = 0; k < names.length; ++k) {
-                var name = names[k];
-                if (source.hasOwnProperty(name)) {
-                    if (typeof Object.getOwnPropertyDescriptor == 'function') {
-                        info = Object.getOwnPropertyDescriptor(source, name);
-
-                        if (info.get) {
-                            Object.defineProperty(destination, name, info);
-                            continue;
-                        }
-                    }
-
-                    if (source[name] === null)
-                        destination[name] = null;
-else if (MetaHub.is_array(source[name]) && source[name].length == 0)
-                        destination[name] = [];
-else if (typeof source[name] == 'object' && !MetaHub.has_properties(source[name]))
-                        destination[name] = {};
-else
-                        destination[name] = source[name];
-                    //              else
-                    //                info.value = source[name];
-                    //              Object.defineProperty(destination, name, info);
-                    //            }
-                }
-            }
-        }
-        return destination;
-    }
-    MetaHub.extend = extend;
-
-    // Pseudo GUID
-    function guid() {
-        return S4() + S4() + "-" + S4() + "-" + S4();
-    }
-    MetaHub.guid = guid;
-
-    function clone(source, names) {
-        var result = {};
-        MetaHub.extend(result, source, names);
-        return result;
-    }
-    MetaHub.clone = clone;
-
-    function get_connection(a, b) {
-        for (var x = 0; x < a.internal_connections.length; x++) {
-            if (a.internal_connections[x].other === b) {
-                return a.internal_connections[x];
-            }
-        }
-
-        return null;
-    }
-    MetaHub.get_connection = get_connection;
-
-    function filter(source, check) {
-        var result = {};
-        for (var key in source) {
-            if (check(source[key], key, source))
-                result[key] = source[key];
-        }
-
-        return result;
-    }
-    MetaHub.filter = filter;
-
-    function map(source, action) {
-        var result = {};
-        for (var key in source) {
-            result[key] = action(source[key], key, source);
-        }
-
-        return result;
-    }
-    MetaHub.map = map;
-
-    function map_to_array(source, action) {
-        var result = [];
-        for (var key in source) {
-            result.push(action(source[key], key, source));
-        }
-        return result;
-    }
-    MetaHub.map_to_array = map_to_array;
-
-    //  function get_variables(source) {
-    //    var result = {};
-    //    if (typeof source == 'object' || typeof source == 'function') {
-    //      for (var k in source) {
-    //        if (source.hasOwnProperty(k) && typeof source[k] != 'function') {
-    //          result[k] = source[k];
-    //        }
-    //      }
-    //    }
-    //    return result;
-    //  }
-    //  function serialize(source) {
-    //    if (source.original_properties) {
-    //      var temp = {};
-    //      MetaHub.extend(temp, source, source.original_properties);
-    //      return JSON.stringify(temp);
-    //      //return JSON.stringify(source, source.original_properties);
-    //    }
-    //    else {
-    //      return JSON.stringify(source);
-    //    }
-    //  };
-    var Meta_Object = (function () {
-        function Meta_Object() {
-            this.is_meta_object = true;
-            this.events = {};
-            this.internal_connections = new Array();
-        }
-        Meta_Object.connect_objects = function (first, other, type) {
-            var connection = MetaHub.get_connection(first, other);
-            if (connection) {
-                if (connection.type != type && type) {
-                    connection.type = type;
-                    return true;
-                }
-
-                return false;
-            }
-
-            if (type === 'parent')
-                first.parent = other;
-
-            connection = new Meta_Connection(first, other, type);
-            first.internal_connections.push(connection);
-            return true;
-        };
-
-        Meta_Object.disconnect_objects = function (first, other) {
-            var connection = MetaHub.get_connection(first, other);
-            if (connection) {
-                var type = connection.type;
-                MetaHub.remove(first.internal_connections, connection);
-
-                for (var event in other.events) {
-                    first.unlisten(other, event);
-                }
-
-                connection.parent = null;
-                connection.other = null;
-
-                first.invoke('disconnect.' + type, other, first);
-
-                if (connection.type === 'parent') {
-                    var parents = first.get_connections('parent');
-                    if (parents.length == 0) {
-                        delete first.parent;
-                        if (!first.__disconnecting_everything) {
-                            first.disconnect_all();
-                        }
-                    } else {
-                        first.parent = parents[0];
-                    }
-                }
-            }
-        };
-
-        Meta_Object.has_property = function (target, name) {
-            var x, names = name.split('.');
-            for (x = 0; x < names.length; x++) {
-                if (!target.hasOwnProperty(names[x]))
-                    return false;
-
-                target = target[names[x]];
-            }
-
-            return true;
-        };
-
-        Meta_Object.invoke_binding = function (source, owner, name) {
-            if (!owner.events[name])
-                return;
-
-            var args = Array.prototype.slice.call(arguments, 3);
-            var info = owner.events[name], length = info.length;
-            for (var x = 0; x < length; ++x) {
-                var binding = info[x], listener = binding.listener;
-
-                if (listener !== source && listener) {
-                    binding.method.apply(listener, args);
-                }
-            }
-        };
-
-        //       toString () {
-        //        return this.meta_source + ":" + this.guid;
-        //      };
-        Meta_Object.prototype.listen = function (other, name, method, options) {
-            if (typeof options === "undefined") { options = null; }
-            if (typeof method !== 'function')
-                throw new Error('Meta_Object.listen requires the passed method to be a function, not a "' + typeof method + '"');
-
-            if (other !== this) {
-                if (!other.is_meta_object) {
-                    this.connect(other, '');
-                }
-            }
-
-            if (other.events[name] == null)
-                other.events[name] = [];
-
-            var event = {
-                method: method,
-                listener: this,
-                async: false
-            };
-
-            if (typeof options == 'object') {
-                if (options.once) {
-                    event.method = function () {
-                        MetaHub.remove(other.events[name], event);
-                        method.apply(this, Array.prototype.slice.call(arguments));
-                    };
-                }
-                if (options.async) {
-                    event.async = true;
-                }
-            }
-
-            if (options && options.first)
-                other.events[name].unshift(event);
-else
-                other.events[name].push(event);
-        };
-
-        Meta_Object.prototype.unlisten = function (other, name) {
-            if (other.events[name] == null)
-                return;
-
-            var list = other.events[name];
-            for (var i = list.length - 1; i >= 0; --i) {
-                if (list[i].listener === this) {
-                    list.splice(i, 1);
-                }
-            }
-
-            if (list.length == 0) {
-                delete other.events[name];
-            }
-        };
-
-        Meta_Object.prototype.invoke = function (name) {
-            var args = [];
-            for (var _i = 0; _i < (arguments.length - 1); _i++) {
-                args[_i] = arguments[_i + 1];
-            }
-            if (!this.events[name])
-                return;
-
-            var info = this.events[name];
-            for (var x = 0; x < info.length; ++x) {
-                info[x].method.apply(info[x].listener, args);
-            }
-        };
-
-        Meta_Object.prototype.invoke_async = function (name) {
-            var args = Array.prototype.slice.call(arguments, 1);
-            var finish = args[args.length - 1];
-            if (!this.events[name]) {
-                if (typeof finish == 'function')
-                    finish.apply(this, args.slice(0, args.length - 1));
-                return;
-            }
-
-            var info = this.events[name];
-            var loop = function (x) {
-                if (x < info.length) {
-                    // Use this eventually:
-                    // args[args.length - 1] = loop.bind(this, x + 1);
-                    args[args.length - 1] = function () {
-                        loop(x + 1);
-                    };
-                    info[x].method.apply(info[x].listener, args);
-                } else {
-                    if (typeof finish == 'function')
-                        finish.apply(this, args.slice(0, args.length - 1));
-                }
-            };
-            loop(0);
-        };
-
-        Meta_Object.prototype.gather = function (name) {
-            var args = Array.prototype.slice.call(arguments, 1);
-            if (!this.events[name])
-                return args[0];
-
-            var info = this.events[name];
-            for (var x = 0; x < info.length; ++x) {
-                args[0] = info[x].method.apply(info[x].listener, args);
-            }
-            return args[0];
-        };
-
-        Meta_Object.prototype.connect = function (other, type, other_type) {
-            if (typeof other_type === "undefined") { other_type = undefined; }
-            if (other_type == undefined)
-                other_type = type;
-
-            if (!other.is_meta_object)
-                return;
-
-            if (!Meta_Object.connect_objects(this, other, type)) {
-                return;
-            }
-
-            Meta_Object.connect_objects(other, this, other_type);
-
-            this.invoke('connect.' + type, other, this);
-            other.invoke('connect.' + other_type, this, other);
-        };
-
-        Meta_Object.prototype.disconnect = function (other) {
-            Meta_Object.disconnect_objects(this, other);
-            Meta_Object.disconnect_objects(other, this);
-        };
-
-        Meta_Object.prototype.disconnect_all = function (type) {
-            if (type == undefined) {
-                for (var x = this.internal_connections.length - 1; x >= 0; --x) {
-                    this.disconnect(this.internal_connections[x].other);
-                }
-                this.internal_connections = [];
-                this.invoke('disconnect-all', this);
-            } else {
-                var connections = this.get_connections(type);
-                for (var x = connections.length - 1; x >= 0; --x) {
-                    this.disconnect(connections[x]);
-                }
-            }
-            //      delete this.__disconnecting_everything;
-        };
-
-        Meta_Object.prototype.is_listening = function (other, name) {
-            if (!other.is_meta_object)
-                return false;
-
-            for (var x in other.events[name]) {
-                if (other.events[name][x].listener === this)
-                    return true;
-            }
-            return false;
-        };
-
-        // This function is long and complicated because it is a heavy hitter both in usefulness
-        // and performance cost.
-        Meta_Object.prototype.get_connections = function () {
-            var filters = [];
-            for (var _i = 0; _i < (arguments.length - 0); _i++) {
-                filters[_i] = arguments[_i + 0];
-            }
-            var x;
-            var first_filter = filters.shift();
-
-            var result = [];
-            if (typeof first_filter == 'string') {
-                for (x = 0; x < this.internal_connections.length; x++) {
-                    if (this.internal_connections[x].type == first_filter) {
-                        result.push(this.internal_connections[x].other);
-                    }
-                }
-            } else if (typeof first_filter == 'function') {
-                for (x = 0; x < this.internal_connections.length; x++) {
-                    if (first_filter(this.internal_connections[x].other)) {
-                        result.push(this.internal_connections[x].other);
-                    }
-                }
-            }
-
-            for (var f = 0; f < filters.length; f++) {
-                var filter = filters[f];
-
-                if (typeof filter == 'string') {
-                    for (x = result.length - 1; x >= 0; x--) {
-                        if (this.internal_connections[result[x]].type != filter) {
-                            result.splice(x, 1);
-                        }
-                    }
-                } else if (typeof filter == 'function') {
-                    for (x = result.length - 1; x >= 0; x--) {
-                        if (!filter(result[x])) {
-                            result.splice(x, 1);
-                        }
-                    }
-                }
-            }
-
-            return result;
-        };
-
-        Meta_Object.prototype.get_connection = function (filter) {
-            return this.get_connections(filter)[0];
-        };
-
-        Meta_Object.prototype.define_connection_getter = function (property_name, connection_name) {
-            this[property_name] = function (filter) {
-                return this.get_connections(connection_name, filter);
-            };
-        };
-
-        Meta_Object.prototype.define_object = function (property_name, connection_name) {
-            var property = {};
-            this[property_name] = property;
-
-            this.listen(this, 'connect.' + connection_name, function (item) {
-                property[item.name] = item;
-            });
-
-            this.listen(this, 'disconnect.' + connection_name, function (item) {
-                delete property[item];
-            });
-        };
-
-        Meta_Object.prototype.optimize_getter = function (property_name, connection_name) {
-            var array = [];
-            this[property_name] = array;
-
-            this.listen(this, 'connect.' + connection_name, function (item) {
-                array.push(item);
-            });
-
-            this.listen(this, 'disconnect.' + connection_name, function (item) {
-                MetaHub.remove(array, item);
-            });
-        };
-        return Meta_Object;
-    })();
-    MetaHub.Meta_Object = Meta_Object;
-
-    var Meta_Connection = (function () {
-        function Meta_Connection(parent, other, type) {
-            this.type = '';
-            this.parent = parent;
-            this.other = other;
-            this.type = type;
-        }
-        return Meta_Connection;
-    })();
-    MetaHub.Meta_Connection = Meta_Connection;
-})(MetaHub || (MetaHub = {}));
+/// <reference path="core/require.ts"/>
+var MetaHub = require('metahub');
 /**
 * User: Chris Johnson
 * Date: 9/19/13
@@ -540,6 +26,8 @@ var Ground;
 
             var table = Ground.Table.create_from_trellis(trellis);
             var sql = table.create_sql_from_trellis(trellis);
+
+            //      console.log('sql', sql)
             return this.query(sql).then(function () {
                 return table;
             });
@@ -564,7 +52,7 @@ var Ground;
             //        .then(()=> this.query('SET foreign_key_checks = 1'));
             return when.map(this.get_tables(), function (table) {
                 //        console.log('table', table);
-                return _this.query('DROP TABLE IF EXISTS ' + table);
+                return _this.query('DROP TABLE IF EXISTS `' + table + '`');
             });
         };
 
@@ -599,6 +87,13 @@ var Ground;
             connection.end();
 
             return def.promise;
+        };
+
+        Database.prototype.query_single = function (sql, args) {
+            if (typeof args === "undefined") { args = undefined; }
+            return this.query(sql, args).then(function (rows) {
+                return rows[0];
+            });
         };
         return Database;
     })();
@@ -781,7 +276,22 @@ else
             if (!parent.primary_key)
                 throw new Error(parent.name + ' needs a primary key when being inherited by ' + this.name + '.');
 
-            parent.clone_property(parent.primary_key, this);
+            var keys;
+
+            if (parent.table && parent.table.primary_keys) {
+                keys = parent.table.primary_keys;
+                if (!this.table)
+                    this.table = Ground.Table.create_from_trellis(this);
+
+                this.table.primary_keys = keys;
+                console.log('table', this.table);
+            } else {
+                keys = [parent.primary_key];
+            }
+
+            for (var i = 0; i < keys.length; ++i) {
+                parent.clone_property(keys[i], this);
+            }
             this.primary_key = parent.primary_key;
         };
         return Trellis;
@@ -801,6 +311,7 @@ var Ground;
             if (typeof base_path === "undefined") { base_path = null; }
             this.joins = [];
             this.filters = [];
+            this.property_filters = {};
             this.post_clauses = [];
             this.include_links = true;
             this.fields = [];
@@ -830,37 +341,17 @@ else
                 this.add_arguments(arguments);
         };
 
-        Query.prototype.add_property_filter = function (property, value, like) {
+        Query.prototype.add_property_filter = function (property, value, operator) {
             if (typeof value === "undefined") { value = null; }
-            if (typeof like === "undefined") { like = false; }
-            property = this.trellis.sanitize_property(property);
+            if (typeof operator === "undefined") { operator = '='; }
+            if (Query.operators.indexOf(operator) === -1)
+                throw new Error("Invalid operator: '" + operator + "'.");
 
-            var placeholder = ':' + property.name + '_filter';
-            if (value === 'null' && property.type != 'string') {
-                this.filters.push(property.query() + ' IS NULL');
-                return;
-            }
-
-            if (value !== null)
-                value = this.ground.convert_value(value, property.type);
-
-            if (property.get_relationship() == Ground.Relationships.many_to_many) {
-                this.add_property_join(property, placeholder, true);
-            } else {
-                if (like) {
-                    this.filters.push(property.query() + ' LIKE ' + placeholder);
-                    if (value !== null)
-                        value = '%' + value + '%';
-                } else {
-                    this.filters.push(property.query() + ' = ' + placeholder);
-                }
-            }
-
-            if (value !== null) {
-                var args = {};
-                args[placeholder] = value;
-                this.add_arguments(args);
-            }
+            this.property_filters[property] = {
+                property: property,
+                value: value,
+                operator: operator
+            };
         };
 
         Query.prototype.add_key_filter = function (value) {
@@ -882,13 +373,6 @@ else
             if (arguments) {
                 this.add_arguments(arguments);
             }
-        };
-
-        Query.prototype.add_property_join = function (property, id, reverse) {
-            if (typeof reverse === "undefined") { reverse = false; }
-            var join = new Ground.Link_Trellis(property);
-            var join_sql = join.generate_join(id, reverse);
-            this.add_join(join_sql);
         };
 
         Query.prototype.add_post = function (clause, arguments) {
@@ -933,11 +417,13 @@ else
                 return ' LIMIT ' + offset + ', ' + limit;
             }
         };
-
         Query.prototype.generate_sql = function (properties) {
             var data = this.get_fields_and_joins(properties);
+            var data2 = this.process_property_filters();
             var fields = data.fields.concat(this.fields);
-            var joins = data.joins.concat(this.joins);
+            var joins = data.joins.concat(this.joins, data2.joins);
+            var args = MetaHub.concat(this.arguments, data2.arguments);
+            var filters = this.filters.concat(data2.filters);
 
             if (fields.length == 0)
                 throw new Error('No authorized fields found for trellis ' + this.main_table + '.');
@@ -954,8 +440,8 @@ else
             if (this.post_clauses.length > 0)
                 sql += " " + this.post_clauses.join(" ");
 
-            for (var pattern in this.arguments) {
-                var value = this.arguments[pattern];
+            for (var pattern in args) {
+                var value = args[pattern];
                 sql = sql.replace(new RegExp(pattern), Ground.Property.get_field_value_sync(value));
             }
             return sql;
@@ -995,15 +481,21 @@ else
             };
         };
 
+        Query.prototype.generate_property_join = function (property, id, reverse) {
+            if (typeof reverse === "undefined") { reverse = false; }
+            var join = new Ground.Link_Trellis(property);
+            return join.generate_join(id, reverse);
+        };
+
         Query.prototype.get_many_list = function (id, property, relationship) {
             var other_property = property.get_other_property();
             var query = new Query(other_property.parent, this.get_path(property.name));
             query.include_links = false;
             query.expansions = this.expansions;
             if (relationship === Ground.Relationships.many_to_many)
-                query.add_property_join(property, id);
+                query.add_join(query.generate_property_join(property, id));
 else if (relationship === Ground.Relationships.one_to_many)
-                query.add_property_filter(other_property, id);
+                query.add_property_filter(other_property.name, id);
 
             return query.run();
         };
@@ -1018,7 +510,6 @@ else if (relationship === Ground.Relationships.one_to_many)
                 items.push(this.base_path);
 
             items = items.concat(args);
-
             return items.join('/');
         };
 
@@ -1109,20 +600,73 @@ else if (relationship === Ground.Relationships.one_to_many)
             });
         };
 
+        Query.prototype.process_property_filter = function (filter) {
+            var result = {
+                filters: [],
+                arguments: {},
+                joins: []
+            };
+            var property = this.trellis.sanitize_property(filter.property);
+            var value = filter.value;
+
+            var placeholder = ':' + property.name + '_filter';
+            if (value === 'null' && property.type != 'string') {
+                result.filters.push(property.query() + ' IS NULL');
+                return result;
+            }
+
+            if (value !== null)
+                value = this.ground.convert_value(value, property.type);
+
+            if (property.get_relationship() == Ground.Relationships.many_to_many) {
+                result.joins.push(this.generate_property_join(property, placeholder, true));
+            } else {
+                if (filter.operator.toLowerCase() == 'like') {
+                    result.filters.push(property.query() + ' LIKE ' + placeholder);
+                    if (value !== null)
+                        value = '%' + value + '%';
+                } else {
+                    result.filters.push(property.query() + ' = ' + placeholder);
+                }
+            }
+
+            if (value !== null) {
+                result.arguments[placeholder] = value;
+            }
+
+            return result;
+        };
+
+        Query.prototype.process_property_filters = function () {
+            var result = {};
+            for (var i in this.property_filters) {
+                var filter = this.property_filters[i];
+                MetaHub.extend(result, this.process_property_filter(filter));
+            }
+            return result;
+        };
+
         Query.prototype.run = function (args) {
             if (typeof args === "undefined") { args = {}; }
             var _this = this;
             var properties = this.trellis.get_all_properties();
-            var sql = this.generate_sql(properties);
-            sql = sql.replace(/\r/g, "\n");
-            if (Query.log_queries)
-                console.log('query', sql);
+            var tree = this.trellis.get_tree();
+            var promises = tree.map(function (trellis) {
+                return _this.ground.invoke(trellis.name + '.query', _this);
+            });
 
-            var args = MetaHub.values(this.arguments).concat(args);
-            return this.db.query(sql).then(function (rows) {
-                return when.all(rows.map(function (row) {
-                    return _this.process_row(row, properties);
-                }));
+            return when.all(promises).then(function () {
+                var sql = _this.generate_sql(properties);
+                sql = sql.replace(/\r/g, "\n");
+                if (Query.log_queries)
+                    console.log('query', sql);
+
+                var args = MetaHub.values(_this.arguments).concat(args);
+                return _this.db.query(sql).then(function (rows) {
+                    return when.all(rows.map(function (row) {
+                        return _this.process_row(row, properties);
+                    }));
+                });
             });
         };
 
@@ -1147,6 +691,11 @@ else if (relationship === Ground.Relationships.one_to_many)
             });
         };
         Query.log_queries = false;
+        Query.operators = [
+            '=',
+            'LIKE',
+            '!='
+        ];
         return Query;
     })();
     Ground.Query = Query;
@@ -1185,9 +734,10 @@ else
 
                 var conditions = [];
                 var ids = [];
-                for (var key in primary_keys) {
+                for (var i in primary_keys) {
+                    var key = primary_keys[i];
                     ids[key] = this.seed[key];
-                    conditions.push(key + ' = ' + trellis.properties[key].get_field_value(ids[key]));
+                    conditions.push(key + ' = ' + Ground.Property.get_field_value_sync(ids[key]));
                 }
                 var condition_string = conditions.join(' AND ');
                 if (!condition_string)
@@ -1195,7 +745,7 @@ else
 
                 var sql = 'SELECT ' + primary_keys.join(', ') + ' FROM ' + trellis.get_table_name() + ' WHERE ' + condition_string;
 
-                return this.db.query(sql).then(function (id_result) {
+                return this.db.query_single(sql).then(function (id_result) {
                     if (!id_result)
                         return _this.create_record(trellis);
 else
@@ -1210,6 +760,7 @@ else
             var values = [];
             var core_properties = trellis.get_core_properties();
             var promises = [];
+
             for (var name in core_properties) {
                 var property = core_properties[name];
                 if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
@@ -1219,8 +770,6 @@ else
                         if (value.length == 0) {
                             throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
                         }
-
-                        //            console.log('  ', name, value)
                         values.push(value);
                     });
 
@@ -1236,7 +785,6 @@ else
                     console.log(sql);
 
                 return _this.db.query(sql).then(function (result) {
-                    //              console.log(arguments)
                     var id;
                     if (_this.seed[trellis.primary_key]) {
                         id = _this.seed[trellis.primary_key];
@@ -1246,7 +794,7 @@ else
                     }
 
                     return _this.update_links(trellis, id, true).then(function () {
-                        return _this.ground.invoke(trellis.name + '.create', _this.seed, trellis);
+                        return _this.ground.invoke(trellis.name + '.created', _this.seed, trellis);
                     });
                 });
             });
@@ -1294,7 +842,11 @@ else
                 return Math.round(new Date().getTime() / 1000).toString();
 
             if (!value && property.insert == 'author') {
-                throw new Error('Inserting author not yet supported');
+                if (!this.user_id)
+                    throw new Error('Cannot insert author because current user is not set.');
+
+                return this.user_id;
+                //        throw new Error('Inserting author not yet supported');
             }
 
             return value.toString();
@@ -1409,13 +961,17 @@ else
             var tree = this.trellis.get_tree().filter(function (t) {
                 return !t.is_virtual;
             });
-
-            var promises = tree.map(function (trellis) {
-                return _this.generate_sql(trellis);
+            var invoke_promises = tree.map(function (trellis) {
+                return _this.ground.invoke(trellis.name + '.update', _this, trellis);
             });
 
-            return when.all(promises).then(function () {
-                return _this.seed;
+            return when.all(invoke_promises).then(function () {
+                var promises = tree.map(function (trellis) {
+                    return _this.generate_sql(trellis);
+                });
+                return when.all(promises).then(function () {
+                    return _this.seed;
+                });
             });
         };
         Update.log_queries = false;
@@ -1576,6 +1132,9 @@ var Ground;
             for (var i in subset) {
                 var trellis = subset[i];
                 if (typeof trellis.parent === 'string') {
+                    if (!all[trellis.parent])
+                        throw new Error(trellis.name + ' references a parent that does not exist: ' + trellis.parent + '.');
+
                     trellis.set_parent(all[trellis.parent]);
                     trellis.check_primary_key();
                 }
@@ -1588,9 +1147,11 @@ var Ground;
             }
         };
 
-        Core.prototype.insert_object = function (trellis, seed) {
+        Core.prototype.insert_object = function (trellis, seed, uid, as_service) {
             if (typeof seed === "undefined") { seed = {}; }
-            return this.update_object(trellis, seed);
+            if (typeof uid === "undefined") { uid = null; }
+            if (typeof as_service === "undefined") { as_service = false; }
+            return this.update_object(trellis, seed, uid, as_service);
         };
 
         Core.is_private = function (property) {
@@ -1601,8 +1162,9 @@ var Ground;
             return property.is_private || property.is_readonly;
         };
 
-        Core.prototype.update_object = function (trellis, seed, as_service) {
+        Core.prototype.update_object = function (trellis, seed, uid, as_service) {
             if (typeof seed === "undefined") { seed = {}; }
+            if (typeof uid === "undefined") { uid = null; }
             if (typeof as_service === "undefined") { as_service = false; }
             var trellis = this.sanitize_trellis_argument(trellis);
 
@@ -1611,6 +1173,7 @@ var Ground;
 
             this.invoke(trellis.name + '.update', seed, trellis);
             var update = new Ground.Update(trellis, seed, this);
+            update.user_id = uid;
             update.is_service = as_service;
             return update.run();
         };
@@ -1783,7 +1346,6 @@ else
         };
 
         Table.prototype.create_sql_from_trellis = function (trellis) {
-            var primary_keys;
             if (!trellis) {
                 if (!this.trellis)
                     throw new Error('No valid trellis to generate sql from.');
@@ -1815,18 +1377,31 @@ else
                 fields.push(field);
             }
 
+            var primary_keys = this.get_primary_keys(trellis);
+
+            return Table.create_sql_from_array(this.name, fields, primary_keys, this.indexes);
+        };
+
+        Table.prototype.get_primary_keys = function (trellis) {
+            if (!this.primary_keys && trellis.parent) {
+                var parent = trellis.parent;
+                do {
+                    if (parent.table && parent.table.primary_keys) {
+                        return parent.table.primary_keys;
+                    }
+                } while(parent = parent.parent);
+            }
+
             if (this.primary_keys && this.primary_keys.length > 0) {
-                primary_keys = this.primary_keys.map(function (name) {
+                return this.primary_keys.map(function (name) {
                     if (!trellis.properties[name])
                         throw new Error('Error creating ' + trellis.name + '; it does not have a primary key named ' + name + '.');
 
                     return trellis.properties[name].get_field_name();
                 });
-            } else {
-                primary_keys = [trellis.properties[trellis.primary_key].get_field_name()];
             }
 
-            return Table.create_sql_from_array(this.name, fields, primary_keys, this.indexes);
+            return [trellis.properties[trellis.primary_key].get_field_name()];
         };
 
         Table.format_value = function (value) {
@@ -2085,7 +1660,7 @@ else if (value === false)
                 value = 'FALSE';
             if (value === null || value === undefined)
                 value = 'NULL';
-else if (this.type == 'string' || this.type == 'text') {
+else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
                 value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
             } else if (this.type == 'reference' && typeof value === 'object') {
                 //        console.log(value.other_trellis, this.other_trellis.name)
@@ -2202,7 +1777,8 @@ var Ground;
             return query.run();
         };
 
-        Irrigation.prototype.update = function (request) {
+        Irrigation.prototype.update = function (request, uid) {
+            if (typeof uid === "undefined") { uid = null; }
             var promises = [];
 
             if (!request.objects)
@@ -2210,7 +1786,7 @@ var Ground;
 
             for (var i = 0; i < request.objects.length; ++i) {
                 var object = request.objects[i];
-                var promise = this.ground.update_object(object.trellis, object);
+                var promise = this.ground.update_object(object.trellis, object, uid);
                 promises.push(promise);
             }
 
@@ -2227,7 +1803,7 @@ var Ground;
 /// <reference path="core/require.ts"/>
 /// <reference path="../defs/when.d.ts"/>
 /// <reference path="../defs/linq.d.ts"/>
-/// <reference path="../../metahub/metahub.ts"/>
+/// <reference path="../../metahub/metahub.d.ts"/>
 /// <reference path="core/Core.ts"/>
 /// <reference path="db/Table.ts"/>
 /// <reference path="db/Link_Trellis.ts"/>

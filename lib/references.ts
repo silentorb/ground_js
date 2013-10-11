@@ -8,7 +8,7 @@
 /// <reference path="../defs/when.d.ts"/>
 /// <reference path="../defs/linq.d.ts"/>
 
-/// <reference path="../../metahub/metahub.ts"/>
+/// <reference path="../../metahub/metahub.d.ts"/>
 
 /// <reference path="core/Core.ts"/>
 /// <reference path="db/Table.ts"/>

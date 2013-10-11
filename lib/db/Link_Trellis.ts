@@ -19,19 +19,32 @@ module Ground {
       this.args = this.get_arguments(property);
     }
 
-    generate_join(id, reverse:boolean = false){
+    generate_join(id, reverse:boolean = false) {
       var sql;
-      if(reverse){
+      if (reverse) {
         sql = "JOIN %table_name ON %table_name.%second_key = %forward_id" +
-        " AND %table_name.%first_key = " + id + "\n";
+          " AND %table_name.%first_key = " + id + "\n";
       }
       else {
         sql = "JOIN %table_name ON %table_name.%second_key = " + id +
-        " AND %table_name.%first_key = %back_id\n";
+          " AND %table_name.%first_key = %back_id\n";
       }
 
       return Link_Trellis.populate_sql(sql, this.args);
     }
+
+    generate_delete(first_id, second_id) {
+      var sql = "DELETE FROM %table_name WHERE %table_name.%first_key = " + first_id +
+        " AND %table_name.%second_key = " + second_id + "\n;"
+      return Link_Trellis.populate_sql(sql, this.args);
+    }
+
+    generate_insert(first_id, second_id) {
+      var sql = "REPLACE INTO %table_name (`%first_key`, `%second_key`) VALUES ("
+        + first_id + ", " + second_id + ")\n;"
+      return Link_Trellis.populate_sql(sql, this.args);
+    }
+
     get_arguments(property) {
       var other_property = property.get_other_property();
       var first_key, second_key;
@@ -80,9 +93,9 @@ module Ground {
       return result;
     }
 
-    static populate_sql(sql:string, args):string{
+    static populate_sql(sql:string, args):string {
       var result = sql;
-      for(var a in args) {
+      for (var a in args) {
         result = result.replace(new RegExp(a, 'g'), args[a]);
       }
       return result;

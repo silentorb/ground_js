@@ -167,6 +167,9 @@ module Ground {
       for (var i in subset) {
         var trellis = subset[i];
         if (typeof trellis.parent === 'string') {
+          if (!all[trellis.parent])
+            throw new Error(trellis.name + ' references a parent that does not exist: ' + trellis.parent + '.')
+
           trellis.set_parent(all[trellis.parent]);
           trellis.check_primary_key();
         }
@@ -179,8 +182,8 @@ module Ground {
       }
     }
 
-    insert_object(trellis, seed:ISeed = {}):Promise {
-      return this.update_object(trellis, seed);
+    insert_object(trellis, seed:ISeed = {}, uid = null, as_service = false):Promise {
+      return this.update_object(trellis, seed, uid, as_service);
     }
 
     static is_private(property:Property):boolean {
@@ -191,7 +194,7 @@ module Ground {
       return property.is_private || property.is_readonly;
     }
 
-    update_object(trellis, seed:ISeed = {}, as_service = false):Promise {
+    update_object(trellis, seed:ISeed = {}, uid = null, as_service:boolean = false ):Promise {
       var trellis = this.sanitize_trellis_argument(trellis);
 
       // If _deleted is an object then it is a list of links
@@ -202,6 +205,7 @@ module Ground {
 
       this.invoke(trellis.name + '.update', seed, trellis);
       var update = new Update(trellis, seed, this);
+      update.user_id = uid
       update.is_service = as_service;
       return update.run();
     }

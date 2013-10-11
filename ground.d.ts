@@ -107,11 +107,29 @@ declare module Ground {
     interface IService_Response {
         objects: any[];
     }
+    interface Filter {
+        property: string;
+        value;
+        operator: string;
+    }
+    interface External_Query_Source {
+        fields?;
+        filters?: any[];
+    }
+    interface Internal_Query_Source {
+        fields?;
+        filters?: any[];
+        joins?: string[];
+        arguments?;
+    }
     class Query {
         public ground: Ground.Core;
         public main_table: string;
         public joins: string[];
         public filters: string[];
+        public property_filters: {
+            [name: string]: Filter;
+        };
         public post_clauses: any[];
         public limit: string;
         public trellis: Ground.Trellis;
@@ -122,15 +140,15 @@ declare module Ground {
         public arguments: {};
         public expansions: string[];
         static log_queries: boolean;
+        static operators: string[];
         private links;
         constructor(trellis: Ground.Trellis, base_path?: string);
         public add_arguments(args): void;
         public add_filter(clause: string, arguments?: any[]): void;
-        public add_property_filter(property, value?, like?: boolean): void;
+        public add_property_filter(property: string, value?, operator?: string): void;
         public add_key_filter(value): void;
         public add_field(clause: string, arguments?): void;
         public add_join(clause: string, arguments?): void;
-        public add_property_join(property: Ground.Property, id, reverse?: boolean): void;
         public add_post(clause: string, arguments?): void;
         public add_expansion(clause): void;
         public add_link(property): void;
@@ -138,22 +156,22 @@ declare module Ground {
         public generate_sql(properties): string;
         public get_fields_and_joins(properties: {
             [name: string]: Ground.Property;
-        }, include_primary_key?: boolean): {
-            fields: string[];
-            joins: any[];
-        };
+        }, include_primary_key?: boolean): Internal_Query_Source;
+        public generate_property_join(property: Ground.Property, id, reverse?: boolean): string;
         public get_many_list(id, property: Ground.Property, relationship: Ground.Relationships): Promise;
         public get_path(...args: string[]): string;
         public get_reference_object(row, property: Ground.Property): Promise;
         public has_expansion(path: string): boolean;
         public process_row(row, authorized_properties?): Promise;
+        public process_property_filter(filter): Internal_Query_Source;
+        public process_property_filters(): Internal_Query_Source;
         public run(args?: {}): Promise;
         public run_as_service(arguments?: {}): Promise;
     }
 }
 declare module Ground {
     class Update {
-        private seed;
+        public seed: Ground.ISeed;
         private fields;
         public override: boolean;
         public trellis: Ground.Trellis;
@@ -263,6 +281,7 @@ declare module Ground {
         static create_from_trellis(trellis: Ground.Trellis, ground?: Ground.Core): Table;
         static create_sql_from_array(table_name: string, source: any[], primary_keys?: any[], indexes?: any[]): string;
         public create_sql_from_trellis(trellis: Ground.Trellis): string;
+        private get_primary_keys(trellis);
         static format_value(value);
         static generate_index_sql(name: string, index): string;
         public load_from_schema(source): void;

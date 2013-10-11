@@ -127,7 +127,7 @@ module Ground {
         value = 'FALSE';
       if (value === null || value === undefined)
         value = 'NULL';
-      else if (this.type == 'string' || this.type == 'text') {
+      else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
         value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
       }
       else if (this.type == 'reference' && typeof value === 'object') {

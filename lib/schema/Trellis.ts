@@ -85,6 +85,13 @@ module Ground {
 //      );
     }
 
+    get_id(source) {
+      if (source && typeof source === 'object')
+        return source[this.primary_key];
+
+      return source;
+    }
+
     get_join(main_table:string):string {
       if (!this.parent)
         return null;
@@ -183,7 +190,23 @@ module Ground {
       if (!parent.primary_key)
         throw new Error(parent.name + ' needs a primary key when being inherited by ' + this.name + '.');
 
-      parent.clone_property(parent.primary_key, this);
+      var keys;
+//      console.log(this.name, parent.name)
+      if (parent.table && parent.table.primary_keys) {
+        keys = parent.table.primary_keys;
+        if (!this.table)
+          this.table = Table.create_from_trellis(this)
+
+        this.table.primary_keys = keys
+        console.log('table', this.table)
+      }
+      else {
+        keys = [ parent.primary_key ]
+      }
+
+      for (var i = 0; i < keys.length; ++i) {
+        parent.clone_property(keys[i], this);
+      }
       this.primary_key = parent.primary_key;
     }
   }

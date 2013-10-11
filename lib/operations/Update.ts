@@ -5,8 +5,8 @@
 /// <reference path="../references.ts"/>
 
 module Ground {
- export class Update {
-    private seed:ISeed;
+  export class Update {
+    seed:ISeed;
     private fields:any[];
     override:boolean = true;
     trellis:Trellis;
@@ -14,6 +14,7 @@ module Ground {
     ground:Core;
     db:Database;
     is_service:boolean = false;
+    user_id
     static log_queries:boolean = false;
 
     constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
@@ -24,7 +25,7 @@ module Ground {
       this.db = ground.db;
     }
 
-    private  generate_sql(trellis:Trellis):Promise {
+    private generate_sql(trellis:Trellis):Promise {
       var duplicate = '', primary_keys;
       var id = this.seed[trellis.primary_key];
       if (!id && id !== 0) {
@@ -39,9 +40,10 @@ module Ground {
 
         var conditions = [];
         var ids = [];
-        for (var key in primary_keys) {
+        for (var i in primary_keys) {
+          var key = primary_keys[i]
           ids[key] = this.seed[key];
-          conditions.push(key + ' = ' + trellis.properties[key].get_field_value(ids[key]));
+          conditions.push(key + ' = ' + Property.get_field_value_sync(ids[key]));
         }
         var condition_string = conditions.join(' AND ');
         if (!condition_string)
@@ -50,7 +52,7 @@ module Ground {
         var sql = 'SELECT ' + primary_keys.join(', ') + ' FROM ' + trellis.get_table_name()
           + ' WHERE ' + condition_string;
 
-        return this.db.query(sql)
+        return this.db.query_single(sql)
           .then((id_result) => {
             if (!id_result)
               return this.create_record(trellis);
@@ -65,6 +67,7 @@ module Ground {
       var values = [];
       var core_properties = trellis.get_core_properties();
       var promises = [];
+
       for (var name in core_properties) {
         var property = core_properties[name];
         if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
@@ -74,8 +77,6 @@ module Ground {
             if (value.length == 0) {
               throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
             }
-
-//            console.log('  ', name, value)
             values.push(value);
           });
 
@@ -93,7 +94,6 @@ module Ground {
 
           return this.db.query(sql)
             .then((result) => {
-//              console.log(arguments)
               var id;
               if (this.seed[trellis.primary_key]) {
                 id = this.seed[trellis.primary_key];
@@ -105,10 +105,10 @@ module Ground {
 
               return this.update_links(trellis, id, true)
                 .then(()=> {
-                  return this.ground.invoke(trellis.name + '.create', this.seed, trellis);
-                });
-            });
-        });
+                  return this.ground.invoke(trellis.name + '.created', this.seed, trellis);
+                })
+            })
+        })
     }
 
     private update_record(trellis:Trellis, id, key_condition):Promise {
@@ -155,7 +155,11 @@ module Ground {
         return Math.round(new Date().getTime() / 1000).toString()
 
       if (!value && property.insert == 'author') {
-        throw new Error('Inserting author not yet supported');
+        if (!this.user_id)
+          throw new Error('Cannot insert author because current user is not set.')
+
+        return this.user_id
+//        throw new Error('Inserting author not yet supported');
       }
 
       return value.toString();
@@ -227,8 +231,36 @@ module Ground {
       if (!MetaHub.is_array(list))
         return when.resolve();
 
-//      var join = new Link_Trellis(property);
-      throw new Error('Not yet implemented');
+      var join = new Link_Trellis(property);
+      var other_trellis = property.get_referenced_trellis()
+      var promises = []
+
+      for (var i = 0; i < list.length; i++) {
+        var seed = list[i]
+        var other_id = other_trellis.get_id(seed)
+
+        // Clients can use the _remove flag to detach items from lists without deleting them
+        if (typeof seed === 'object' && seed._remove) {
+          if (other_id !== null) {
+            var sql = join.generate_delete_row(id, other_id)
+            promises.push(this.ground.invoke(join.table_name + '.delete', property, id, other_id, join)
+              .then(() => this.db.query(sql))
+            )
+          }
+        }
+        else {
+          if (other_id === null) {
+            seed = this.ground.update_object(other_trellis, seed, this.user_id)
+            other_id = other_trellis.get_id(seed)
+          }
+
+          promises.push(this.db.query(join.generate_insert(other_id, id))
+            .then(() => this.ground.invoke(join.table_name + '.create', property, id, other_id, join))
+          )
+        }
+      }
+
+      return when.all(promises)
     }
 
     private update_one_to_many(property:Property, id):Promise {
@@ -266,13 +298,18 @@ module Ground {
       return this.ground.update_object(trellis, object);
     }
 
-    public  run():Promise {
+    public run():Promise {
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
+      var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this, trellis));
 
-      var promises = tree.map((trellis:Trellis) => this.generate_sql(trellis));
-
-      return when.all(promises)
-        .then(()=> this.seed);
+      return when.all(invoke_promises)
+        .then(()=> {
+          var promises = tree.map((trellis:Trellis) => this.generate_sql(trellis));
+          return when.all(promises)
+            .then(()=> {
+              return this.seed
+            })
+        })
     }
   }
 }

@@ -24,6 +24,7 @@ module Ground {
 
       var table = Table.create_from_trellis(trellis);
       var sql = table.create_sql_from_trellis(trellis);
+//      console.log('sql', sql)
       return this.query(sql)
         .then(()=>table)
     }
@@ -43,7 +44,7 @@ module Ground {
 //        .then(()=> this.query('SET foreign_key_checks = 1'));
       return when.map(this.get_tables(), (table) => {
 //        console.log('table', table);
-        return this.query('DROP TABLE IF EXISTS ' + table);
+        return this.query('DROP TABLE IF EXISTS `' + table + '`');
       });
     }
 
@@ -76,5 +77,11 @@ module Ground {
 
       return def.promise;
     }
-  }
+
+    query_single(sql:string, args:any[] = undefined):Promise {
+      return this.query(sql, args)
+        .then((rows) => rows[0])
+    }
+
+    }
 }

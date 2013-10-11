@@ -82,7 +82,6 @@ module Ground {
     }
 
     create_sql_from_trellis(trellis:Trellis):string {
-      var primary_keys;
       if (!trellis) {
         if (!this.trellis)
           throw new Error('No valid trellis to generate sql from.');
@@ -115,19 +114,34 @@ module Ground {
         fields.push(field);
       }
 
+      var primary_keys = this.get_primary_keys(trellis);
+
+      return Table.create_sql_from_array(this.name, fields, primary_keys, this.indexes);
+    }
+
+    private get_primary_keys(trellis:Trellis):string[] {
+
+      // Inherit primary keys
+      if (!this.primary_keys && trellis.parent) {
+        var parent = trellis.parent;
+        do {
+          if (parent.table && parent.table.primary_keys) {
+            return parent.table.primary_keys;
+          }
+        }
+        while (parent = parent.parent)
+      }
+
       if (this.primary_keys && this.primary_keys.length > 0) {
-        primary_keys = this.primary_keys.map((name) => {
+        return this.primary_keys.map((name) => {
           if (!trellis.properties[name])
             throw new Error('Error creating ' + trellis.name + '; it does not have a primary key named ' + name + '.');
 
           return trellis.properties[name].get_field_name();
         });
       }
-      else {
-        primary_keys = [ trellis.properties[trellis.primary_key].get_field_name() ];
-      }
 
-      return Table.create_sql_from_array(this.name, fields, primary_keys, this.indexes);
+      return [ trellis.properties[trellis.primary_key].get_field_name() ];
     }
 
     static format_value(value) {

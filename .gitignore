@@ -1,5 +1,2 @@
-node_modules/buster
-node_modules/.bin
-node_modules/buster-coffee
-node_modules/metahub
+node_modules
 npm-debug.log

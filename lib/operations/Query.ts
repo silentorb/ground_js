@@ -8,32 +8,57 @@
 module Ground {
 
   interface ILink {
-    other:Trellis;
-    property:Property;
+    other:Trellis
+    property:Property
   }
 
   export interface IService_Response {
-    objects:any[];
+    objects:any[]
+  }
+
+  export interface Filter {
+    property:string
+    value
+    operator:string
+  }
+
+  export interface External_Query_Source {
+    fields?
+    filters?:any[]
+  }
+
+  export interface Internal_Query_Source {
+    fields?
+    filters?:any[]
+    joins?:string[]
+    arguments?
+
   }
 
   export class Query {
     ground:Core;
-    main_table:string;
-    joins:string[] = [];
-    filters:string[] = [];
-    post_clauses:any[] = [];
-    limit:string;
-    trellis:Trellis;
-    db:Database;
-    include_links:boolean = true;
-    fields:string[] = [];
-    base_path:string;
-    arguments = {};
+    main_table:string
+    joins:string[] = []
+    filters:string[] = []
+    property_filters:{ [name: string]: Filter; } = {};
+    post_clauses:any[] = []
+    limit:string
+    trellis:Trellis
+    db:Database
+    include_links:boolean = true
+    fields:string[] = []
+    base_path:string
+    arguments = {}
     expansions:string[] = []
 
-    static log_queries:boolean = false;
+    static log_queries:boolean = false
+    public static operators = [
+      '=',
+      'LIKE',
+      '!='
+    ]
 
-    private links:ILink[] = [];
+    private links:ILink[] = []
 
     constructor(trellis:Trellis, base_path:string = null) {
       this.trellis = trellis;
@@ -59,36 +84,14 @@ module Ground {
         this.add_arguments(arguments);
     }
 
-    add_property_filter(property, value = null, like:boolean = false) {
-      property = this.trellis.sanitize_property(property);
+    add_property_filter(property:string, value = null, operator:string = '=') {
+      if (Query.operators.indexOf(operator) === -1)
+        throw new Error("Invalid operator: '" + operator + "'.")
 
-      var placeholder = ':' + property.name + '_filter';
-      if (value === 'null' && property.type != 'string') {
-        this.filters.push(property.query() + ' IS NULL');
-        return;
-      }
-
-      if (value !== null)
-        value = this.ground.convert_value(value, property.type);
-
-      if (property.get_relationship() == Relationships.many_to_many) {
-        this.add_property_join(property, placeholder, true);
-      }
-      else {
-        if (like) {
-          this.filters.push(property.query() + ' LIKE ' + placeholder);
-          if (value !== null)
-            value = '%' + value + '%';
-        }
-        else {
-          this.filters.push(property.query() + ' = ' + placeholder);
-        }
-      }
-
-      if (value !== null) {
-        var args = {};
-        args[placeholder] = value;
-        this.add_arguments(args)
+      this.property_filters[property] = {
+        property: property,
+        value: value,
+        operator: operator
       }
     }
 
@@ -109,12 +112,6 @@ module Ground {
       if (arguments) {
         this.add_arguments(arguments);
       }
-    }
-
-    add_property_join(property:Property, id, reverse:boolean = false) {
-      var join = new Link_Trellis(property);
-      var join_sql = join.generate_join(id, reverse);
-      this.add_join(join_sql);
     }
 
     add_post(clause:string, arguments = null) {
@@ -157,11 +154,13 @@ module Ground {
         return ' LIMIT ' + offset + ', ' + limit;
       }
     }
-
     generate_sql(properties):string {
-      var data = this.get_fields_and_joins(properties);
-      var fields = data.fields.concat(this.fields);
-      var joins = data.joins.concat(this.joins);
+      var data = this.get_fields_and_joins(properties)
+      var data2 = this.process_property_filters()
+      var fields = data.fields.concat(this.fields)
+      var joins = data.joins.concat(this.joins, data2.joins)
+      var args = MetaHub.concat(this.arguments,data2.arguments)
+      var filters = this.filters.concat(data2.filters)
 
       if (fields.length == 0)
         throw new Error('No authorized fields found for trellis ' + this.main_table + '.');
@@ -180,14 +179,14 @@ module Ground {
 
       // Temporary fix to simulate prepared statements.  Banking on the mysql module supporting them soon.
 
-      for (var pattern in this.arguments) {
-        var value = this.arguments[pattern];
+      for (var pattern in args) {
+        var value = args[pattern];
         sql = sql.replace(new RegExp(pattern), Property.get_field_value_sync(value));
       }
       return sql;
     }
 
-    get_fields_and_joins(properties:{ [name: string]: Property }, include_primary_key:boolean = true) {
+    get_fields_and_joins(properties:{ [name: string]: Property }, include_primary_key:boolean = true):Internal_Query_Source {
       var name, fields:string[] = [];
       var trellises:{ [name: string]: Trellis } = {};
       for (name in properties) {
@@ -221,15 +220,20 @@ module Ground {
       }
     }
 
+    generate_property_join(property:Property, id, reverse:boolean = false) {
+      var join = new Link_Trellis(property);
+      return join.generate_join(id, reverse);
+    }
+
     get_many_list(id, property:Property, relationship:Relationships):Promise {
       var other_property = property.get_other_property();
       var query = new Query(other_property.parent, this.get_path(property.name));
       query.include_links = false;
       query.expansions = this.expansions;
       if (relationship === Relationships.many_to_many)
-        query.add_property_join(property, id);
+        query.add_join(query.generate_property_join(property, id));
       else if (relationship === Relationships.one_to_many)
-        query.add_property_filter(other_property, id);
+        query.add_property_filter(other_property.name, id);
 
       return query.run();
     }
@@ -240,7 +244,6 @@ module Ground {
         items.push(this.base_path);
 
       items = items.concat(args);
-
       return items.join('/');
     }
 
@@ -323,16 +326,70 @@ module Ground {
         .then(()=> row)
     }
 
+    process_property_filter(filter):Internal_Query_Source {
+      var result = {
+        filters: [],
+        arguments: {},
+        joins: []
+      }
+      var property = this.trellis.sanitize_property(filter.property);
+      var value = filter.value;
+
+      var placeholder = ':' + property.name + '_filter';
+      if (value === 'null' && property.type != 'string') {
+        result.filters.push(property.query() + ' IS NULL');
+        return result;
+      }
+
+      if (value !== null)
+        value = this.ground.convert_value(value, property.type);
+
+      if (property.get_relationship() == Relationships.many_to_many) {
+        result.joins.push(this.generate_property_join(property, placeholder, true));
+      }
+      else {
+        if (filter.operator.toLowerCase() == 'like') {
+          result.filters.push(property.query() + ' LIKE ' + placeholder);
+          if (value !== null)
+            value = '%' + value + '%';
+        }
+        else {
+          result.filters.push(property.query() + ' = ' + placeholder);
+        }
+      }
+
+      if (value !== null) {
+        result.arguments[placeholder] = value;
+      }
+
+      return result;
+    }
+
+    process_property_filters():Internal_Query_Source {
+      var result = {}
+      for (var i in this.property_filters) {
+        var filter = this.property_filters[i]
+        MetaHub.extend(result, this.process_property_filter(filter))
+      }
+      return result
+    }
+
     run(args = {}):Promise {
       var properties = this.trellis.get_all_properties();
-      var sql = this.generate_sql(properties);
-      sql = sql.replace(/\r/g, "\n");
-      if (Query.log_queries)
-        console.log('query', sql);
+      var tree = this.trellis.get_tree()
+      var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', this));
 
-      var args = MetaHub.values(this.arguments).concat(args);
-      return this.db.query(sql)
-        .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
+      return when.all(promises)
+        .then(()=> {
+          var sql = this.generate_sql(properties);
+          sql = sql.replace(/\r/g, "\n");
+          if (Query.log_queries)
+            console.log('query', sql);
+
+          var args = MetaHub.values(this.arguments).concat(args);
+          return this.db.query(sql)
+            .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
+        });
     }
 
     run_as_service(arguments = {}):Promise {
