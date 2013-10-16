@@ -71,8 +71,8 @@ module Ground {
       return result;
     }
 
-    get_core_properties():Property[] {
-      var result = []
+    get_core_properties():{ [name: string]: Property } {
+      var result = {}
       for (var i in this.properties) {
         var property = this.properties[i];
         if (property.type != 'list')
@@ -154,6 +154,24 @@ module Ground {
       while (trellis = trellis.parent);
 
       return tree;
+    }
+
+    initialize(all) {
+      if (typeof this.parent === 'string') {
+        if (!all[this.parent])
+          throw new Error(this.name + ' references a parent that does not exist: ' + this.parent + '.')
+
+        this.set_parent(all[this.parent])
+        this.check_primary_key()
+      }
+
+      for (var j in this.properties) {
+        var property:Property = this.properties[j]
+        if (property.other_trellis_name) {
+          var other_trellis = property.other_trellis = all[property.other_trellis_name]
+          property.initialize_composite_reference(other_trellis)
+        }
+      }
     }
 
     load_from_object(source:ITrellis_Source) {

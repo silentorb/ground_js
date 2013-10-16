@@ -16,10 +16,20 @@ module Ground {
     objects:any[]
   }
 
-  export interface Filter {
+  export interface Query_Filter {
     property:string
     value
-    operator:string
+    operator?:string
+  }
+
+  export interface Query_Sort {
+    property
+    dir?
+  }
+
+  export interface Query_Wrapper {
+    start:string
+    end:string
   }
 
   export interface External_Query_Source {
@@ -40,7 +50,7 @@ module Ground {
     main_table:string
     joins:string[] = []
     filters:string[] = []
-    property_filters:{ [name: string]: Filter; } = {};
+    property_filters:{ [name: string]: Query_Filter; } = {};
     post_clauses:any[] = []
     limit:string
     trellis:Trellis
@@ -50,6 +60,7 @@ module Ground {
     base_path:string
     arguments = {}
     expansions:string[] = []
+    wrappers:Query_Wrapper[] = []
 
     static log_queries:boolean = false
     public static operators = [
@@ -63,7 +74,6 @@ module Ground {
     constructor(trellis:Trellis, base_path:string = null) {
       this.trellis = trellis;
       this.ground = trellis.ground;
-      this.expansions = this.ground.expansions;
       this.db = this.ground.db;
       this.main_table = trellis.get_table_name();
       if (base_path)
@@ -138,6 +148,27 @@ module Ground {
       this.links[property.name] = link;
     }
 
+    add_sort(sort:Query_Sort) {
+      if (!this.trellis.properties[sort.property])
+        throw new Error(this.trellis.name + ' does not contain sort property: ' + sort.property)
+
+      var sql = this.trellis.properties[sort.property].name
+
+      if (typeof sort.dir === 'string') {
+        var dir = sort.dir.toUpperCase()
+        if (dir == 'ASC')
+          sql += ' ASC'
+        else if (dir == 'DESC')
+          sql += ' DESC'
+      }
+
+      return sql
+    }
+
+    add_wrapper(wrapper:Query_Wrapper) {
+      this.wrappers.push(wrapper)
+    }
+
     generate_pager(offset:number = 0, limit:number = 0):string {
       offset = Math.round(offset);
       limit = Math.round(limit);
@@ -172,16 +203,21 @@ module Ground {
         sql += "\n" + joins.join("\n");
 
       if (this.filters.length > 0)
-        sql += "\nWHERE " + this.filters.join(" AND ");
+        sql += "\nWHERE " + this.filters.join(" AND ")
 
       if (this.post_clauses.length > 0)
-        sql += " " + this.post_clauses.join(" ");
+        sql += " " + this.post_clauses.join(" ")
 
       // Temporary fix to simulate prepared statements.  Banking on the mysql module supporting them soon.
 
       for (var pattern in args) {
         var value = args[pattern];
         sql = sql.replace(new RegExp(pattern), Property.get_field_value_sync(value));
+      }
+
+      for (var i = 0; i < this.wrappers.length; ++i) {
+        var wrapper = this.wrappers[i]
+        sql = wrapper.start + sql + wrapper.end
       }
       return sql;
     }

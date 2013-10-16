@@ -84,12 +84,11 @@ module Ground {
   }
 
   export class Core extends MetaHub.Meta_Object {
-    trellises:Trellis[] = [];
-    tables:Table[] = [];
-    views:Array<any> = [];
-    property_types:Property_Type[] = [];
-    db:Database;
-    expansions:any[] = []
+    trellises:Trellis[] = []
+    tables:Table[] = []
+    views:any[] = []
+    property_types:Property_Type[] = []
+    db:Database
 
     constructor(config, db_name:string) {
       super();
@@ -166,19 +165,7 @@ module Ground {
 
       for (var i in subset) {
         var trellis = subset[i];
-        if (typeof trellis.parent === 'string') {
-          if (!all[trellis.parent])
-            throw new Error(trellis.name + ' references a parent that does not exist: ' + trellis.parent + '.')
-
-          trellis.set_parent(all[trellis.parent]);
-          trellis.check_primary_key();
-        }
-
-        for (var j in trellis.properties) {
-          var property:Property = trellis.properties[j];
-          if (property.other_trellis_name)
-            property.other_trellis = this.trellises[property.other_trellis_name];
-        }
+trellis.initialize(all)
       }
     }
 
@@ -194,7 +181,7 @@ module Ground {
       return property.is_private || property.is_readonly;
     }
 
-    update_object(trellis, seed:ISeed = {}, uid = null, as_service:boolean = false ):Promise {
+    update_object(trellis, seed:ISeed = {}, uid = null, as_service:boolean = false):Promise {
       var trellis = this.sanitize_trellis_argument(trellis);
 
       // If _deleted is an object then it is a list of links
@@ -233,7 +220,7 @@ module Ground {
       this.parse_schema(data);
     }
 
-    load_tables(tables:Array<any>) {
+    load_tables(tables:any[]) {
       for (var name in tables) {
         var table_name;
 //        var trellis = this.trellises[name];
@@ -248,25 +235,29 @@ module Ground {
       }
     }
 
-    load_trellises(trellises:ITrellis_Source[]) {
+    load_trellises(trellises:ITrellis_Source[]):Trellis[] {
       var subset = [];
       for (var name in trellises) {
         var trellis = this.add_trellis(name, trellises[name], false);
         subset[name] = trellis;
       }
 
-      this.initialize_trellises(subset, this.trellises);
+      return subset
     }
 
     private parse_schema(data:ISchema_Source) {
+      var subset = null
       if (data.trellises)
-        this.load_trellises(data.trellises);
+        subset = this.load_trellises(data.trellises);
 
       if (data.views)
         this.views = this.views.concat(data.views);
 
       if (data.tables)
         this.load_tables(data.tables);
+
+      if (subset)
+        this.initialize_trellises(subset, this.trellises);
     }
 
     static remove_fields(object, trellis:Trellis, filter) {
@@ -302,4 +293,5 @@ module Ground {
   }
 }
 
-module.exports = Ground
+module.
+exports = Ground

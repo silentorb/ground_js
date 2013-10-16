@@ -1,16 +1,3 @@
-/**
-* User: Chris Johnson
-* Date: 10/9/13
-*/
-/// <reference path="core/require.ts"/>
-var MetaHub = require('metahub');
-/**
-* User: Chris Johnson
-* Date: 9/19/13
-*/
-/// <reference path="../references.ts"/>
-/// <reference path="../../defs/mysql.d.ts"/>
-/// <reference path="../../defs/when.d.ts"/>
 var when = require('when');
 
 var Ground;
@@ -27,7 +14,6 @@ var Ground;
             var table = Ground.Table.create_from_trellis(trellis);
             var sql = table.create_sql_from_trellis(trellis);
 
-            //      console.log('sql', sql)
             return this.query(sql).then(function () {
                 return table;
             });
@@ -35,7 +21,6 @@ var Ground;
 
         Database.prototype.create_tables = function (trellises) {
             var _this = this;
-            //      console.log(Object.keys(trellises));
             var promises = MetaHub.map_to_array(trellises, function (trellis) {
                 return _this.create_table(trellis);
             });
@@ -44,14 +29,7 @@ var Ground;
 
         Database.prototype.drop_all_tables = function () {
             var _this = this;
-            //      return this.query('SET foreign_key_checks = 0')
-            //        .then(when.map(this.get_tables(),(table) => {
-            //            console.log('table', table);
-            //            return this.query('DROP TABLE IF EXISTS ' + table);
-            //          }))
-            //        .then(()=> this.query('SET foreign_key_checks = 1'));
             return when.map(this.get_tables(), function (table) {
-                //        console.log('table', table);
                 return _this.query('DROP TABLE IF EXISTS `' + table + '`');
             });
         };
@@ -72,14 +50,12 @@ var Ground;
             connection = mysql.createConnection(this.settings[this.database]);
             connection.connect();
 
-            //      console.log('start', sql)
             connection.query(sql, args, function (err, rows, fields) {
                 if (err) {
                     console.log('error', sql);
                     throw err;
                 }
 
-                //        console.log('sql', sql)
                 def.resolve(rows, fields);
 
                 return null;
@@ -99,12 +75,6 @@ var Ground;
     })();
     Ground.Database = Database;
 })(Ground || (Ground = {}));
-/**
-* Created with JetBrains PhpStorm.
-* User: Chris Johnson
-* Date: 9/18/13
-*/
-/// <reference path="../references.ts"/>
 var Ground;
 (function (Ground) {
     var Trellis = (function () {
@@ -114,9 +84,7 @@ var Ground;
             this.table = null;
             this.name = null;
             this.primary_key = 'id';
-            // Property that are specific to this trellis and not inherited from a parent trellis
             this.properties = {};
-            // Every property including inherited properties
             this.all_properties = {};
             this.is_virtual = false;
             this.ground = ground;
@@ -170,7 +138,7 @@ var Ground;
         };
 
         Trellis.prototype.get_core_properties = function () {
-            var result = [];
+            var result = {};
             for (var i in this.properties) {
                 var property = this.properties[i];
                 if (property.type != 'list')
@@ -178,9 +146,13 @@ var Ground;
             }
 
             return result;
-            //      return Enumerable.From(this.properties).Where(
-            //        (p) => p.type != 'list'
-            //      );
+        };
+
+        Trellis.prototype.get_id = function (source) {
+            if (source && typeof source === 'object')
+                return source[this.primary_key];
+
+            return source;
         };
 
         Trellis.prototype.get_join = function (main_table) {
@@ -242,6 +214,24 @@ else
             return tree;
         };
 
+        Trellis.prototype.initialize = function (all) {
+            if (typeof this.parent === 'string') {
+                if (!all[this.parent])
+                    throw new Error(this.name + ' references a parent that does not exist: ' + this.parent + '.');
+
+                this.set_parent(all[this.parent]);
+                this.check_primary_key();
+            }
+
+            for (var j in this.properties) {
+                var property = this.properties[j];
+                if (property.other_trellis_name) {
+                    var other_trellis = property.other_trellis = all[property.other_trellis_name];
+                    property.initialize_composite_reference(other_trellis);
+                }
+            }
+        };
+
         Trellis.prototype.load_from_object = function (source) {
             for (var name in source) {
                 if (name != 'name' && name != 'properties' && this[name] !== undefined && source[name] !== undefined) {
@@ -298,12 +288,6 @@ else
     })();
     Ground.Trellis = Trellis;
 })(Ground || (Ground = {}));
-/**
-* Created with JetBrains PhpStorm.
-* User: Chris Johnson
-* Date: 9/18/13
-*/
-/// <reference path="../references.ts"/>
 var Ground;
 (function (Ground) {
     var Query = (function () {
@@ -317,10 +301,10 @@ var Ground;
             this.fields = [];
             this.arguments = {};
             this.expansions = [];
+            this.wrappers = [];
             this.links = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
-            this.expansions = this.ground.expansions;
             this.db = this.ground.db;
             this.main_table = trellis.get_table_name();
             if (base_path)
@@ -400,6 +384,27 @@ else
             this.links[property.name] = link;
         };
 
+        Query.prototype.add_sort = function (sort) {
+            if (!this.trellis.properties[sort.property])
+                throw new Error(this.trellis.name + ' does not contain sort property: ' + sort.property);
+
+            var sql = this.trellis.properties[sort.property].name;
+
+            if (typeof sort.dir === 'string') {
+                var dir = sort.dir.toUpperCase();
+                if (dir == 'ASC')
+                    sql += ' ASC';
+else if (dir == 'DESC')
+                    sql += ' DESC';
+            }
+
+            return sql;
+        };
+
+        Query.prototype.add_wrapper = function (wrapper) {
+            this.wrappers.push(wrapper);
+        };
+
         Query.prototype.generate_pager = function (offset, limit) {
             if (typeof offset === "undefined") { offset = 0; }
             if (typeof limit === "undefined") { limit = 0; }
@@ -443,6 +448,11 @@ else
             for (var pattern in args) {
                 var value = args[pattern];
                 sql = sql.replace(new RegExp(pattern), Ground.Property.get_field_value_sync(value));
+            }
+
+            for (var i = 0; i < this.wrappers.length; ++i) {
+                var wrapper = this.wrappers[i];
+                sql = wrapper.start + sql + wrapper.end;
             }
             return sql;
         };
@@ -700,11 +710,6 @@ else if (relationship === Ground.Relationships.one_to_many)
     })();
     Ground.Query = Query;
 })(Ground || (Ground = {}));
-/**
-* User: Chris Johnson
-* Date: 9/23/13
-*/
-/// <reference path="../references.ts"/>
 var Ground;
 (function (Ground) {
     var Update = (function () {
@@ -764,7 +769,6 @@ else
             for (var name in core_properties) {
                 var property = core_properties[name];
                 if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
-                    //          console.log('field', name, this.seed[property.name])
                     fields.push('`' + property.get_field_name() + '`');
                     var field_promise = this.get_field_value(property).then(function (value) {
                         if (value.length == 0) {
@@ -846,7 +850,6 @@ else
                     throw new Error('Cannot insert author because current user is not set.');
 
                 return this.user_id;
-                //        throw new Error('Inserting author not yet supported');
             }
 
             return value.toString();
@@ -856,7 +859,6 @@ else
             if (property.is_virtual)
                 return false;
 
-            // Ignore shared fields
             var field = property.get_field_override();
             if (field && field.share)
                 return false;
@@ -876,7 +878,6 @@ else
             if (property.is_virtual)
                 return false;
 
-            // Ignore shared fields
             var field = property.get_field_override();
             if (field && field.share)
                 return false;
@@ -913,11 +914,39 @@ else
 
         Update.prototype.update_many_to_many = function (property, id, create) {
             if (typeof create === "undefined") { create = false; }
+            var _this = this;
             var list = this.seed[property.name];
             if (!MetaHub.is_array(list))
                 return when.resolve();
 
-            throw new Error('Not yet implemented');
+            var join = new Ground.Link_Trellis(property);
+            var other_trellis = property.get_referenced_trellis();
+            var promises = [];
+
+            for (var i = 0; i < list.length; i++) {
+                var seed = list[i];
+                var other_id = other_trellis.get_id(seed);
+
+                if (typeof seed === 'object' && seed._remove) {
+                    if (other_id !== null) {
+                        var sql = join.generate_delete_row(id, other_id);
+                        promises.push(this.ground.invoke(join.table_name + '.delete', property, id, other_id, join).then(function () {
+                            return _this.db.query(sql);
+                        }));
+                    }
+                } else {
+                    if (other_id === null) {
+                        seed = this.ground.update_object(other_trellis, seed, this.user_id);
+                        other_id = other_trellis.get_id(seed);
+                    }
+
+                    promises.push(this.db.query(join.generate_insert(other_id, id)).then(function () {
+                        return _this.ground.invoke(join.table_name + '.create', property, id, other_id, join);
+                    }));
+                }
+            }
+
+            return when.all(promises);
         };
 
         Update.prototype.update_one_to_many = function (property, id) {
@@ -979,11 +1008,6 @@ else
     })();
     Ground.Update = Update;
 })(Ground || (Ground = {}));
-/**
-* User: Chris Johnson
-* Date: 9/25/13
-*/
-/// <reference path="../references.ts"/>
 var Ground;
 (function (Ground) {
     var Delete = (function () {
@@ -996,25 +1020,12 @@ var Ground;
     })();
     Ground.Delete = Delete;
 })(Ground || (Ground = {}));
-/**
-* Created with JetBrains PhpStorm.
-* User: Chris Johnson
-* Date: 9/18/13
-*/
 var __extends = this.__extends || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
     __.prototype = b.prototype;
     d.prototype = new __();
 };
-/// <reference path="../references.ts"/>
-/// <reference path="../db/Database.ts"/>
-/// <reference path="../schema/Trellis.ts"/>
-/// <reference path="../operations/Query.ts"/>
-/// <reference path="../operations/Update.ts"/>
-/// <reference path="../operations/Delete.ts"/>
-/// <reference path="../../defs/node.d.ts"/>
-//var MetaHub = require('metahub');
 var Ground;
 (function (Ground) {
     var Property_Type = (function () {
@@ -1056,7 +1067,6 @@ var Ground;
             this.tables = [];
             this.views = [];
             this.property_types = [];
-            this.expansions = [];
             this.db = new Ground.Database(config, db_name);
             var path = require('path');
             var filename = path.resolve(__dirname, 'property_types.json');
@@ -1109,9 +1119,6 @@ var Ground;
             return null;
         };
 
-        //    create_query(trellis:Trellis, base_path = '') {
-        //      return new Query(trellis, base_path);
-        //    }
         Core.prototype.create_query = function (trellis_name, base_path) {
             if (typeof base_path === "undefined") { base_path = ''; }
             var trellis = this.sanitize_trellis_argument(trellis_name);
@@ -1131,19 +1138,7 @@ var Ground;
 
             for (var i in subset) {
                 var trellis = subset[i];
-                if (typeof trellis.parent === 'string') {
-                    if (!all[trellis.parent])
-                        throw new Error(trellis.name + ' references a parent that does not exist: ' + trellis.parent + '.');
-
-                    trellis.set_parent(all[trellis.parent]);
-                    trellis.check_primary_key();
-                }
-
-                for (var j in trellis.properties) {
-                    var property = trellis.properties[j];
-                    if (property.other_trellis_name)
-                        property.other_trellis = this.trellises[property.other_trellis_name];
-                }
+                trellis.initialize(all);
             }
         };
 
@@ -1205,11 +1200,6 @@ var Ground;
             for (var name in tables) {
                 var table_name;
 
-                //        var trellis = this.trellises[name];
-                //        if (trellis)
-                //          table_name = trellis.get_table_name();
-                //        else
-                //          table_name = name;
                 var table = new Ground.Table(name, this);
                 table.load_from_schema(tables[name]);
                 this.tables[name] = table;
@@ -1223,18 +1213,22 @@ var Ground;
                 subset[name] = trellis;
             }
 
-            this.initialize_trellises(subset, this.trellises);
+            return subset;
         };
 
         Core.prototype.parse_schema = function (data) {
+            var subset = null;
             if (data.trellises)
-                this.load_trellises(data.trellises);
+                subset = this.load_trellises(data.trellises);
 
             if (data.views)
                 this.views = this.views.concat(data.views);
 
             if (data.tables)
                 this.load_tables(data.tables);
+
+            if (subset)
+                this.initialize_trellises(subset, this.trellises);
         };
 
         Core.remove_fields = function (object, trellis, filter) {
@@ -1273,17 +1267,11 @@ var Ground;
 })(Ground || (Ground = {}));
 
 module.exports = Ground;
-/**
-* User: Chris Johnson
-* Date: 9/19/13
-*/
-/// <reference path="../references.ts"/>
-/// <reference path="../../../metahub/metahub.ts"/>
 var Ground;
 (function (Ground) {
     var Table = (function () {
         function Table(name, ground) {
-            this.properties = [];
+            this.properties = {};
             this.name = name;
             this.ground = ground;
         }
@@ -1449,13 +1437,18 @@ else
     })();
     Ground.Table = Table;
 })(Ground || (Ground = {}));
-/**
-* User: Chris Johnson
-* Date: 10/1/13
-*/
-/// <reference path="../references.ts"/>
 var Ground;
 (function (Ground) {
+    var Link_Trellis2 = (function () {
+        function Link_Trellis2(property) {
+            this.properties = {};
+            this.property = property;
+            this.args = this.get_arguments(property);
+        }
+        return Link_Trellis2;
+    })();
+    Ground.Link_Trellis2 = Link_Trellis2;
+
     var Link_Trellis = (function () {
         function Link_Trellis(property) {
             this.id_suffix = '';
@@ -1473,12 +1466,21 @@ var Ground;
 
             return Link_Trellis.populate_sql(sql, this.args);
         };
+
+        Link_Trellis.prototype.generate_delete_row = function (first_id, second_id) {
+            var sql = "DELETE FROM %table_name WHERE %table_name.%first_key = " + first_id + " AND %table_name.%second_key = " + second_id + "\n;";
+            return Link_Trellis.populate_sql(sql, this.args);
+        };
+
+        Link_Trellis.prototype.generate_insert = function (first_id, second_id) {
+            var sql = "REPLACE INTO %table_name (`%first_key`, `%second_key`) VALUES (" + first_id + ", " + second_id + ")\n;";
+            return Link_Trellis.populate_sql(sql, this.args);
+        };
+
         Link_Trellis.prototype.get_arguments = function (property) {
             var other_property = property.get_other_property();
             var first_key, second_key;
 
-            // Since we are checking for an ideal cross table name,
-            // Use plural trellis names isntead of any table name overrides.
             var other_table = other_property.parent.get_plural();
             var temp = [other_table, property.parent.get_plural()];
             temp = temp.sort();
@@ -1501,6 +1503,7 @@ else if (field.trellis === other_property.other_trellis)
                         second_key = name;
                 }
 
+                console.log('info', first_key, second_key, table.name, result);
                 if (!first_key || !second_key)
                     throw new Error('Properties do not line up for cross table: ' + this.table_name + '.');
 
@@ -1531,14 +1534,6 @@ else if (field.trellis === other_property.other_trellis)
     })();
     Ground.Link_Trellis = Link_Trellis;
 })(Ground || (Ground = {}));
-/**
-* Created with JetBrains PhpStorm.
-* User: Chris Johnson
-* Date: 9/18/13
-* Time: 5:40 PM
-*/
-/// <reference path="../references.ts"/>
-/// <reference path="../../defs/when.d.ts"/>
 var Ground;
 (function (Ground) {
     (function (Relationships) {
@@ -1561,6 +1556,7 @@ var Ground;
             this.other_trellis_name = null;
             this.is_private = false;
             this.is_virtual = false;
+            this.composite_properties = null;
             for (var i in source) {
                 if (this.hasOwnProperty(i))
                     this[i] = source[i];
@@ -1573,6 +1569,22 @@ var Ground;
             this.name = name;
             this.parent = trellis;
         }
+        Property.prototype.initialize_composite_reference = function (other_trellis) {
+            var table = other_trellis.table;
+            if (table && table.primary_keys && table.primary_keys.length > 1) {
+                for (var i = 0; i < table.primary_keys.length; ++i) {
+                    var key = table.primary_keys[i];
+                    var name = other_trellis.name + '_' + key;
+                    if (key != other_trellis.primary_key) {
+                        var other_property = other_trellis.properties[key];
+                        var new_property = this.parent.add_property(name, other_property.get_data());
+                        this.composite_properties = this.composite_properties || [];
+                        this.composite_properties.push(new_property);
+                    }
+                }
+            }
+        };
+
         Property.prototype.get_data = function () {
             var result = {
                 type: this.type
@@ -1637,7 +1649,6 @@ var Ground;
             if (typeof value === 'string') {
                 value = value.replace(/'/g, "\\'", value);
                 value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
-                //        console.log('value', value)
             } else if (value === true)
                 value = 'TRUE';
 else if (value === false)
@@ -1663,7 +1674,6 @@ else if (value === false)
 else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
                 value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
             } else if (this.type == 'reference' && typeof value === 'object') {
-                //        console.log(value.other_trellis, this.other_trellis.name)
                 var trellis = this.other_trellis;
                 var ground = this.parent.ground;
 
@@ -1712,9 +1722,6 @@ else
             if (!create_if_none)
                 return null;
 
-            // If there is no existing connection defined in this trellis, create a dummy
-            // connection and assume that it is a list.  This means that implicit connections
-            // are either one-to-many or many-to-many, never one-to-one.
             var attributes = {};
             attributes.type = 'list';
             attributes.trellis = this.parent.name;
@@ -1759,11 +1766,6 @@ else
     })();
     Ground.Property = Property;
 })(Ground || (Ground = {}));
-/**
-* User: Chris Johnson
-* Date: 10/3/13
-*/
-/// <reference path="../references.ts"/>
 var Ground;
 (function (Ground) {
     var Irrigation = (function () {
@@ -1771,8 +1773,27 @@ var Ground;
             this.ground = ground;
         }
         Irrigation.prototype.query = function (request) {
-            var trellis = this.ground.sanitize_trellis_argument(request.trellis);
+            var i, trellis = this.ground.sanitize_trellis_argument(request.trellis);
             var query = new Ground.Query(trellis);
+
+            if (request.filters) {
+                for (i = 0; i < request.filters.length; ++i) {
+                    var filter = request.filters[i];
+                    query.add_property_filter(filter.property, filter.value, filter.operator);
+                }
+            }
+
+            if (request.sorts) {
+                for (i = 0; i < request.sorts.length; ++i) {
+                    query.add_sort(request.sorts[i]);
+                }
+            }
+
+            if (request.expansions) {
+                for (i = 0; i < request.expansions.length; ++i) {
+                    query.expansions.push(request.expansions[i]);
+                }
+            }
 
             return query.run();
         };
@@ -1796,22 +1817,5 @@ var Ground;
     })();
     Ground.Irrigation = Irrigation;
 })(Ground || (Ground = {}));
-/**
-* User: Chris Johnson
-* Date: 9/19/13
-*/
-/// <reference path="core/require.ts"/>
-/// <reference path="../defs/when.d.ts"/>
-/// <reference path="../defs/linq.d.ts"/>
-/// <reference path="../../metahub/metahub.d.ts"/>
-/// <reference path="core/Core.ts"/>
-/// <reference path="db/Table.ts"/>
-/// <reference path="db/Link_Trellis.ts"/>
-/// <reference path="schema/Property.ts"/>
-/// <reference path="schema/Trellis.ts"/>
-/// <reference path="operations/Query.ts"/>
-/// <reference path="operations/Update.ts"/>
-/// <reference path="operations/Delete.ts"/>
-/// <reference path="services/Irrigation.ts"/>
 require('source-map-support').install();
 //# sourceMappingURL=ground.js.map

@@ -1,57 +1,8 @@
 /// <reference path="defs/mysql.d.ts" />
 /// <reference path="defs/when.d.ts" />
 /// <reference path="defs/node.d.ts" />
+/// <reference path="../metahub/metahub.d.ts" />
 /// <reference path="defs/linq.d.ts" />
-/**
-* Created with JetBrains PhpStorm.
-* User: Chris Johnson
-* Date: 9/18/13
-*/
-declare module MetaHub {
-    function remove(array, item): void;
-    function has_properties(obj): boolean;
-    function is_array(obj): boolean;
-    function size(obj): number;
-    function S4(): string;
-    function values(source): any[];
-    function concat(destination, source): {};
-    function extend(destination, source, names?);
-    function guid(): string;
-    function clone(source, names): {};
-    function get_connection(a, b);
-    function filter(source, check: (value: any, key?: any, source?: any) => boolean): {};
-    function map(source, action): {};
-    function map_to_array(source, action): any[];
-    class Meta_Object {
-        public is_meta_object: boolean;
-        private events;
-        private internal_connections;
-        static connect_objects(first, other, type): boolean;
-        static disconnect_objects(first, other): void;
-        static has_property(target, name): boolean;
-        static invoke_binding(source, owner, name): void;
-        public listen(other: Meta_Object, name: string, method: (...args: any[]) => any, options?): void;
-        public unlisten(other, name): void;
-        public invoke(name: string, ...args: any[]): void;
-        public invoke_async(name): void;
-        public gather(name);
-        public connect(other: Meta_Object, type: string, other_type?: string): void;
-        public disconnect(other): void;
-        public disconnect_all(type): void;
-        public is_listening(other, name): boolean;
-        public get_connections(...filters: any[]): any[];
-        public get_connection(filter);
-        public define_connection_getter(property_name, connection_name): void;
-        public define_object(property_name, connection_name): void;
-        public optimize_getter(property_name, connection_name): void;
-    }
-    class Meta_Connection {
-        public other: Meta_Object;
-        public parent: Meta_Object;
-        public type: string;
-        constructor(parent, other, type);
-    }
-}
 declare var when;
 declare module Ground {
     class Database {
@@ -63,6 +14,7 @@ declare module Ground {
         public drop_all_tables(): Promise;
         public get_tables(): Promise;
         public query(sql: string, args?: any[]): Promise;
+        public query_single(sql: string, args?: any[]): Promise;
     }
 }
 declare module Ground {
@@ -90,13 +42,17 @@ declare module Ground {
         public get_all_properties(): {
             [name: string]: Ground.Property;
         };
-        public get_core_properties(): Ground.Property[];
+        public get_core_properties(): {
+            [name: string]: Ground.Property;
+        };
+        public get_id(source);
         public get_join(main_table: string): string;
         public get_links(): Ground.Property[];
         public get_plural(): string;
         public get_table_name(): string;
         public get_table_query(): string;
         public get_tree(): Trellis[];
+        public initialize(all): void;
         public load_from_object(source: Ground.ITrellis_Source): void;
         public query_primary_key(): string;
         public sanitize_property(property);
@@ -107,10 +63,18 @@ declare module Ground {
     interface IService_Response {
         objects: any[];
     }
-    interface Filter {
+    interface Query_Filter {
         property: string;
         value;
-        operator: string;
+        operator?: string;
+    }
+    interface Query_Sort {
+        property;
+        dir?;
+    }
+    interface Query_Wrapper {
+        start: string;
+        end: string;
     }
     interface External_Query_Source {
         fields?;
@@ -128,7 +92,7 @@ declare module Ground {
         public joins: string[];
         public filters: string[];
         public property_filters: {
-            [name: string]: Filter;
+            [name: string]: Query_Filter;
         };
         public post_clauses: any[];
         public limit: string;
@@ -139,6 +103,7 @@ declare module Ground {
         public base_path: string;
         public arguments: {};
         public expansions: string[];
+        public wrappers: Query_Wrapper[];
         static log_queries: boolean;
         static operators: string[];
         private links;
@@ -152,6 +117,8 @@ declare module Ground {
         public add_post(clause: string, arguments?): void;
         public add_expansion(clause): void;
         public add_link(property): void;
+        public add_sort(sort: Query_Sort): string;
+        public add_wrapper(wrapper: Query_Wrapper): void;
         public generate_pager(offset?: number, limit?: number): string;
         public generate_sql(properties): string;
         public get_fields_and_joins(properties: {
@@ -179,6 +146,7 @@ declare module Ground {
         public ground: Ground.Core;
         public db: Ground.Database;
         public is_service: boolean;
+        public user_id;
         static log_queries: boolean;
         constructor(trellis: Ground.Trellis, seed: Ground.ISeed, ground?: Ground.Core);
         private generate_sql(trellis);
@@ -239,22 +207,21 @@ declare module Ground {
         public views: any[];
         public property_types: Property_Type[];
         public db: Ground.Database;
-        public expansions: any[];
         constructor(config, db_name: string);
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
         public convert_value(value, type);
         public create_query(trellis_name: string, base_path?: string): Ground.Query;
         public delete_object(trellis: Ground.Trellis, seed: ISeed): Promise;
         public initialize_trellises(subset: Ground.Trellis[], all?): void;
-        public insert_object(trellis, seed?: ISeed): Promise;
+        public insert_object(trellis, seed?: ISeed, uid?, as_service?: boolean): Promise;
         static is_private(property: Ground.Property): boolean;
         static is_private_or_readonly(property: Ground.Property): boolean;
-        public update_object(trellis, seed?: ISeed, as_service?: boolean): Promise;
+        public update_object(trellis, seed?: ISeed, uid?, as_service?: boolean): Promise;
         static load_json_from_file(filename: string);
         public load_property_types(filename: string): void;
         public load_schema_from_file(filename: string): void;
         public load_tables(tables: any[]): void;
-        public load_trellises(trellises: ITrellis_Source[]): void;
+        public load_trellises(trellises: ITrellis_Source[]): Ground.Trellis[];
         private parse_schema(data);
         static remove_fields(object, trellis: Ground.Trellis, filter);
         public sanitize_trellis_argument(trellis);
@@ -269,7 +236,7 @@ declare module Ground {
     }
     class Table {
         public name: string;
-        public properties: any[];
+        public properties: {};
         public indexes: any[];
         public ground: Ground.Core;
         public db_name: string;
@@ -288,6 +255,12 @@ declare module Ground {
     }
 }
 declare module Ground {
+    class Link_Trellis2 {
+        public properties: {
+            [name: string]: Ground.Property;
+        };
+        public seed;
+    }
     class Link_Trellis {
         public table_name: string;
         public property: Ground.Property;
@@ -297,6 +270,8 @@ declare module Ground {
         public id_suffix: string;
         constructor(property: Ground.Property);
         public generate_join(id, reverse?: boolean): string;
+        public generate_delete_row(first_id, second_id): string;
+        public generate_insert(first_id, second_id): string;
         public get_arguments(property): {
             '%first_id': any;
             '%second_id': any;
@@ -324,7 +299,9 @@ declare module Ground {
         public other_trellis_name: string;
         public is_private: boolean;
         public is_virtual: boolean;
+        public composite_properties: any[];
         constructor(name: string, source: Ground.IProperty_Source, trellis: Ground.Trellis);
+        public initialize_composite_reference(other_trellis: Ground.Trellis): void;
         public get_data(): Ground.IProperty_Source;
         public get_field_name(): string;
         public get_field_override(create_if_missing?: boolean): Ground.IField;
@@ -342,6 +319,10 @@ declare module Ground {
 declare module Ground {
     interface Query_Request {
         trellis: string;
+        filters?: Ground.Query_Filter[];
+        sorts?: Ground.Query_Sort[];
+        expansions?: string[];
+        reductions?: string[];
     }
     interface Update_Request {
         objects: any[];
@@ -350,6 +331,6 @@ declare module Ground {
         public ground: Ground.Core;
         constructor(ground: Ground.Core);
         public query(request: Query_Request): Promise;
-        public update(request: Update_Request): Promise;
+        public update(request: Update_Request, uid?): Promise;
     }
 }

@@ -4,4 +4,3 @@
  */
 
 /// <reference path="core/require.ts"/>
-var MetaHub = require('metahub')

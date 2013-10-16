@@ -27,6 +27,7 @@ module Ground {
     other_trellis_name:string = null;
     is_private:boolean = false;
     is_virtual:boolean = false;
+    composite_properties:any[] = null
 
     constructor(name:string, source:IProperty_Source, trellis:Trellis) {
       for (var i in source) {
@@ -40,6 +41,22 @@ module Ground {
 
       this.name = name;
       this.parent = trellis;
+    }
+
+    initialize_composite_reference(other_trellis:Trellis) {
+      var table = other_trellis.table
+      if (table && table.primary_keys && table.primary_keys.length > 1) {
+        for (var i = 0; i < table.primary_keys.length; ++i) {
+          var key = table.primary_keys[i]
+          var name = other_trellis.name + '_' + key
+          if (key != other_trellis.primary_key) {
+            var other_property = other_trellis.properties[key]
+            var new_property = this.parent.add_property(name, other_property.get_data())
+            this.composite_properties = this.composite_properties || []
+            this.composite_properties.push(new_property)
+          }
+        }
+      }
     }
 
     get_data():IProperty_Source {

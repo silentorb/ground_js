@@ -6,7 +6,58 @@
 /// <reference path="../references.ts"/>
 
 module Ground {
+
   export class Link_Trellis {
+    properties:{ [name: string]: Property; } = {}
+    seed
+    table_name:string
+
+    constructor(property:Property) {
+      this.initialize_property(property)
+      this.initialize_property(property.get_other_property())
+    }
+
+    initialize_property(property:Property) {
+      this.properties[property.name] = property
+      if (property.composite_properties) {
+        for (var i in property.composite_properties) {
+          var prop = property.composite_properties[i]
+          this.properties[prop.name] = prop
+        }
+      }
+    }
+
+    generate_join(seed) {
+//      var sql = "JOIN %table_name ON %table_name.%second_key = " + id +
+//        " AND %table_name.%first_key = %back_id\n";
+
+      var conditions = []
+      for (var i in this.properties) {
+        var property = this.properties[i]
+        var condition = Link_Trellis.get_condition(property, seed)
+        if (condition)
+          conditions.push(condition)
+      }
+
+      return 'JOIN ' + this.table_name + ' ON ' + conditions.join(' AND ') + "\n"
+    }
+
+    private generate_table_name() {
+      var temp = MetaHub.map_to_array(this.properties,
+        (p)=>  p.parent.get_plural())
+      temp = temp.sort()
+      this.table_name = temp.join('_')
+    }
+
+    static get_condition(property:Property, seed) {
+      if (seed[property.name] !== undefined)
+        return property.query() + ' = ' + seed[property.name]
+      else
+        return null
+    }
+  }
+
+  export class Link_Trellis2 {
     table_name:string;
     property:Property;
     args;
@@ -33,7 +84,7 @@ module Ground {
       return Link_Trellis.populate_sql(sql, this.args);
     }
 
-    generate_delete(first_id, second_id) {
+    generate_delete_row(first_id, second_id) {
       var sql = "DELETE FROM %table_name WHERE %table_name.%first_key = " + first_id +
         " AND %table_name.%second_key = " + second_id + "\n;"
       return Link_Trellis.populate_sql(sql, this.args);
@@ -73,6 +124,7 @@ module Ground {
             second_key = name;
         }
 
+        console.log('info', first_key, second_key, table.name, result)
         if (!first_key || !second_key)
           throw new Error('Properties do not line up for cross table: ' + this.table_name + '.');
 

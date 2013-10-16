@@ -3,7 +3,7 @@
  * Date: 9/19/13
  */
 /// <reference path="../references.ts"/>
-/// <reference path="../../../metahub/metahub.ts"/>
+/// <reference path="../../../metahub/metahub.d.ts"/>
 
 module Ground {
   export interface IField {
@@ -13,14 +13,14 @@ module Ground {
   }
 
   export class Table {
-    name:string;
-    properties:any[] = [];
-    indexes:any[];
-    ground:Core;
-    db_name:string;
-    trellis:Trellis;
-    primary_keys:any[];
-    query:string;
+    name:string
+    properties = {}
+    indexes:any[]
+    ground:Core
+    db_name:string
+    trellis:Trellis
+    primary_keys:any[]
+    query:string
 
     constructor(name:string, ground:Core) {
       this.name = name;
