@@ -256,18 +256,18 @@ module Ground {
       }
     }
 
-    generate_property_join(property:Property, id, reverse:boolean = false) {
+    generate_property_join(property:Property, seed) {
       var join = new Link_Trellis(property);
-      return join.generate_join(id, reverse);
+      return join.generate_join(seed);
     }
 
-    get_many_list(id, property:Property, relationship:Relationships):Promise {
+    get_many_list(seed, id, property:Property, relationship:Relationships):Promise {
       var other_property = property.get_other_property();
       var query = new Query(other_property.parent, this.get_path(property.name));
       query.include_links = false;
       query.expansions = this.expansions;
       if (relationship === Relationships.many_to_many)
-        query.add_join(query.generate_property_join(property, id));
+        query.add_join(query.generate_property_join(property, seed));
       else if (relationship === Relationships.one_to_many)
         query.add_property_filter(other_property.name, id);
 
@@ -348,7 +348,7 @@ module Ground {
               break;
             case Relationships.one_to_many:
             case Relationships.many_to_many:
-              promise = this.get_many_list(id, property, relationship)
+              promise = this.get_many_list(row, id, property, relationship)
               break;
           }
 
@@ -381,7 +381,10 @@ module Ground {
         value = this.ground.convert_value(value, property.type);
 
       if (property.get_relationship() == Relationships.many_to_many) {
-        result.joins.push(this.generate_property_join(property, placeholder, true));
+        var join_seed = {}
+        join_seed[property.name] = ':' + property.name + '_filter'
+
+        result.joins.push(this.generate_property_join(property, join_seed));
       }
       else {
         if (filter.operator.toLowerCase() == 'like') {

@@ -1,4 +1,4 @@
-var when = require('when');
+var MetaHub = require('metahub');var when = require('when');
 
 var Ground;
 (function (Ground) {
@@ -274,7 +274,6 @@ else
                     this.table = Ground.Table.create_from_trellis(this);
 
                 this.table.primary_keys = keys;
-                console.log('table', this.table);
             } else {
                 keys = [parent.primary_key];
             }
@@ -491,19 +490,18 @@ else
             };
         };
 
-        Query.prototype.generate_property_join = function (property, id, reverse) {
-            if (typeof reverse === "undefined") { reverse = false; }
+        Query.prototype.generate_property_join = function (property, seed) {
             var join = new Ground.Link_Trellis(property);
-            return join.generate_join(id, reverse);
+            return join.generate_join(seed);
         };
 
-        Query.prototype.get_many_list = function (id, property, relationship) {
+        Query.prototype.get_many_list = function (seed, id, property, relationship) {
             var other_property = property.get_other_property();
             var query = new Query(other_property.parent, this.get_path(property.name));
             query.include_links = false;
             query.expansions = this.expansions;
             if (relationship === Ground.Relationships.many_to_many)
-                query.add_join(query.generate_property_join(property, id));
+                query.add_join(query.generate_property_join(property, seed));
 else if (relationship === Ground.Relationships.one_to_many)
                 query.add_property_filter(other_property.name, id);
 
@@ -592,7 +590,7 @@ else if (relationship === Ground.Relationships.one_to_many)
                             break;
                         case Ground.Relationships.one_to_many:
                         case Ground.Relationships.many_to_many:
-                            promise = this.get_many_list(id, property, relationship);
+                            promise = this.get_many_list(row, id, property, relationship);
                             break;
                     }
 
@@ -629,7 +627,10 @@ else if (relationship === Ground.Relationships.one_to_many)
                 value = this.ground.convert_value(value, property.type);
 
             if (property.get_relationship() == Ground.Relationships.many_to_many) {
-                result.joins.push(this.generate_property_join(property, placeholder, true));
+                var join_seed = {};
+                join_seed[property.name] = ':' + property.name + '_filter';
+
+                result.joins.push(this.generate_property_join(property, join_seed));
             } else {
                 if (filter.operator.toLowerCase() == 'like') {
                     result.filters.push(property.query() + ' LIKE ' + placeholder);
@@ -912,7 +913,7 @@ else
             return when.all(promises);
         };
 
-        Update.prototype.update_many_to_many = function (property, id, create) {
+        Update.prototype.update_many_to_many = function (property, row, id, create) {
             if (typeof create === "undefined") { create = false; }
             var _this = this;
             var list = this.seed[property.name];
@@ -929,7 +930,7 @@ else
 
                 if (typeof seed === 'object' && seed._remove) {
                     if (other_id !== null) {
-                        var sql = join.generate_delete_row(id, other_id);
+                        var sql = join.generate_delete_row(row);
                         promises.push(this.ground.invoke(join.table_name + '.delete', property, id, other_id, join).then(function () {
                             return _this.db.query(sql);
                         }));
@@ -1439,96 +1440,69 @@ else
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
-    var Link_Trellis2 = (function () {
-        function Link_Trellis2(property) {
-            this.properties = {};
-            this.property = property;
-            this.args = this.get_arguments(property);
-        }
-        return Link_Trellis2;
-    })();
-    Ground.Link_Trellis2 = Link_Trellis2;
-
     var Link_Trellis = (function () {
         function Link_Trellis(property) {
-            this.id_suffix = '';
-            this.property = property;
-            this.args = this.get_arguments(property);
+            this.properties = {};
+            this.initialize_property(property);
+            this.initialize_property(property.get_other_property());
         }
-        Link_Trellis.prototype.generate_join = function (id, reverse) {
-            if (typeof reverse === "undefined") { reverse = false; }
-            var sql;
-            if (reverse) {
-                sql = "JOIN %table_name ON %table_name.%second_key = %forward_id" + " AND %table_name.%first_key = " + id + "\n";
-            } else {
-                sql = "JOIN %table_name ON %table_name.%second_key = " + id + " AND %table_name.%first_key = %back_id\n";
+        Link_Trellis.prototype.initialize_property = function (property) {
+            this.properties[property.name] = property;
+            if (property.composite_properties) {
+                for (var i in property.composite_properties) {
+                    var prop = property.composite_properties[i];
+                    this.properties[prop.name] = prop;
+                }
             }
-
-            return Link_Trellis.populate_sql(sql, this.args);
         };
 
-        Link_Trellis.prototype.generate_delete_row = function (first_id, second_id) {
-            var sql = "DELETE FROM %table_name WHERE %table_name.%first_key = " + first_id + " AND %table_name.%second_key = " + second_id + "\n;";
-            return Link_Trellis.populate_sql(sql, this.args);
+        Link_Trellis.prototype.generate_join = function (seed) {
+            return 'JOIN ' + this.table_name + ' ON ' + this.get_condition_string(seed) + "\n";
+        };
+
+        Link_Trellis.prototype.generate_delete_row = function (seed) {
+            return 'DELETE ' + this.table_name + ' ON ' + this.get_condition_string(seed) + "\n";
+            throw new Error('not implemented');
         };
 
         Link_Trellis.prototype.generate_insert = function (first_id, second_id) {
-            var sql = "REPLACE INTO %table_name (`%first_key`, `%second_key`) VALUES (" + first_id + ", " + second_id + ")\n;";
-            return Link_Trellis.populate_sql(sql, this.args);
+            throw new Error('not implemented');
         };
 
-        Link_Trellis.prototype.get_arguments = function (property) {
-            var other_property = property.get_other_property();
-            var first_key, second_key;
-
-            var other_table = other_property.parent.get_plural();
-            var temp = [other_table, property.parent.get_plural()];
+        Link_Trellis.prototype.generate_table_name = function () {
+            var temp = MetaHub.map_to_array(this.properties, function (p) {
+                return p.parent.get_plural();
+            });
             temp = temp.sort();
             this.table_name = temp.join('_');
-            var result = {
-                '%first_id': property.query(),
-                '%second_id': other_property.query(),
-                '%back_id': other_property.parent.query_primary_key(),
-                '%forward_id': property.parent.query_primary_key()
-            };
-
-            var ground = property.parent.ground;
-            var table = ground.tables[this.table_name];
-            if (table && Object.keys(table.properties).length >= 2) {
-                for (var name in table.properties) {
-                    var field = table.properties[name];
-                    if (field.trellis === property.trellis)
-                        first_key = name;
-else if (field.trellis === other_property.other_trellis)
-                        second_key = name;
-                }
-
-                console.log('info', first_key, second_key, table.name, result);
-                if (!first_key || !second_key)
-                    throw new Error('Properties do not line up for cross table: ' + this.table_name + '.');
-
-                MetaHub.extend(result, {
-                    '%table_name': table.name,
-                    '%first_key': first_key,
-                    '%second_key': second_key
-                });
-            } else {
-                MetaHub.extend(result, {
-                    '%table_name': this.table_name,
-                    '%first_key': property.parent.name + this.id_suffix,
-                    '%second_key': other_property.parent.name + this.id_suffix
-                });
-            }
-
-            return result;
         };
 
-        Link_Trellis.populate_sql = function (sql, args) {
-            var result = sql;
-            for (var a in args) {
-                result = result.replace(new RegExp(a, 'g'), args[a]);
+        Link_Trellis.get_condition = function (property, seed) {
+            if (seed[property.name] !== undefined) {
+                var value = seed[property.name];
+                if (typeof value === 'function')
+                    value == value();
+else
+                    value = property.get_sql_value(value);
+                return property.query() + ' = ' + value;
+            } else
+                return null;
+        };
+
+        Link_Trellis.prototype.get_condition_string = function (seed) {
+            return this.get_conditions(seed).join(' AND ');
+        };
+
+        Link_Trellis.prototype.get_conditions = function (seed) {
+            var conditions = [];
+            for (var i in this.properties) {
+                var property = this.properties[i];
+                var condition = Link_Trellis.get_condition(property, seed);
+                if (condition)
+                    conditions.push(condition);
             }
-            return result;
+
+            return conditions;
         };
         return Link_Trellis;
     })();
@@ -1659,8 +1633,44 @@ else if (value === false)
             return value;
         };
 
-        Property.prototype.get_field_value = function (value, as_service) {
+        Property.prototype.get_sql_value = function (value, type) {
+            if (typeof type === "undefined") { type = null; }
+            type = type || this.type;
+            var property_type = this.parent.ground.property_types[type];
+
+            if (property_type && property_type.parent)
+                return this.get_sql_value(value, property_type.parent.name);
+
+            switch (type) {
+                case 'list':
+                    throw new Error('Cannot call get_sql_value on a list property');
+                case 'reference':
+                    if (typeof value === 'object') {
+                        value = value[this.other_trellis.primary_key];
+                    }
+                    return value || 'NULL';
+                case 'int':
+                    return Math.round(value);
+                case 'string':
+                case 'text':
+                    value = value.replace(/'/g, "\\'", value);
+                    return "'" + value.replace(/[\r\n]+/, "\n") + "'";
+                case 'bool':
+                    return value ? 'TRUE' : 'FALSE';
+                case 'float':
+                case 'double':
+                    return new Number(value);
+                case 'money':
+                    if (typeof value !== 'number')
+                        return parseFloat(value.toString());
+            }
+
+            throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')');
+        };
+
+        Property.prototype.get_field_value = function (value, as_service, update) {
             if (typeof as_service === "undefined") { as_service = false; }
+            if (typeof update === "undefined") { update = false; }
             var _this = this;
             if (typeof value === 'string')
                 value = value.replace(/'/g, "\\'", value);

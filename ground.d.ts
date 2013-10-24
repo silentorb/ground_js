@@ -124,8 +124,8 @@ declare module Ground {
         public get_fields_and_joins(properties: {
             [name: string]: Ground.Property;
         }, include_primary_key?: boolean): Internal_Query_Source;
-        public generate_property_join(property: Ground.Property, id, reverse?: boolean): string;
-        public get_many_list(id, property: Ground.Property, relationship: Ground.Relationships): Promise;
+        public generate_property_join(property: Ground.Property, seed): string;
+        public get_many_list(seed, id, property: Ground.Property, relationship: Ground.Relationships): Promise;
         public get_path(...args: string[]): string;
         public get_reference_object(row, property: Ground.Property): Promise;
         public has_expansion(path: string): boolean;
@@ -157,7 +157,7 @@ declare module Ground {
         private get_field_value(property);
         private is_update_property(property);
         private update_links(trellis, id, create?);
-        private update_many_to_many(property, id, create?);
+        private update_many_to_many(property, row, id, create?);
         private update_one_to_many(property, id);
         private update_reference(property, id);
         private update_reference_object(object, property, id);
@@ -255,30 +255,21 @@ declare module Ground {
     }
 }
 declare module Ground {
-    class Link_Trellis2 {
+    class Link_Trellis {
         public properties: {
             [name: string]: Ground.Property;
         };
         public seed;
-    }
-    class Link_Trellis {
         public table_name: string;
-        public property: Ground.Property;
-        public args;
-        public first_property: Ground.Property;
-        public second_property: Ground.Property;
-        public id_suffix: string;
         constructor(property: Ground.Property);
-        public generate_join(id, reverse?: boolean): string;
-        public generate_delete_row(first_id, second_id): string;
+        public initialize_property(property: Ground.Property): void;
+        public generate_join(seed): string;
+        public generate_delete_row(seed): string;
         public generate_insert(first_id, second_id): string;
-        public get_arguments(property): {
-            '%first_id': any;
-            '%second_id': any;
-            '%back_id': any;
-            '%forward_id': any;
-        };
-        static populate_sql(sql: string, args): string;
+        private generate_table_name();
+        static get_condition(property: Ground.Property, seed): string;
+        public get_condition_string(seed): string;
+        public get_conditions(seed): string[];
     }
 }
 declare module Ground {
@@ -307,7 +298,8 @@ declare module Ground {
         public get_field_override(create_if_missing?: boolean): Ground.IField;
         public get_field_type();
         static get_field_value_sync(value);
-        public get_field_value(value, as_service?: boolean): Promise;
+        public get_sql_value(value, type?);
+        public get_field_value(value, as_service?: boolean, update?: boolean): Promise;
         public get_other_id(entity);
         public get_other_property(create_if_none?: boolean): Property;
         public get_property_type(): Ground.Property_Type;

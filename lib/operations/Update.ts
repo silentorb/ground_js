@@ -226,7 +226,7 @@ module Ground {
       return when.all(promises);
     }
 
-    private update_many_to_many(property:Property, id, create:boolean = false):Promise {
+    private update_many_to_many(property:Property, row, id, create:boolean = false):Promise {
       var list = this.seed[property.name];
       if (!MetaHub.is_array(list))
         return when.resolve();
@@ -242,7 +242,7 @@ module Ground {
         // Clients can use the _remove flag to detach items from lists without deleting them
         if (typeof seed === 'object' && seed._remove) {
           if (other_id !== null) {
-            var sql = join.generate_delete_row(id, other_id)
+            var sql = join.generate_delete_row(row)
             promises.push(this.ground.invoke(join.table_name + '.delete', property, id, other_id, join)
               .then(() => this.db.query(sql))
             )

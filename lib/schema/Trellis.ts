@@ -216,7 +216,7 @@ module Ground {
           this.table = Table.create_from_trellis(this)
 
         this.table.primary_keys = keys
-        console.log('table', this.table)
+//        console.log('table', this.table)
       }
       else {
         keys = [ parent.primary_key ]

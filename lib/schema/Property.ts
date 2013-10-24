@@ -134,7 +134,41 @@ module Ground {
       return value;
     }
 
-    get_field_value(value, as_service:boolean = false):Promise {
+    get_sql_value(value, type = null) {
+      type = type || this.type
+      var property_type = this.parent.ground.property_types[type];
+
+      if (property_type && property_type.parent)
+        return this.get_sql_value(value, property_type.parent.name);
+
+      switch (type) {
+        case 'list':
+          throw new Error('Cannot call get_sql_value on a list property')
+        case 'reference':
+          if (typeof value === 'object') {
+            value = value[this.other_trellis.primary_key]
+          }
+          return value || 'NULL';
+        case 'int':
+          return Math.round(value);
+        case 'string':
+        case 'text':
+          value = value.replace(/'/g, "\\'", value);
+          return "'" + value.replace(/[\r\n]+/, "\n") + "'";
+        case 'bool':
+          return value ? 'TRUE' : 'FALSE'
+        case 'float':
+        case 'double':
+          return new Number(value)
+        case 'money':
+          if (typeof value !== 'number')
+            return parseFloat(value.toString());
+      }
+
+      throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')')
+    }
+
+    get_field_value(value, as_service:boolean = false, update:boolean = false):Promise {
       if (typeof value === 'string')
         value = value.replace(/'/g, "\\'", value);
 
