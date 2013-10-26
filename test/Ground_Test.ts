@@ -35,7 +35,7 @@ export class Fixture {
     var db = this.ground.db;
     this.load_schema();
     return db.drop_all_tables()
-      .then(()=>  db.create_tables(this.ground.trellises))
+      .then(()=>  db.create_trellis_tables(this.ground.trellises))
   }
 
   populate():Promise {

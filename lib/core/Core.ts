@@ -111,6 +111,14 @@ module Ground {
       return trellis;
     }
 
+    get_base_property_type(type) {
+      var property_type = this.property_types[type];
+      if (property_type.parent)
+        return this.get_base_property_type(property_type.parent.name)
+
+      return property_type
+    }
+
     convert_value(value, type) {
       if (!value) {
         if (type == 'bool')
@@ -165,7 +173,7 @@ module Ground {
 
       for (var i in subset) {
         var trellis = subset[i];
-trellis.initialize(all)
+        trellis.initialize(all)
       }
     }
 
@@ -221,6 +229,7 @@ trellis.initialize(all)
     }
 
     load_tables(tables:any[]) {
+      console.log('tables', tables)
       for (var name in tables) {
         var table_name;
 //        var trellis = this.trellises[name];
@@ -228,7 +237,6 @@ trellis.initialize(all)
 //          table_name = trellis.get_table_name();
 //        else
 //          table_name = name;
-
         var table = new Table(name, this);
         table.load_from_schema(tables[name]);
         this.tables[name] = table;
@@ -294,4 +302,4 @@ trellis.initialize(all)
 }
 
 module.
-exports = Ground
+  exports = Ground

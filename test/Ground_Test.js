@@ -32,7 +32,7 @@ var Fixture = (function () {
         var db = this.ground.db;
         this.load_schema();
         return db.drop_all_tables().then(function () {
-            return db.create_tables(_this.ground.trellises);
+            return db.create_trellis_tables(_this.ground.trellises);
         });
     };
 

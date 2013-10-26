@@ -143,7 +143,7 @@ module Ground {
 
       switch (type) {
         case 'list':
-          throw new Error('Cannot call get_sql_value on a list property')
+//          throw new Error('Cannot call get_sql_value on a list property')
         case 'reference':
           if (typeof value === 'object') {
             value = value[this.other_trellis.primary_key]

@@ -238,12 +238,12 @@ module Ground {
       for (var i = 0; i < list.length; i++) {
         var seed = list[i]
         var other_id = other_trellis.get_id(seed)
-
+//        var other_seed = join.get_other_seed(seed)
         // Clients can use the _remove flag to detach items from lists without deleting them
         if (typeof seed === 'object' && seed._remove) {
           if (other_id !== null) {
-            var sql = join.generate_delete_row(row)
-            promises.push(this.ground.invoke(join.table_name + '.delete', property, id, other_id, join)
+            var sql = join.generate_delete_row([row, seed])
+            promises.push(this.ground.invoke(join.table_name + '.delete', property, id, row, seed, join)
               .then(() => this.db.query(sql))
             )
           }
@@ -251,12 +251,17 @@ module Ground {
         else {
           if (other_id === null) {
             seed = this.ground.update_object(other_trellis, seed, this.user_id)
-            other_id = other_trellis.get_id(seed)
+              .then((seed)=>
+                promises.push(this.db.query(join.generate_insert([row, seed]))
+                  .then(() => this.ground.invoke(join.table_name + '.create', property, id, row, seed, join))
+                )
+            )
           }
-
-          promises.push(this.db.query(join.generate_insert(other_id, id))
-            .then(() => this.ground.invoke(join.table_name + '.create', property, id, other_id, join))
-          )
+          else {
+            promises.push(this.db.query(join.generate_insert([row, seed]))
+              .then(() => this.ground.invoke(join.table_name + '.create', property, id, row, seed, join))
+            )
+          }
         }
       }
 

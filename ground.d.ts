@@ -8,9 +8,12 @@ declare module Ground {
     class Database {
         public settings: {};
         public database: string;
+        public log_queries: boolean;
         constructor(settings: {}, database: string);
+        public add_table_to_database(table: Ground.Table, ground: Ground.Core): Promise;
+        public add_non_trellis_tables_to_database(tables: Ground.Table[], ground: Ground.Core): Promise;
         public create_table(trellis: Ground.Trellis): Promise;
-        public create_tables(trellises: Ground.Trellis[]): Promise;
+        public create_trellis_tables(trellises: Ground.Trellis[]): Promise;
         public drop_all_tables(): Promise;
         public get_tables(): Promise;
         public query(sql: string, args?: any[]): Promise;
@@ -209,6 +212,7 @@ declare module Ground {
         public db: Ground.Database;
         constructor(config, db_name: string);
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
+        public get_base_property_type(type);
         public convert_value(value, type);
         public create_query(trellis_name: string, base_path?: string): Ground.Query;
         public delete_object(trellis: Ground.Trellis, seed: ISeed): Promise;
@@ -246,6 +250,7 @@ declare module Ground {
         constructor(name: string, ground: Ground.Core);
         public connect_trellis(trellis: Ground.Trellis): void;
         static create_from_trellis(trellis: Ground.Trellis, ground?: Ground.Core): Table;
+        public create_sql(ground: Ground.Core): string;
         static create_sql_from_array(table_name: string, source: any[], primary_keys?: any[], indexes?: any[]): string;
         public create_sql_from_trellis(trellis: Ground.Trellis): string;
         private get_primary_keys(trellis);
@@ -256,20 +261,19 @@ declare module Ground {
 }
 declare module Ground {
     class Link_Trellis {
-        public properties: {
-            [name: string]: Ground.Property;
-        };
+        public properties;
         public seed;
         public table_name: string;
+        public trellises: Ground.Trellis[];
         constructor(property: Ground.Property);
-        public initialize_property(property: Ground.Property): void;
-        public generate_join(seed): string;
-        public generate_delete_row(seed): string;
-        public generate_insert(first_id, second_id): string;
+        public initialize_property(property: Ground.Property): any[];
+        public generate_join(seeds: any[]): string;
+        public generate_delete_row(seeds: any[]): string;
+        public generate_insert(seeds: any[]): string;
         private generate_table_name();
         static get_condition(property: Ground.Property, seed): string;
-        public get_condition_string(seed): string;
-        public get_conditions(seed): string[];
+        public get_condition_string(seeds: any[]): string;
+        public get_conditions(seeds: any[]): string[];
     }
 }
 declare module Ground {

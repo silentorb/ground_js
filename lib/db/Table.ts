@@ -44,13 +44,35 @@ module Ground {
       return table;
     }
 
+    create_sql(ground:Core){
+      var fields = [];
+      for (var name in this.properties) {
+        var property = this.properties[name];
+
+        var field = {
+          name: property.name || name,
+          type: ground.get_base_property_type(property.type).field_type,
+          default: undefined
+        };
+
+        if (property.default !== undefined)
+          field.default = property.default;
+
+        fields.push(field);
+      }
+
+      return Table.create_sql_from_array(this.name, fields, this.primary_keys, this.indexes);
+    }
+
     static create_sql_from_array(table_name:string, source:any[], primary_keys = [], indexes = []):string {
       var fields = MetaHub.map_to_array(source, (field, index)=> {
         var name = field.name || index;
         var type = field.type;
 
-        if (!type)
-          throw new Error('Field ' + name + 'is missing a type.');
+        if (!type) {
+          console.log('source', table_name, source)
+          throw new Error('Field ' + name + ' is missing a type.');
+        }
 
         var field_sql = '`' + name + '` ' + type;
         if (primary_keys.indexOf(name) > -1) {

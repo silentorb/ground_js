@@ -8,45 +8,71 @@
 module Ground {
 
   export class Link_Trellis {
-    properties:{ [name: string]: Property;
-    } = {}
+    properties
     seed
     table_name:string
+    trellises:Trellis[] = []
 
     constructor(property:Property) {
-      this.initialize_property(property)
-      this.initialize_property(property.get_other_property())
+      var other_property = property.get_other_property()
+      this.trellises.push(property.parent)
+      this.trellises.push(other_property.parent)
+
+      // Determine table name
+      var other_table = other_property.parent.get_plural();
+      var temp = [other_table, property.parent.get_plural()];
+      temp = temp.sort();
+      this.table_name = temp.join('_');
+
+      this.properties = [
+        this.initialize_property(property),
+        this.initialize_property(other_property)
+      ]
     }
 
     initialize_property(property:Property) {
-      this.properties[property.name] = property
+      var result = []
+      result.push(property)
       if (property.composite_properties) {
         for (var i in property.composite_properties) {
           var prop = property.composite_properties[i]
-          this.properties[prop.name] = prop
+          result.push(prop)
         }
       }
+      return result
     }
 
-    generate_join(seed) {
+    generate_join(seeds:any[]) {
 //      var sql = "JOIN %table_name ON %table_name.%second_key = " + id +
 //        " AND %table_name.%first_key = %back_id\n";
 
-      return 'JOIN ' + this.table_name + ' ON ' + this.get_condition_string(seed) + "\n"
+      return 'JOIN ' + this.table_name + ' ON ' + this.get_condition_string(seeds) + "\n"
     }
 
-    generate_delete_row(seed):string {
+    generate_delete_row(seeds:any[]):string {
 //      var sql = "DELETE FROM %table_name WHERE %table_name.%first_key = " + first_id +
 //        " AND %table_name.%second_key = " + second_id + "\n;"
 //      return Link_Trellis2.populate_sql(sql, this.args);
-      return 'DELETE ' + this.table_name + ' ON ' + this.get_condition_string(seed) + "\n"
-      throw new Error('not implemented')
+      return 'DELETE ' + this.table_name + ' ON ' + this.get_condition_string(seeds) + "\n"
     }
 
-    generate_insert(first_id, second_id):string {
-      var fields =this.get_key_values()
+    generate_insert(seeds:any[]):string {
+      var values = [], keys = []
 
-      throw new Error('not implemented')
+      for (var i in this.properties) {
+        var list = this.properties[i], seed = seeds[i]
+        for (var p in list) {
+          var property = list[p], seed = seeds[i]
+          keys.push(property.name)
+          values.push(property.get_sql_value(seed[property.name]))
+        }
+      }
+      return 'REPLACE INTO ' + this.table_name + ' (`'
+        + keys.join('`, `')
+        + '`) VALUES ('
+        + values.join(', ')
+        + ');\n'
+
 //      var sql = "REPLACE INTO %table_name (`%first_key`, `%second_key`) VALUES ("
 //        + first_id + ", " + second_id + ")\n;"
 //      return Link_Trellis2.populate_sql(sql, this.args);
@@ -72,41 +98,74 @@ module Ground {
         return null
     }
 
-    get_condition_string(seed):string {
-      return this.get_conditions(seed).join(' AND ')
+    get_condition_string(seeds:any[]):string {
+      return this.get_conditions(seeds).join(' AND ')
     }
 
-//    get_key_values():any {
-//      var result = {}
-//
-//      for (var p in this.properties) {
-//        var property = this.properties[p]
-//        var trellis = property.other_trellis
-//        var primary = trellis.properties[trellis.primary_key]
-//        result[trellis.primary_key] = primary
-//        if (primary.composite_properties) {
-//          for (var c in primary.composite_properties) {
-//            result[c] = primary.composite_properties[c]
-//          }
-//        }
-//      }
-//
-//      return result
-//    }
-
-    get_conditions(seed):string[] {
+    get_conditions(seeds:any[]):string[] {
       var conditions = []
       for (var i in this.properties) {
-        var property = this.properties[i]
-        var condition = Link_Trellis.get_condition(property, seed)
-        if (condition)
-          conditions.push(condition)
+        var list = this.properties[i], seed = seeds[i]
+        for (var p in list) {
+          var property = list[p]
+          var condition = Link_Trellis.get_condition(property, seed)
+          if (condition)
+            conditions.push(condition)
+        }
       }
 
       return conditions
     }
 
+/*
+Went to all this work and now I'm not sure it's necessary for many-to-many connections
 
+    // Very important function.  Determines the primary key values of
+    // the referenced seed based on a referring seed.  Uses two different
+    // possible methods to determine this.
+
+    // property_index can be either zero or one.
+    // It determines whether the provided seed belongs
+    // to the first or second trellis of this cross table
+    get_other_seed(seed, property_index = 0) {
+      if (property_index !== 0 && property_index !== 1)
+        throw new Error('get_other_seed()\'s property_index can only be 0 or 1.')
+
+      var result = {}, i, other_property
+      var property = this.properties[property_index]
+      var other_property_list = this.properties[1 - property_index]
+      var other_trellis = property.other_trellis
+      var reference_value = seed[property.name]
+
+      // First consider explicit composite reference properties.
+      // This is done first so they can be overriden by the reference object.
+      for (i = 0; i < other_property_list.length; ++i) {
+        other_property = other_property_list[i]
+        var reference_name = other_trellis.name + '_' + other_property.name
+        if (seed[reference_name] !== undefined)
+          result[other_property.name] = seed[reference_name]
+      }
+
+      // Next consider the referenced value
+      if (typeof reference_value === 'object') {
+        for (i = 0; i < other_property_list.length; ++i) {
+          other_property = other_property_list[i]
+          if (reference_value[other_property.name] !== undefined)
+            result[other_property.name] = reference_value[other_property.name]
+        }
+      }
+      else {
+        result[other_trellis.primary_key] = reference_value
+      }
+
+      for (i = 0; i < other_property_list.length; ++i) {
+        other_property = other_property_list[i]
+        if (result[other_property.name] === undefined)
+          throw new Error('Link reference seed for ' + property.parent.name + ' has incomplete reference to ' + other_trellis.name + '.')
+      }
+      return result
+    }
+    */
   }
 
 }
