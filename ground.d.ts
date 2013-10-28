@@ -160,7 +160,7 @@ declare module Ground {
         private get_field_value(property);
         private is_update_property(property);
         private update_links(trellis, id, create?);
-        private update_many_to_many(property, row, id, create?);
+        private update_many_to_many(property, create?);
         private update_one_to_many(property, id);
         private update_reference(property, id);
         private update_reference_object(object, property, id);
@@ -298,6 +298,7 @@ declare module Ground {
         constructor(name: string, source: Ground.IProperty_Source, trellis: Ground.Trellis);
         public initialize_composite_reference(other_trellis: Ground.Trellis): void;
         public get_data(): Ground.IProperty_Source;
+        public get_default(): any;
         public get_field_name(): string;
         public get_field_override(create_if_missing?: boolean): Ground.IField;
         public get_field_type();

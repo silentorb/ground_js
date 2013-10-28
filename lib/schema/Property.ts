@@ -22,7 +22,7 @@ module Ground {
     is_readonly:boolean = false;
     insert:string = null;
     other_property:string = null;
-    default = null;
+    default;
     other_trellis:Trellis = null;
     other_trellis_name:string = null;
     is_private:boolean = false;
@@ -76,6 +76,13 @@ module Ground {
         result.insert = this.insert;
 
       return result;
+    }
+
+    get_default():any {
+      if (this.default == undefined && this.parent.parent && this.parent.parent.properties[this.name])
+        return this.parent.parent.properties[this.name].get_default()
+
+      return this.default
     }
 
     get_field_name():string {
@@ -137,6 +144,9 @@ module Ground {
     get_sql_value(value, type = null) {
       type = type || this.type
       var property_type = this.parent.ground.property_types[type];
+      if (value === undefined || value === null) {
+        value = this.get_default()
+      }
 
       if (property_type && property_type.parent)
         return this.get_sql_value(value, property_type.parent.name);

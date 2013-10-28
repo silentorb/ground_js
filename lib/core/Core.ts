@@ -229,7 +229,7 @@ module Ground {
     }
 
     load_tables(tables:any[]) {
-      console.log('tables', tables)
+//      console.log('tables', tables)
       for (var name in tables) {
         var table_name;
 //        var trellis = this.trellises[name];

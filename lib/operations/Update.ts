@@ -218,7 +218,7 @@ module Ground {
             promises.push(this.update_one_to_many(property, id));
             break;
           case Relationships.many_to_many:
-            promises.push(this.update_many_to_many(property, id, create));
+            promises.push(this.update_many_to_many(property, create));
             break;
         }
       }
@@ -226,8 +226,9 @@ module Ground {
       return when.all(promises);
     }
 
-    private update_many_to_many(property:Property, row, id, create:boolean = false):Promise {
+    private update_many_to_many(property:Property, create:boolean = false):Promise {
       var list = this.seed[property.name];
+      var row = this.seed
       if (!MetaHub.is_array(list))
         return when.resolve();
 
@@ -236,30 +237,30 @@ module Ground {
       var promises = []
 
       for (var i = 0; i < list.length; i++) {
-        var seed = list[i]
-        var other_id = other_trellis.get_id(seed)
-//        var other_seed = join.get_other_seed(seed)
+        var other = list[i]
+        var other_id = other_trellis.get_id(other)
+//        var other_seed = join.get_other_seed(other)
         // Clients can use the _remove flag to detach items from lists without deleting them
-        if (typeof seed === 'object' && seed._remove) {
+        if (typeof other === 'object' && other._remove) {
           if (other_id !== null) {
-            var sql = join.generate_delete_row([row, seed])
-            promises.push(this.ground.invoke(join.table_name + '.delete', property, id, row, seed, join)
+            var sql = join.generate_delete_row([row, other])
+            promises.push(this.ground.invoke(join.table_name + '.delete', property, row, other, join)
               .then(() => this.db.query(sql))
             )
           }
         }
         else {
           if (other_id === null) {
-            seed = this.ground.update_object(other_trellis, seed, this.user_id)
-              .then((seed)=>
-                promises.push(this.db.query(join.generate_insert([row, seed]))
-                  .then(() => this.ground.invoke(join.table_name + '.create', property, id, row, seed, join))
+            other = this.ground.update_object(other_trellis, other, this.user_id)
+              .then((other)=>
+                promises.push(this.db.query(join.generate_insert([row, other]))
+                  .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
                 )
             )
           }
           else {
-            promises.push(this.db.query(join.generate_insert([row, seed]))
-              .then(() => this.ground.invoke(join.table_name + '.create', property, id, row, seed, join))
+            promises.push(this.db.query(join.generate_insert([row, other]))
+              .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
             )
           }
         }
