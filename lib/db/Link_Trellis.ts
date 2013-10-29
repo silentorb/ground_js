@@ -8,10 +8,16 @@
 module Ground {
 
   // Map an entity reference property to a 
-  export interface Link_Reference {
+  export interface Identity_Reference {
+    name: string
+    trellis:Trellis
+    keys:Identity_Key[]
+  }
+
+  export interface Identity_Key {
     name: string
     type: string
-    source:Property
+    property:Property
   }
 
   export class Link_Trellis {
@@ -20,41 +26,45 @@ module Ground {
     table_name:string
     trellises:Trellis[] = []
 
-    constructor(property:Property) {
-      var other_property = property.get_other_property()
-      this.trellises.push(property.parent)
-      this.trellises.push(other_property.parent)
+    constructor(trellises:Trellis[]) {
+      this.trellises = trellises
+      this.table_name = trellises.map((t)=> t.get_plural())
+        .sort().join('_')
 
-      // Determine table name
-      var other_table = other_property.parent.get_plural();
-      var temp = [other_table, property.parent.get_plural()];
-      temp = temp.sort();
-      this.table_name = temp.join('_');
-
-      this.properties = [
-        this.initialize_property(property),
-        this.initialize_property(other_property)
-      ]
+      this.properties = trellises.map((x)=> this.create_identity(x))
     }
 
-    initialize_property(property:Property) {
-      var result = []
-      result.push(Link_Trellis.create_reference(property))
+    create_identity(trellis:Trellis):Identity_Reference {
+      var properties = []
+      var property = trellis.properties[trellis.primary_key]
+      properties.push(Link_Trellis.create_reference(property))
+
       if (property.composite_properties) {
         for (var i in property.composite_properties) {
           var prop = property.composite_properties[i]
-          result.push(Link_Trellis.create_reference(prop))
+          properties.push(Link_Trellis.create_reference(prop))
         }
       }
-      return result
+      return {
+        name: trellis.name,
+        trellis: trellis,
+        keys: properties
+      }
     }
 
-    static create_reference(property:Property):Link_Reference {
+    static create_from_property(property:Property):Link_Trellis {
+      var trellises = [
+        property.parent,
+        property.other_trellis]
+      return new Link_Trellis(trellises)
+    }
+
+    static create_reference(property:Property):Identity_Key {
       var name = property.name
       return {
         name: name,
-        property.type,
-        source: property
+        type: property.type,
+        property: property
       }
     }
 
@@ -80,7 +90,7 @@ module Ground {
         var list = this.properties[i], seed = seeds[i]
         for (var p in list) {
           var property = list[p], seed = seeds[i], name = property.name
-          if ()
+//          if ()
           keys.push(name)
           values.push(property.get_sql_value(seed[name]))
         }

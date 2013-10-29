@@ -257,7 +257,7 @@ module Ground {
     }
 
     generate_property_join(property:Property, seed) {
-      var join = new Link_Trellis(property);
+      var join = Link_Trellis.create_from_property(property);
       return join.generate_join(seed);
     }
 

@@ -232,7 +232,7 @@ module Ground {
       if (!MetaHub.is_array(list))
         return when.resolve();
 
-      var join = new Link_Trellis(property);
+      var join = Link_Trellis.create_from_property(property);
       var other_trellis = property.get_referenced_trellis()
       var promises = []
 

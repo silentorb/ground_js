@@ -115,6 +115,18 @@ module Ground {
       return this.plural || this.name + 's';
     }
 
+    get_primary_keys() {
+      if (this.table && this.table.primary_keys) {
+        var result = []
+        for(var name in this.table.primary_keys) {
+          result.push(this.properties[name])
+        }
+        return result
+      }
+
+      return [ this.properties[this.primary_key] ]
+    }
+
     get_table_name():string {
 //      console.log('get_table_name', this.name, this.is_virtual, this.plural, this.table)
       if (this.is_virtual) {
