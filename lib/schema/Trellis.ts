@@ -118,8 +118,9 @@ module Ground {
     get_primary_keys() {
       if (this.table && this.table.primary_keys) {
         var result = []
-        for(var name in this.table.primary_keys) {
-          result.push(this.properties[name])
+        for (var i in this.table.primary_keys) {
+          var key = this.table.primary_keys[i]
+          result.push(this.properties[key])
         }
         return result
       }

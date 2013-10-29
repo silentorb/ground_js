@@ -8,7 +8,7 @@
 module Ground {
 
   // Map an entity reference property to a 
-  export interface Identity_Reference {
+  export interface Identity {
     name: string
     trellis:Trellis
     keys:Identity_Key[]
@@ -25,26 +25,37 @@ module Ground {
     seed
     table_name:string
     trellises:Trellis[] = []
+    trellis_dictionary = {} // Should contain the same values as trellises, just keyed by trellis name
+    identities:{[name:string]: Identity}
 
     constructor(trellises:Trellis[]) {
       this.trellises = trellises
+
+      for (var i = 0; i < trellises.length; ++i) {
+        var trellis = trellises[i]
+        this.trellis_dictionary[trellis.name] = trellis
+      }
+
       this.table_name = trellises.map((t)=> t.get_plural())
         .sort().join('_')
 
       this.properties = trellises.map((x)=> this.create_identity(x))
     }
 
-    create_identity(trellis:Trellis):Identity_Reference {
-      var properties = []
-      var property = trellis.properties[trellis.primary_key]
-      properties.push(Link_Trellis.create_reference(property))
+    create_identity(trellis:Trellis):Identity {
+      var properties = [], property, name
+      var keys = trellis.get_primary_keys()
+//console.log('keys', keys)
+      for (var i = 0; i < keys.length; ++i) {
+        property = keys[i]
+        if (property.name == trellis.primary_key)
+          name = trellis.name
+        else
+          name = trellis.name + '_' + property.name
 
-      if (property.composite_properties) {
-        for (var i in property.composite_properties) {
-          var prop = property.composite_properties[i]
-          properties.push(Link_Trellis.create_reference(prop))
-        }
+        properties.push(Link_Trellis.create_reference(property, name))
       }
+
       return {
         name: trellis.name,
         trellis: trellis,
@@ -59,8 +70,7 @@ module Ground {
       return new Link_Trellis(trellises)
     }
 
-    static create_reference(property:Property):Identity_Key {
-      var name = property.name
+    static create_reference(property:Property, name:string):Identity_Key {
       return {
         name: name,
         type: property.type,
@@ -68,7 +78,7 @@ module Ground {
       }
     }
 
-    generate_join(seeds:any[]) {
+    generate_join(seeds:{}) {
 //      var sql = "JOIN %table_name ON %table_name.%second_key = " + id +
 //        " AND %table_name.%first_key = %back_id\n";
 
@@ -113,30 +123,31 @@ module Ground {
       this.table_name = temp.join('_')
     }
 
-    static get_condition(property:Property, seed) {
-      if (seed[property.name] !== undefined) {
-        var value = seed[property.name]
+    static get_condition(key:Identity_Key, seed) {
+      if (seed[key.name] !== undefined) {
+        var value = seed[key.name]
         if (typeof value === 'function')
           value == value()
         else
-          value = property.get_sql_value(value)
-        return property.query() + ' = ' + value
+          value = key.property.get_sql_value(value)
+
+        return key.property.query() + ' = ' + value
       }
       else
         return null
     }
 
-    get_condition_string(seeds:any[]):string {
+    get_condition_string(seeds:{}):string {
       return this.get_conditions(seeds).join(' AND ')
     }
 
-    get_conditions(seeds:any[]):string[] {
+    get_conditions(seeds:{}):string[] {
       var conditions = []
-      for (var i in this.properties) {
-        var list = this.properties[i], seed = seeds[i]
-        for (var p in list) {
-          var property = list[p]
-          var condition = Link_Trellis.get_condition(property, seed)
+      for (var i in this.identities) {
+        var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]
+        for (var p in identity.keys) {
+          var key = identity[p]
+          var condition = Link_Trellis.get_condition(key, seed)
           if (condition)
             conditions.push(condition)
         }

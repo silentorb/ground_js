@@ -52,6 +52,7 @@ declare module Ground {
         public get_join(main_table: string): string;
         public get_links(): Ground.Property[];
         public get_plural(): string;
+        public get_primary_keys(): any[];
         public get_table_name(): string;
         public get_table_query(): string;
         public get_tree(): Trellis[];
@@ -260,20 +261,36 @@ declare module Ground {
     }
 }
 declare module Ground {
+    interface Identity {
+        name: string;
+        trellis: Ground.Trellis;
+        keys: Identity_Key[];
+    }
+    interface Identity_Key {
+        name: string;
+        type: string;
+        property: Ground.Property;
+    }
     class Link_Trellis {
         public properties;
         public seed;
         public table_name: string;
         public trellises: Ground.Trellis[];
-        constructor(property: Ground.Property);
-        public initialize_property(property: Ground.Property): any[];
-        public generate_join(seeds: any[]): string;
+        public trellis_dictionary: {};
+        public identities: {
+            [name: string]: Identity;
+        };
+        constructor(trellises: Ground.Trellis[]);
+        public create_identity(trellis: Ground.Trellis): Identity;
+        static create_from_property(property: Ground.Property): Link_Trellis;
+        static create_reference(property: Ground.Property, name: string): Identity_Key;
+        public generate_join(seeds: {}): string;
         public generate_delete_row(seeds: any[]): string;
         public generate_insert(seeds: any[]): string;
         private generate_table_name();
-        static get_condition(property: Ground.Property, seed): string;
-        public get_condition_string(seeds: any[]): string;
-        public get_conditions(seeds: any[]): string[];
+        static get_condition(key: Identity_Key, seed): string;
+        public get_condition_string(seeds: {}): string;
+        public get_conditions(seeds: {}): string[];
     }
 }
 declare module Ground {

@@ -197,6 +197,19 @@ var Ground;
             return this.plural || this.name + 's';
         };
 
+        Trellis.prototype.get_primary_keys = function () {
+            if (this.table && this.table.primary_keys) {
+                var result = [];
+                for (var i in this.table.primary_keys) {
+                    var key = this.table.primary_keys[i];
+                    result.push(this.properties[key]);
+                }
+                return result;
+            }
+
+            return [this.properties[this.primary_key]];
+        };
+
         Trellis.prototype.get_table_name = function () {
             if (this.is_virtual) {
                 if (this.parent) {
@@ -512,7 +525,7 @@ else
         };
 
         Query.prototype.generate_property_join = function (property, seed) {
-            var join = new Ground.Link_Trellis(property);
+            var join = Ground.Link_Trellis.create_from_property(property);
             return join.generate_join(seed);
         };
 
@@ -942,7 +955,7 @@ else
             if (!MetaHub.is_array(list))
                 return when.resolve();
 
-            var join = new Ground.Link_Trellis(property);
+            var join = Ground.Link_Trellis.create_from_property(property);
             var other_trellis = property.get_referenced_trellis();
             var promises = [];
 
@@ -1496,32 +1509,60 @@ else
 var Ground;
 (function (Ground) {
     var Link_Trellis = (function () {
-        function Link_Trellis(property) {
+        function Link_Trellis(trellises) {
+            var _this = this;
             this.trellises = [];
-            var other_property = property.get_other_property();
-            this.trellises.push(property.parent);
-            this.trellises.push(other_property.parent);
+            this.trellis_dictionary = {};
+            this.trellises = trellises;
 
-            var other_table = other_property.parent.get_plural();
-            var temp = [other_table, property.parent.get_plural()];
-            temp = temp.sort();
-            this.table_name = temp.join('_');
-
-            this.properties = [
-                this.initialize_property(property),
-                this.initialize_property(other_property)
-            ];
-        }
-        Link_Trellis.prototype.initialize_property = function (property) {
-            var result = [];
-            result.push(property);
-            if (property.composite_properties) {
-                for (var i in property.composite_properties) {
-                    var prop = property.composite_properties[i];
-                    result.push(prop);
-                }
+            for (var i = 0; i < trellises.length; ++i) {
+                var trellis = trellises[i];
+                this.trellis_dictionary[trellis.name] = trellis;
             }
-            return result;
+
+            this.table_name = trellises.map(function (t) {
+                return t.get_plural();
+            }).sort().join('_');
+
+            this.properties = trellises.map(function (x) {
+                return _this.create_identity(x);
+            });
+        }
+        Link_Trellis.prototype.create_identity = function (trellis) {
+            var properties = [], property, name;
+            var keys = trellis.get_primary_keys();
+            console.log('keys', keys);
+            for (var i = 0; i < keys.length; ++i) {
+                property = keys[i];
+                if (property.name == trellis.primary_key)
+                    name = trellis.name;
+else
+                    name = trellis.name + '_' + property.name;
+
+                properties.push(Link_Trellis.create_reference(property, name));
+            }
+
+            return {
+                name: trellis.name,
+                trellis: trellis,
+                keys: properties
+            };
+        };
+
+        Link_Trellis.create_from_property = function (property) {
+            var trellises = [
+                property.parent,
+                property.other_trellis
+            ];
+            return new Link_Trellis(trellises);
+        };
+
+        Link_Trellis.create_reference = function (property, name) {
+            return {
+                name: name,
+                type: property.type,
+                property: property
+            };
         };
 
         Link_Trellis.prototype.generate_join = function (seeds) {
@@ -1540,6 +1581,7 @@ var Ground;
                 var list = this.properties[i], seed = seeds[i];
                 for (var p in list) {
                     var property = list[p], seed = seeds[i], name = property.name;
+
                     keys.push(name);
                     values.push(property.get_sql_value(seed[name]));
                 }
@@ -1555,14 +1597,15 @@ var Ground;
             this.table_name = temp.join('_');
         };
 
-        Link_Trellis.get_condition = function (property, seed) {
-            if (seed[property.name] !== undefined) {
-                var value = seed[property.name];
+        Link_Trellis.get_condition = function (key, seed) {
+            if (seed[key.name] !== undefined) {
+                var value = seed[key.name];
                 if (typeof value === 'function')
                     value == value();
 else
-                    value = property.get_sql_value(value);
-                return property.query() + ' = ' + value;
+                    value = key.property.get_sql_value(value);
+
+                return key.property.query() + ' = ' + value;
             } else
                 return null;
         };
@@ -1573,11 +1616,11 @@ else
 
         Link_Trellis.prototype.get_conditions = function (seeds) {
             var conditions = [];
-            for (var i in this.properties) {
-                var list = this.properties[i], seed = seeds[i];
-                for (var p in list) {
-                    var property = list[p];
-                    var condition = Link_Trellis.get_condition(property, seed);
+            for (var i in this.identities) {
+                var identity = this.identities[i], seed = seeds[identity.trellis.name];
+                for (var p in identity.keys) {
+                    var key = identity[p];
+                    var condition = Link_Trellis.get_condition(key, seed);
                     if (condition)
                         conditions.push(condition);
                 }
