@@ -7,7 +7,8 @@
 
 module Ground {
 
-  export interface Link_Property {
+  // Map an entity reference property to a 
+  export interface Link_Reference {
     name: string
     type: string
     source:Property
@@ -38,17 +39,17 @@ module Ground {
 
     initialize_property(property:Property) {
       var result = []
-      result.push(Link_Trellis.create_link_property(property))
+      result.push(Link_Trellis.create_reference(property))
       if (property.composite_properties) {
         for (var i in property.composite_properties) {
           var prop = property.composite_properties[i]
-          result.push(Link_Trellis.create_link_property(prop))
+          result.push(Link_Trellis.create_reference(prop))
         }
       }
       return result
     }
 
-    static create_link_property(property:Property):Link_Property {
+    static create_reference(property:Property):Link_Reference {
       var name = property.name
       return {
         name: name,
