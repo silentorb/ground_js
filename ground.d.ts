@@ -140,6 +140,7 @@ declare module Ground {
         public run_as_service(arguments?: {}): Promise;
     }
 }
+declare var uuid;
 declare module Ground {
     class Update {
         public seed: Ground.ISeed;
@@ -277,16 +278,14 @@ declare module Ground {
         public table_name: string;
         public trellises: Ground.Trellis[];
         public trellis_dictionary: {};
-        public identities: {
-            [name: string]: Identity;
-        };
+        public identities: Identity[];
         constructor(trellises: Ground.Trellis[]);
         public create_identity(trellis: Ground.Trellis): Identity;
         static create_from_property(property: Ground.Property): Link_Trellis;
         static create_reference(property: Ground.Property, name: string): Identity_Key;
         public generate_join(seeds: {}): string;
         public generate_delete_row(seeds: any[]): string;
-        public generate_insert(seeds: any[]): string;
+        public generate_insert(seeds: {}): string;
         private generate_table_name();
         static get_condition(key: Identity_Key, seed): string;
         public get_condition_string(seeds: {}): string;

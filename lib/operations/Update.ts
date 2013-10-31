@@ -4,6 +4,8 @@
  */
 /// <reference path="../references.ts"/>
 
+var uuid = require('node-uuid')
+
 module Ground {
   export class Update {
     seed:ISeed;
@@ -67,6 +69,10 @@ module Ground {
       var values = [];
       var core_properties = trellis.get_core_properties();
       var promises = [];
+
+      if (core_properties[trellis.primary_key].type == 'guid' && !this.seed[trellis.primary_key]) {
+        this.seed[trellis.primary_key] = uuid.v1()
+      }
 
       for (var name in core_properties) {
         var property = core_properties[name];
@@ -252,14 +258,20 @@ module Ground {
         else {
           if (other_id === null) {
             other = this.ground.update_object(other_trellis, other, this.user_id)
-              .then((other)=>
-                promises.push(this.db.query(join.generate_insert([row, other]))
+              .then((other)=> {
+                var seeds = {}
+                seeds[this.trellis.name] = row
+                seeds[other_trellis.name] = other
+                promises.push(this.db.query(join.generate_insert(seeds))
                   .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
                 )
-            )
+              })
           }
           else {
-            promises.push(this.db.query(join.generate_insert([row, other]))
+            var seeds = {}
+            seeds[this.trellis.name] = row
+            seeds[other_trellis.name] = other
+            promises.push(this.db.query(join.generate_insert(seeds))
               .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
             )
           }
@@ -301,7 +313,7 @@ module Ground {
       if (other_property && object[other_property.name] !== undefined)
         object[other_property.name] = id;
 
-      return this.ground.update_object(trellis, object);
+      return this.ground.update_object(trellis, object, this.user_id);
     }
 
     public run():Promise {

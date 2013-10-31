@@ -160,6 +160,9 @@ module Ground {
           }
           return value || 'NULL';
         case 'int':
+          if (!value)
+            return 0
+
           return Math.round(value);
         case 'string':
         case 'text':
@@ -169,7 +172,10 @@ module Ground {
           return value ? 'TRUE' : 'FALSE'
         case 'float':
         case 'double':
-          return new Number(value)
+          if (!value)
+            return 0
+
+          return parseFloat(value)
         case 'money':
           if (typeof value !== 'number')
             return parseFloat(value.toString());

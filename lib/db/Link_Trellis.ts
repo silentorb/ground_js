@@ -26,7 +26,7 @@ module Ground {
     table_name:string
     trellises:Trellis[] = []
     trellis_dictionary = {} // Should contain the same values as trellises, just keyed by trellis name
-    identities:{[name:string]: Identity}
+    identities:Identity[]
 
     constructor(trellises:Trellis[]) {
       this.trellises = trellises
@@ -39,7 +39,7 @@ module Ground {
       this.table_name = trellises.map((t)=> t.get_plural())
         .sort().join('_')
 
-      this.properties = trellises.map((x)=> this.create_identity(x))
+      this.identities = trellises.map((x)=> this.create_identity(x))
     }
 
     create_identity(trellis:Trellis):Identity {
@@ -92,19 +92,27 @@ module Ground {
       return 'DELETE ' + this.table_name + ' ON ' + this.get_condition_string(seeds) + "\n"
     }
 
-    generate_insert(seeds:any[]):string {
+    generate_insert(seeds:{}):string {
       var values = [], keys = []
       console.log('seeds', seeds)
-      console.log('properties', this.properties)
-      for (var i in this.properties) {
-        var list = this.properties[i], seed = seeds[i]
-        for (var p in list) {
-          var property = list[p], seed = seeds[i], name = property.name
-//          if ()
-          keys.push(name)
-          values.push(property.get_sql_value(seed[name]))
+//      console.log('properties', this.identities)
+      for (var i in this.identities) {
+        var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]
+        for (var p in identity.keys) {
+          var key = identity.keys[p]
+          keys.push(key.name)
+          values.push(key.property.get_sql_value(seed[key.property.name]))
         }
       }
+//      for (var i in this.identities) {
+//        var list = this.identities[i], seed = seeds[i]
+//        for (var p in list) {
+//          var property = list[p], seed = seeds[i], name = property.name
+////          if ()
+//          keys.push(name)
+//          values.push(property.get_sql_value(seed[name]))
+//        }
+//      }
       return 'REPLACE INTO ' + this.table_name + ' (`'
         + keys.join('`, `')
         + '`) VALUES ('
@@ -117,7 +125,7 @@ module Ground {
     }
 
     private generate_table_name() {
-      var temp = MetaHub.map_to_array(this.properties,
+      var temp = MetaHub.map_to_array(this.identities,
         (p)=>  p.parent.get_plural())
       temp = temp.sort()
       this.table_name = temp.join('_')
@@ -171,8 +179,8 @@ module Ground {
      throw new Error('get_other_seed()\'s property_index can only be 0 or 1.')
 
      var result = {}, i, other_property
-     var property = this.properties[property_index]
-     var other_property_list = this.properties[1 - property_index]
+     var property = this.identities[property_index]
+     var other_property_list = this.identities[1 - property_index]
      var other_trellis = property.other_trellis
      var reference_value = seed[property.name]
 

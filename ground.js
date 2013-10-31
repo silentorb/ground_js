@@ -745,6 +745,8 @@ else if (relationship === Ground.Relationships.one_to_many)
     })();
     Ground.Query = Query;
 })(Ground || (Ground = {}));
+var uuid = require('node-uuid');
+
 var Ground;
 (function (Ground) {
     var Update = (function () {
@@ -800,6 +802,10 @@ else
             var values = [];
             var core_properties = trellis.get_core_properties();
             var promises = [];
+
+            if (core_properties[trellis.primary_key].type == 'guid' && !this.seed[trellis.primary_key]) {
+                this.seed[trellis.primary_key] = uuid.v1();
+            }
 
             for (var name in core_properties) {
                 var property = core_properties[name];
@@ -973,12 +979,18 @@ else
                 } else {
                     if (other_id === null) {
                         other = this.ground.update_object(other_trellis, other, this.user_id).then(function (other) {
-                            return promises.push(_this.db.query(join.generate_insert([row, other])).then(function () {
+                            var seeds = {};
+                            seeds[_this.trellis.name] = row;
+                            seeds[other_trellis.name] = other;
+                            promises.push(_this.db.query(join.generate_insert(seeds)).then(function () {
                                 return _this.ground.invoke(join.table_name + '.create', property, row, other, join);
                             }));
                         });
                     } else {
-                        promises.push(this.db.query(join.generate_insert([row, other])).then(function () {
+                        var seeds = {};
+                        seeds[this.trellis.name] = row;
+                        seeds[other_trellis.name] = other;
+                        promises.push(this.db.query(join.generate_insert(seeds)).then(function () {
                             return _this.ground.invoke(join.table_name + '.create', property, row, other, join);
                         }));
                     }
@@ -1021,7 +1033,7 @@ else
             if (other_property && object[other_property.name] !== undefined)
                 object[other_property.name] = id;
 
-            return this.ground.update_object(trellis, object);
+            return this.ground.update_object(trellis, object, this.user_id);
         };
 
         Update.prototype.run = function () {
@@ -1524,14 +1536,14 @@ var Ground;
                 return t.get_plural();
             }).sort().join('_');
 
-            this.properties = trellises.map(function (x) {
+            this.identities = trellises.map(function (x) {
                 return _this.create_identity(x);
             });
         }
         Link_Trellis.prototype.create_identity = function (trellis) {
             var properties = [], property, name;
             var keys = trellis.get_primary_keys();
-            console.log('keys', keys);
+
             for (var i = 0; i < keys.length; ++i) {
                 property = keys[i];
                 if (property.name == trellis.primary_key)
@@ -1576,21 +1588,21 @@ else
         Link_Trellis.prototype.generate_insert = function (seeds) {
             var values = [], keys = [];
             console.log('seeds', seeds);
-            console.log('properties', this.properties);
-            for (var i in this.properties) {
-                var list = this.properties[i], seed = seeds[i];
-                for (var p in list) {
-                    var property = list[p], seed = seeds[i], name = property.name;
 
-                    keys.push(name);
-                    values.push(property.get_sql_value(seed[name]));
+            for (var i in this.identities) {
+                var identity = this.identities[i], seed = seeds[identity.trellis.name];
+                for (var p in identity.keys) {
+                    var key = identity.keys[p];
+                    keys.push(key.name);
+                    values.push(key.property.get_sql_value(seed[key.property.name]));
                 }
             }
+
             return 'REPLACE INTO ' + this.table_name + ' (`' + keys.join('`, `') + '`) VALUES (' + values.join(', ') + ');\n';
         };
 
         Link_Trellis.prototype.generate_table_name = function () {
-            var temp = MetaHub.map_to_array(this.properties, function (p) {
+            var temp = MetaHub.map_to_array(this.identities, function (p) {
                 return p.parent.get_plural();
             });
             temp = temp.sort();
@@ -1783,6 +1795,9 @@ else if (value === false)
                     }
                     return value || 'NULL';
                 case 'int':
+                    if (!value)
+                        return 0;
+
                     return Math.round(value);
                 case 'string':
                 case 'text':
@@ -1792,7 +1807,10 @@ else if (value === false)
                     return value ? 'TRUE' : 'FALSE';
                 case 'float':
                 case 'double':
-                    return new Number(value);
+                    if (!value)
+                        return 0;
+
+                    return parseFloat(value);
                 case 'money':
                     if (typeof value !== 'number')
                         return parseFloat(value.toString());
