@@ -153,12 +153,12 @@ module Ground {
         });
     }
 
-    private apply_insert(property:Property, value):string {
+    private apply_insert(property:Property, value) {
       if (property.insert == 'trellis')
         return this.trellis.name;
 
       if (property.type == 'created' || property.type == 'modified')
-        return Math.round(new Date().getTime() / 1000).toString()
+        return Math.round(new Date().getTime() / 1000)
 
       if (!value && property.insert == 'author') {
         if (!this.user_id)
@@ -168,7 +168,7 @@ module Ground {
 //        throw new Error('Inserting author not yet supported');
       }
 
-      return value.toString();
+      return value
     }
 
     is_create_property(property:Property):boolean {
@@ -245,75 +245,89 @@ module Ground {
       for (var i = 0; i < list.length; i++) {
         var other = list[i]
         var other_id = other_trellis.get_id(other)
+        // First updated the embedded list object into the database, then link it to the main seed.
+        var promise = this.update_reference_object(other, property)
+          .then(() => {
 //        var other_seed = join.get_other_seed(other)
-        // Clients can use the _remove flag to detach items from lists without deleting them
-        if (typeof other === 'object' && other._remove) {
-          if (other_id !== null) {
-            var sql = join.generate_delete_row([row, other])
-            promises.push(this.ground.invoke(join.table_name + '.delete', property, row, other, join)
-              .then(() => this.db.query(sql))
-            )
-          }
-        }
-        else {
-          if (other_id === null) {
-            other = this.ground.update_object(other_trellis, other, this.user_id)
-              .then((other)=> {
+            // Clients can use the _remove flag to detach items from lists without deleting them
+            if (typeof other === 'object' && other._remove) {
+              if (other_id !== null) {
+                var sql = join.generate_delete_row([row, other])
+                return this.ground.invoke(join.table_name + '.delete', property, row, other, join)
+                  .then(() => this.db.query(sql))
+
+              }
+            }
+            else {
+              if (other_id === null) {
+                other = this.ground.update_object(other_trellis, other, this.user_id)
+                  .then((other)=> {
+                    var seeds = {}
+                    seeds[this.trellis.name] = row
+                    seeds[other_trellis.name] = other
+                    return this.db.query(join.generate_insert(seeds))
+                      .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
+                  })
+              }
+              else {
                 var seeds = {}
                 seeds[this.trellis.name] = row
                 seeds[other_trellis.name] = other
-                promises.push(this.db.query(join.generate_insert(seeds))
+                return this.db.query(join.generate_insert(seeds))
                   .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
-                )
-              })
-          }
-          else {
-            var seeds = {}
-            seeds[this.trellis.name] = row
-            seeds[other_trellis.name] = other
-            promises.push(this.db.query(join.generate_insert(seeds))
-              .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
-            )
-          }
-        }
+              }
+            }
+          })
+        promises.push(promise)
       }
 
       return when.all(promises)
     }
 
     private update_one_to_many(property:Property, id):Promise {
-      var seed = this.seed;
-      var list = seed[property.name];
+      var seed = this.seed
+      var list = seed[property.name]
       if (!MetaHub.is_array(list))
-        return when.resolve();
+        return when.resolve()
 
-      var promises = MetaHub.map_to_array(list, (item)=> {
-        return this.update_reference_object(item, property, id);
-      });
+      var promises = MetaHub.map_to_array(list, (item) =>
+          this.update_reference_object(item, property)
+      )
 
-      return when.all(promises);
+      return when.all(promises)
     }
 
     private update_reference(property:Property, id):Promise {
-      var item = this.seed[property.name];
+      var item = this.seed[property.name]
       if (!item)
-        return when.resolve();
+        return when.resolve()
 
-      return this.update_reference_object(item, property, id);
+      return this.update_reference_object(item, property)
     }
 
-    private update_reference_object(object, property:Property, id):Promise {
+    private update_reference_object(other, property:Property):Promise {
+      if (typeof other !== 'object')
+        return when.resolve()
+
       var trellis;
-      if (object.trellis)
-        trellis = object.trellis;
+      if (other.trellis)
+        trellis = other.trellis;
       else
         trellis = property.other_trellis;
 
       var other_property = property.get_other_property();
-      if (other_property && object[other_property.name] !== undefined)
-        object[other_property.name] = id;
+      if (other_property) {
+        other[other_property.name] = this.seed[this.trellis.primary_key]
+        if (other_property.composite_properties) {
+          for (var i = 0; i < other_property.composite_properties.length; ++i) {
+            var secondary = other_property.composite_properties[i]
+            other[secondary.name] = this.seed[secondary.get_other_property().name]
+          }
+        }
+      }
 
-      return this.ground.update_object(trellis, object, this.user_id);
+
+      return this.ground.update_object(trellis, other, this.user_id);
     }
 
     public run():Promise {
@@ -322,6 +336,7 @@ module Ground {
 
       return when.all(invoke_promises)
         .then(()=> {
+          console.log('seeeed', this.seed)
           var promises = tree.map((trellis:Trellis) => this.generate_sql(trellis));
           return when.all(promises)
             .then(()=> {

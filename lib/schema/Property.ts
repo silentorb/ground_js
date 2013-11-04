@@ -52,6 +52,9 @@ module Ground {
           if (key != other_trellis.primary_key) {
             var other_property = other_trellis.properties[key]
             var new_property = this.parent.add_property(name, other_property.get_data())
+            new_property.other_property = key
+            new_property.other_trellis_name = this.parent.name
+            new_property.other_trellis = this.parent
             this.composite_properties = this.composite_properties || []
             this.composite_properties.push(new_property)
           }

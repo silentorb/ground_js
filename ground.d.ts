@@ -108,7 +108,6 @@ declare module Ground {
         public arguments: {};
         public expansions: string[];
         public wrappers: Query_Wrapper[];
-        static log_queries: boolean;
         static operators: string[];
         private links;
         constructor(trellis: Ground.Trellis, base_path?: string);
@@ -165,7 +164,7 @@ declare module Ground {
         private update_many_to_many(property, create?);
         private update_one_to_many(property, id);
         private update_reference(property, id);
-        private update_reference_object(object, property, id);
+        private update_reference_object(other, property);
         public run(): Promise;
     }
 }

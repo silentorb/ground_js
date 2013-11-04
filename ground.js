@@ -703,7 +703,7 @@ else
             return when.all(promises).then(function () {
                 var sql = _this.generate_sql(properties);
                 sql = sql.replace(/\r/g, "\n");
-                if (Query.log_queries)
+                if (_this.ground.log_queries)
                     console.log('query', sql);
 
                 var args = MetaHub.values(_this.arguments).concat(args);
@@ -721,7 +721,7 @@ else
             var properties = this.trellis.get_all_properties();
             var sql = this.generate_sql(properties);
             sql = sql.replace(/\r/g, "\n");
-            if (Query.log_queries)
+            if (this.ground.log_queries)
                 console.log('query', sql);
 
             var args = MetaHub.values(this.arguments).concat(arguments);
@@ -735,7 +735,6 @@ else
                 };
             });
         };
-        Query.log_queries = false;
         Query.operators = [
             '=',
             'LIKE',
@@ -884,7 +883,7 @@ else
                 return this.trellis.name;
 
             if (property.type == 'created' || property.type == 'modified')
-                return Math.round(new Date().getTime() / 1000).toString();
+                return Math.round(new Date().getTime() / 1000);
 
             if (!value && property.insert == 'author') {
                 if (!this.user_id)
@@ -893,7 +892,7 @@ else
                 return this.user_id;
             }
 
-            return value.toString();
+            return value;
         };
 
         Update.prototype.is_create_property = function (property) {
@@ -969,32 +968,35 @@ else
                 var other = list[i];
                 var other_id = other_trellis.get_id(other);
 
-                if (typeof other === 'object' && other._remove) {
-                    if (other_id !== null) {
-                        var sql = join.generate_delete_row([row, other]);
-                        promises.push(this.ground.invoke(join.table_name + '.delete', property, row, other, join).then(function () {
-                            return _this.db.query(sql);
-                        }));
-                    }
-                } else {
-                    if (other_id === null) {
-                        other = this.ground.update_object(other_trellis, other, this.user_id).then(function (other) {
+                var promise = this.update_reference_object(other, property).then(function () {
+                    if (typeof other === 'object' && other._remove) {
+                        if (other_id !== null) {
+                            var sql = join.generate_delete_row([row, other]);
+                            return _this.ground.invoke(join.table_name + '.delete', property, row, other, join).then(function () {
+                                return _this.db.query(sql);
+                            });
+                        }
+                    } else {
+                        if (other_id === null) {
+                            other = _this.ground.update_object(other_trellis, other, _this.user_id).then(function (other) {
+                                var seeds = {};
+                                seeds[_this.trellis.name] = row;
+                                seeds[other_trellis.name] = other;
+                                return _this.db.query(join.generate_insert(seeds)).then(function () {
+                                    return _this.ground.invoke(join.table_name + '.create', property, row, other, join);
+                                });
+                            });
+                        } else {
                             var seeds = {};
                             seeds[_this.trellis.name] = row;
                             seeds[other_trellis.name] = other;
-                            promises.push(_this.db.query(join.generate_insert(seeds)).then(function () {
+                            return _this.db.query(join.generate_insert(seeds)).then(function () {
                                 return _this.ground.invoke(join.table_name + '.create', property, row, other, join);
-                            }));
-                        });
-                    } else {
-                        var seeds = {};
-                        seeds[this.trellis.name] = row;
-                        seeds[other_trellis.name] = other;
-                        promises.push(this.db.query(join.generate_insert(seeds)).then(function () {
-                            return _this.ground.invoke(join.table_name + '.create', property, row, other, join);
-                        }));
+                            });
+                        }
                     }
-                }
+                });
+                promises.push(promise);
             }
 
             return when.all(promises);
@@ -1008,7 +1010,7 @@ else
                 return when.resolve();
 
             var promises = MetaHub.map_to_array(list, function (item) {
-                return _this.update_reference_object(item, property, id);
+                return _this.update_reference_object(item, property);
             });
 
             return when.all(promises);
@@ -1019,21 +1021,31 @@ else
             if (!item)
                 return when.resolve();
 
-            return this.update_reference_object(item, property, id);
+            return this.update_reference_object(item, property);
         };
 
-        Update.prototype.update_reference_object = function (object, property, id) {
+        Update.prototype.update_reference_object = function (other, property) {
+            if (typeof other !== 'object')
+                return when.resolve();
+
             var trellis;
-            if (object.trellis)
-                trellis = object.trellis;
+            if (other.trellis)
+                trellis = other.trellis;
 else
                 trellis = property.other_trellis;
 
             var other_property = property.get_other_property();
-            if (other_property && object[other_property.name] !== undefined)
-                object[other_property.name] = id;
+            if (other_property) {
+                other[other_property.name] = this.seed[this.trellis.primary_key];
+                if (other_property.composite_properties) {
+                    for (var i = 0; i < other_property.composite_properties.length; ++i) {
+                        var secondary = other_property.composite_properties[i];
+                        other[secondary.name] = this.seed[secondary.get_other_property().name];
+                    }
+                }
+            }
 
-            return this.ground.update_object(trellis, object, this.user_id);
+            return this.ground.update_object(trellis, other, this.user_id);
         };
 
         Update.prototype.run = function () {
@@ -1046,6 +1058,7 @@ else
             });
 
             return when.all(invoke_promises).then(function () {
+                console.log('seeeed', _this.seed);
                 var promises = tree.map(function (trellis) {
                     return _this.generate_sql(trellis);
                 });
@@ -1694,6 +1707,9 @@ var Ground;
                     if (key != other_trellis.primary_key) {
                         var other_property = other_trellis.properties[key];
                         var new_property = this.parent.add_property(name, other_property.get_data());
+                        new_property.other_property = key;
+                        new_property.other_trellis_name = this.parent.name;
+                        new_property.other_trellis = this.parent;
                         this.composite_properties = this.composite_properties || [];
                         this.composite_properties.push(new_property);
                     }

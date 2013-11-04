@@ -62,7 +62,6 @@ module Ground {
     expansions:string[] = []
     wrappers:Query_Wrapper[] = []
 
-    static log_queries:boolean = false
     public static operators = [
       '=',
       'LIKE',
@@ -332,7 +331,7 @@ module Ground {
 
       if (authorized_properties) {
         for (name in authorized_properties) {
-          property = authorized_properties[name];
+          property = authorized_properties[name]
           if (row[property.name] !== undefined)
             row[property.name] = this.ground.convert_value(row[property.name], property.type);
         }
@@ -341,7 +340,7 @@ module Ground {
       var links = this.trellis.get_all_links((p)=> !p.is_virtual);
 
       for (name in links) {
-        property = links[name];
+        property = links[name]
 
         var path = this.get_path(property.name);
         if (authorized_properties && authorized_properties[name] === undefined)
@@ -432,20 +431,20 @@ module Ground {
         .then(()=> {
           var sql = this.generate_sql(properties);
           sql = sql.replace(/\r/g, "\n");
-          if (Query.log_queries)
+          if (this.ground.log_queries)
             console.log('query', sql);
 
           var args = MetaHub.values(this.arguments).concat(args);
           return this.db.query(sql)
             .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
-        });
+        })
     }
 
     run_as_service(arguments = {}):Promise {
       var properties = this.trellis.get_all_properties();
       var sql = this.generate_sql(properties);
       sql = sql.replace(/\r/g, "\n");
-      if (Query.log_queries)
+      if (this.ground.log_queries)
         console.log('query', sql);
 
       var args = MetaHub.values(this.arguments).concat(arguments);
