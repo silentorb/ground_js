@@ -256,9 +256,9 @@ module Ground {
       }
     }
 
-    generate_property_join(property:Property, seed) {
+    generate_property_join(property:Property, seeds) {
       var join = Link_Trellis.create_from_property(property);
-      return join.generate_join(seed);
+      return join.generate_join(seeds);
     }
 
     get_many_list(seed, id, property:Property, relationship:Relationships):Promise {
@@ -266,10 +266,13 @@ module Ground {
       var query = new Query(other_property.parent, this.get_path(property.name));
       query.include_links = false;
       query.expansions = this.expansions;
-      if (relationship === Relationships.many_to_many)
-        query.add_join(query.generate_property_join(property, seed));
+      if (relationship === Relationships.many_to_many) {
+        var seeds = {}
+        seeds[this.trellis.name] = seed
+        query.add_join(query.generate_property_join(property, seeds))
+      }
       else if (relationship === Relationships.one_to_many)
-        query.add_property_filter(other_property.name, id);
+        query.add_property_filter(other_property.name, id)
 
       return query.run();
     }
@@ -312,13 +315,19 @@ module Ground {
     process_row(row, authorized_properties = null):Promise {
       var name, property, promise, promises = [];
       // Map field names to Trellis property names
-      for (name in this.trellis.properties) {
-        property = this.trellis.properties[name];
-        var field_name = property.get_field_name();
-        if (property.name != field_name && row[field_name] !== undefined) {
-          row[property] = row[field_name];
-          delete row[field_name];
-        }
+//      for (name in this.trellis.properties) {
+//        property = this.trellis.properties[name];
+//        var field_name = property.get_field_name();
+//        if (property.name != field_name && row[field_name] !== undefined) {
+//          row[property] = row[field_name];
+//          delete row[field_name];
+//        }
+//      }
+
+      var properties = this.trellis.get_core_properties()
+      for (name in properties) {
+        property = properties[name]
+        row[property.name] = this.ground.convert_value(row[property.name], property.type)
       }
 
       if (authorized_properties) {
@@ -381,6 +390,7 @@ module Ground {
         value = this.ground.convert_value(value, property.type);
 
       if (property.get_relationship() == Relationships.many_to_many) {
+        throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
         var join_seed = {}
         join_seed[property.name] = ':' + property.name + '_filter'
 

@@ -131,15 +131,18 @@ module Ground {
       this.table_name = temp.join('_')
     }
 
-    static get_condition(key:Identity_Key, seed) {
-      if (seed[key.name] !== undefined) {
-        var value = seed[key.name]
+    get_condition(key:Identity_Key, seed) {
+      if (!seed) {
+        console.log('empty key')
+      }
+      if (seed[key.property.name] !== undefined) {
+        var value = seed[key.property.name]
         if (typeof value === 'function')
           value == value()
         else
           value = key.property.get_sql_value(value)
 
-        return key.property.query() + ' = ' + value
+        return this.table_name + '.' + key.name + ' = ' + value
       }
       else
         return null
@@ -153,9 +156,12 @@ module Ground {
       var conditions = []
       for (var i in this.identities) {
         var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]
+        if (!seed)
+          continue
+
         for (var p in identity.keys) {
-          var key = identity[p]
-          var condition = Link_Trellis.get_condition(key, seed)
+          var key = identity.keys[p]
+          var condition = this.get_condition(key, seed)
           if (condition)
             conditions.push(condition)
         }

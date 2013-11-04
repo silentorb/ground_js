@@ -128,7 +128,7 @@ declare module Ground {
         public get_fields_and_joins(properties: {
             [name: string]: Ground.Property;
         }, include_primary_key?: boolean): Internal_Query_Source;
-        public generate_property_join(property: Ground.Property, seed): string;
+        public generate_property_join(property: Ground.Property, seeds): string;
         public get_many_list(seed, id, property: Ground.Property, relationship: Ground.Relationships): Promise;
         public get_path(...args: string[]): string;
         public get_reference_object(row, property: Ground.Property): Promise;
@@ -212,6 +212,7 @@ declare module Ground {
         public views: any[];
         public property_types: Property_Type[];
         public db: Ground.Database;
+        public log_queries: boolean;
         constructor(config, db_name: string);
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
         public get_base_property_type(type);
@@ -287,7 +288,7 @@ declare module Ground {
         public generate_delete_row(seeds: any[]): string;
         public generate_insert(seeds: {}): string;
         private generate_table_name();
-        static get_condition(key: Identity_Key, seed): string;
+        public get_condition(key: Identity_Key, seed): string;
         public get_condition_string(seeds: {}): string;
         public get_conditions(seeds: {}): string[];
     }

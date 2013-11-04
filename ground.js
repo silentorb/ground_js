@@ -524,9 +524,9 @@ else
             };
         };
 
-        Query.prototype.generate_property_join = function (property, seed) {
+        Query.prototype.generate_property_join = function (property, seeds) {
             var join = Ground.Link_Trellis.create_from_property(property);
-            return join.generate_join(seed);
+            return join.generate_join(seeds);
         };
 
         Query.prototype.get_many_list = function (seed, id, property, relationship) {
@@ -534,9 +534,11 @@ else
             var query = new Query(other_property.parent, this.get_path(property.name));
             query.include_links = false;
             query.expansions = this.expansions;
-            if (relationship === Ground.Relationships.many_to_many)
-                query.add_join(query.generate_property_join(property, seed));
-else if (relationship === Ground.Relationships.one_to_many)
+            if (relationship === Ground.Relationships.many_to_many) {
+                var seeds = {};
+                seeds[this.trellis.name] = seed;
+                query.add_join(query.generate_property_join(property, seeds));
+            } else if (relationship === Ground.Relationships.one_to_many)
                 query.add_property_filter(other_property.name, id);
 
             return query.run();
@@ -586,13 +588,10 @@ else if (relationship === Ground.Relationships.one_to_many)
             var _this = this;
             var name, property, promise, promises = [];
 
-            for (name in this.trellis.properties) {
-                property = this.trellis.properties[name];
-                var field_name = property.get_field_name();
-                if (property.name != field_name && row[field_name] !== undefined) {
-                    row[property] = row[field_name];
-                    delete row[field_name];
-                }
+            var properties = this.trellis.get_core_properties();
+            for (name in properties) {
+                property = properties[name];
+                row[property.name] = this.ground.convert_value(row[property.name], property.type);
             }
 
             if (authorized_properties) {
@@ -661,6 +660,7 @@ else if (relationship === Ground.Relationships.one_to_many)
                 value = this.ground.convert_value(value, property.type);
 
             if (property.get_relationship() == Ground.Relationships.many_to_many) {
+                throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
                 var join_seed = {};
                 join_seed[property.name] = ':' + property.name + '_filter';
 
@@ -1118,6 +1118,7 @@ var Ground;
             this.tables = [];
             this.views = [];
             this.property_types = [];
+            this.log_queries = false;
             this.db = new Ground.Database(config, db_name);
             var path = require('path');
             var filename = path.resolve(__dirname, 'property_types.json');
@@ -1609,15 +1610,18 @@ else
             this.table_name = temp.join('_');
         };
 
-        Link_Trellis.get_condition = function (key, seed) {
-            if (seed[key.name] !== undefined) {
-                var value = seed[key.name];
+        Link_Trellis.prototype.get_condition = function (key, seed) {
+            if (!seed) {
+                console.log('empty key');
+            }
+            if (seed[key.property.name] !== undefined) {
+                var value = seed[key.property.name];
                 if (typeof value === 'function')
                     value == value();
 else
                     value = key.property.get_sql_value(value);
 
-                return key.property.query() + ' = ' + value;
+                return this.table_name + '.' + key.name + ' = ' + value;
             } else
                 return null;
         };
@@ -1630,9 +1634,12 @@ else
             var conditions = [];
             for (var i in this.identities) {
                 var identity = this.identities[i], seed = seeds[identity.trellis.name];
+                if (!seed)
+                    continue;
+
                 for (var p in identity.keys) {
-                    var key = identity[p];
-                    var condition = Link_Trellis.get_condition(key, seed);
+                    var key = identity.keys[p];
+                    var condition = this.get_condition(key, seed);
                     if (condition)
                         conditions.push(condition);
                 }

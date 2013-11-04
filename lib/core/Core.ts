@@ -89,6 +89,7 @@ module Ground {
     views:any[] = []
     property_types:Property_Type[] = []
     db:Database
+    log_queries:boolean = false
 
     constructor(config, db_name:string) {
       super();
