@@ -32,7 +32,6 @@ module Ground {
       trellis.table = this;
     }
 
-
     static create_from_trellis(trellis:Trellis, ground:Core = null):Table {
       if (trellis.table)
         return trellis.table;

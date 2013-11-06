@@ -50,7 +50,8 @@ module Ground {
     main_table:string
     joins:string[] = []
     filters:string[] = []
-    property_filters:{ [name: string]: Query_Filter; } = {};
+    property_filters:{ [name: string]: Query_Filter;
+    } = {};
     post_clauses:any[] = []
     limit:string
     trellis:Trellis
@@ -184,12 +185,13 @@ module Ground {
         return ' LIMIT ' + offset + ', ' + limit;
       }
     }
+
     generate_sql(properties):string {
       var data = this.get_fields_and_joins(properties)
       var data2 = this.process_property_filters()
       var fields = data.fields.concat(this.fields)
       var joins = data.joins.concat(this.joins, data2.joins)
-      var args = MetaHub.concat(this.arguments,data2.arguments)
+      var args = MetaHub.concat(this.arguments, data2.arguments)
       var filters = this.filters.concat(data2.filters)
 
       if (fields.length == 0)
@@ -221,9 +223,11 @@ module Ground {
       return sql;
     }
 
-    get_fields_and_joins(properties:{ [name: string]: Property }, include_primary_key:boolean = true):Internal_Query_Source {
+    get_fields_and_joins(properties:{ [name: string]: Property
+    }, include_primary_key:boolean = true):Internal_Query_Source {
       var name, fields:string[] = [];
-      var trellises:{ [name: string]: Trellis } = {};
+      var trellises:{ [name: string]: Trellis
+      } = {};
       for (name in properties) {
         var property = properties[name];
         // Virtual properties aren't saved to the database
@@ -312,7 +316,7 @@ module Ground {
     }
 
     process_row(row, authorized_properties = null):Promise {
-      var name, property, promise, promises = [];
+      var name, property
       // Map field names to Trellis property names
 //      for (name in this.trellis.properties) {
 //        property = this.trellis.properties[name];
@@ -339,31 +343,33 @@ module Ground {
 
       var links = this.trellis.get_all_links((p)=> !p.is_virtual);
 
-      for (name in links) {
-        property = links[name]
-
-        var path = this.get_path(property.name);
+      var promises = MetaHub.map_to_array(links, (property, name) => {
+        var promise, path = this.get_path(property.name)
         if (authorized_properties && authorized_properties[name] === undefined)
-          continue;
+          return null
 
         if (this.include_links || this.has_expansion(path)) {
-          var id = row[property.parent.primary_key];
-          var relationship = property.get_relationship();
+          var id = row[property.parent.primary_key]
+          var relationship = property.get_relationship()
 
           switch (relationship) {
             case Relationships.one_to_one:
               promise = this.get_reference_object(row, property)
-              break;
+              break
             case Relationships.one_to_many:
             case Relationships.many_to_many:
               promise = this.get_many_list(row, id, property, relationship)
-              break;
+              break
           }
 
-          promise = promise.then((value) => row[name] = value)
-          promises.push(promise);
+          return promise.then((value) => {
+            row[name] = value
+            return row
+          })
         }
-      }
+
+        return null
+      })
 
       return when.all(promises)
         .then(()=> this.ground.invoke(this.trellis.name + '.process.row', row, this, this.trellis))

@@ -78,17 +78,19 @@ module Ground {
         var property = core_properties[name];
         if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
 //          console.log('field', name, this.seed[property.name])
-          fields.push('`' + property.get_field_name() + '`');
-          var field_promise = this.get_field_value(property).then((value) => {
-            if (value.length == 0) {
-              throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
-            }
-            values.push(value);
-          });
-
-          promises.push(field_promise);
+          var temp = (property)=> {
+            return this.get_field_value(property).then((value) => {
+              if (value.length == 0) {
+                throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
+              }
+              fields.push('`' + property.get_field_name() + '`');
+              values.push(value);
+            });
+          }
+          promises.push(temp(property));
         }
       }
+
 
       return when.all(promises)
         .then(()=> {
@@ -325,7 +327,6 @@ module Ground {
           }
         }
       }
-
 
       return this.ground.update_object(trellis, other, this.user_id);
     }

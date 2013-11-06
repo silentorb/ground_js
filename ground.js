@@ -455,6 +455,7 @@ else
                 return ' LIMIT ' + offset + ', ' + limit;
             }
         };
+
         Query.prototype.generate_sql = function (properties) {
             var data = this.get_fields_and_joins(properties);
             var data2 = this.process_property_filters();
@@ -586,7 +587,7 @@ else
         Query.prototype.process_row = function (row, authorized_properties) {
             if (typeof authorized_properties === "undefined") { authorized_properties = null; }
             var _this = this;
-            var name, property, promise, promises = [];
+            var name, property;
 
             var properties = this.trellis.get_core_properties();
             for (name in properties) {
@@ -606,33 +607,33 @@ else
                 return !p.is_virtual;
             });
 
-            for (name in links) {
-                property = links[name];
-
-                var path = this.get_path(property.name);
+            var promises = MetaHub.map_to_array(links, function (property, name) {
+                var promise, path = _this.get_path(property.name);
                 if (authorized_properties && authorized_properties[name] === undefined)
-                    continue;
+                    return null;
 
-                if (this.include_links || this.has_expansion(path)) {
+                if (_this.include_links || _this.has_expansion(path)) {
                     var id = row[property.parent.primary_key];
                     var relationship = property.get_relationship();
 
                     switch (relationship) {
                         case Ground.Relationships.one_to_one:
-                            promise = this.get_reference_object(row, property);
+                            promise = _this.get_reference_object(row, property);
                             break;
                         case Ground.Relationships.one_to_many:
                         case Ground.Relationships.many_to_many:
-                            promise = this.get_many_list(row, id, property, relationship);
+                            promise = _this.get_many_list(row, id, property, relationship);
                             break;
                     }
 
-                    promise = promise.then(function (value) {
-                        return row[name] = value;
+                    return promise.then(function (value) {
+                        row[name] = value;
+                        return row;
                     });
-                    promises.push(promise);
                 }
-            }
+
+                return null;
+            });
 
             return when.all(promises).then(function () {
                 return _this.ground.invoke(_this.trellis.name + '.process.row', row, _this, _this.trellis);
@@ -809,15 +810,16 @@ else
             for (var name in core_properties) {
                 var property = core_properties[name];
                 if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
-                    fields.push('`' + property.get_field_name() + '`');
-                    var field_promise = this.get_field_value(property).then(function (value) {
-                        if (value.length == 0) {
-                            throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
-                        }
-                        values.push(value);
-                    });
-
-                    promises.push(field_promise);
+                    var temp = function (property) {
+                        return _this.get_field_value(property).then(function (value) {
+                            if (value.length == 0) {
+                                throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
+                            }
+                            fields.push('`' + property.get_field_name() + '`');
+                            values.push(value);
+                        });
+                    };
+                    promises.push(temp(property));
                 }
             }
 
@@ -1777,6 +1779,10 @@ var Ground;
         };
 
         Property.prototype.get_field_type = function () {
+            if (this.type == 'reference') {
+                var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
+                return other_primary_property.get_field_type();
+            }
             var property_type = this.get_property_type();
             if (!property_type)
                 throw new Error(this.name + ' could not find valid field type: ' + this.type);
@@ -1857,22 +1863,27 @@ else if (value === false)
                 value = 'NULL';
 else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
                 value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
-            } else if (this.type == 'reference' && typeof value === 'object') {
-                var trellis = this.other_trellis;
-                var ground = this.parent.ground;
+            } else if (this.type == 'reference') {
+                if (typeof value === 'object') {
+                    var trellis = this.other_trellis;
+                    var ground = this.parent.ground;
 
-                return ground.update_object(trellis, value, as_service).then(function (entity) {
-                    var other_id = _this.get_other_id(value);
-                    if (other_id !== null)
-                        value = other_id;
+                    return ground.update_object(trellis, value, as_service).then(function (entity) {
+                        var other_id = _this.get_other_id(value);
+                        if (other_id !== null)
+                            value = other_id;
 else
-                        value = entity[trellis.primary_key];
+                            value = entity[trellis.primary_key];
 
-                    if (value === null || value === undefined)
-                        value = 'NULL';
+                        var other_primary_property = _this.other_trellis.properties[_this.other_trellis.primary_key];
+                        return other_primary_property.get_field_value(value, as_service, update);
 
-                    return value;
-                });
+                        return value;
+                    });
+                }
+
+                var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
+                value = other_primary_property.get_field_value(value, as_service, update);
             }
 
             return when.resolve(value);

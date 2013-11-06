@@ -121,12 +121,16 @@ module Ground {
     }
 
     get_field_type() {
+      if (this.type == 'reference') {
+        var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
+        return other_primary_property.get_field_type()
+      }
       var property_type = this.get_property_type();
       if (!property_type)
         throw new Error(this.name + ' could not find valid field type: ' + this.type);
 
       return property_type.get_field_type();
-    }
+     }
 
     static get_field_value_sync(value) {
       if (typeof value === 'string') {
@@ -200,24 +204,31 @@ module Ground {
       else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
         value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
       }
-      else if (this.type == 'reference' && typeof value === 'object') {
+      else if (this.type == 'reference') {
+        if (typeof value === 'object') {
 //        console.log(value.other_trellis, this.other_trellis.name)
-        var trellis = this.other_trellis;
-        var ground = this.parent.ground;
+          var trellis = this.other_trellis;
+          var ground = this.parent.ground;
 
-        return ground.update_object(trellis, value, as_service)
-          .then((entity)=> {
-            var other_id = this.get_other_id(value);
-            if (other_id !== null)
-              value = other_id;
-            else
-              value = entity[trellis.primary_key];
+          return ground.update_object(trellis, value, as_service)
+            .then((entity)=> {
+              var other_id = this.get_other_id(value);
+              if (other_id !== null)
+                value = other_id;
+              else
+                value = entity[trellis.primary_key];
 
-            if (value === null || value === undefined)
-              value = 'NULL';
+              var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
+              return other_primary_property.get_field_value(value, as_service, update)
+//            if (value === null || value === undefined)
+//              value = 'NULL';
 
-            return value;
-          });
+              return value;
+            });
+        }
+
+        var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
+        value = other_primary_property.get_field_value(value, as_service, update)
       }
 
       return when.resolve(value);
