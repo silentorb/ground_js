@@ -74,7 +74,7 @@ module.exports = function (grunt) {
     watch: {
       ground: {
         files: 'lib/**/*.ts',
-        tasks: ['ground']
+        tasks: ['default']
       }
     }
   })

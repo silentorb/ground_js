@@ -15,9 +15,11 @@ module Ground {
     name:string = null;
     primary_key:string = 'id';
     // Property that are specific to this trellis and not inherited from a parent trellis
-    properties:{ [name: string]: Property } = {};
+    properties:{ [name: string]: Property
+    } = {};
     // Every property including inherited properties
-    all_properties:{ [name: string]: Property; } = {};
+    all_properties:{ [name: string]: Property;
+    } = {};
     is_virtual:boolean = false;
 
     constructor(name:string, ground:Core) {
@@ -46,7 +48,8 @@ module Ground {
       target_trellis.add_property(property_name, this.properties[property_name]);
     }
 
-    get_all_links(filter:(property:Property)=>boolean = null):{ [name: string]: Property; } {
+    get_all_links(filter:(property:Property)=>boolean = null):{ [name: string]: Property;
+    } {
       var result = {};
       var properties = this.get_all_properties();
       for (var name in properties) {
@@ -58,7 +61,8 @@ module Ground {
       return result;
     }
 
-    get_all_properties():{ [name: string]: Property; } {
+    get_all_properties():{ [name: string]: Property;
+    } {
       var result = {}
       var tree = this.get_tree();
       for (var i = 0; i < tree.length; ++i) {
@@ -71,7 +75,8 @@ module Ground {
       return result;
     }
 
-    get_core_properties():{ [name: string]: Property } {
+    get_core_properties():{ [name: string]: Property
+    } {
       var result = {}
       for (var i in this.properties) {
         var property = this.properties[i];
@@ -182,6 +187,9 @@ module Ground {
         var property:Property = this.properties[j]
         if (property.other_trellis_name) {
           var other_trellis = property.other_trellis = all[property.other_trellis_name]
+          if (!other_trellis)
+            throw new Error('Cannot find referenced trellis for ' + this.name + '.' + property.name + ': ' + property.other_trellis_name + '.')
+
           property.initialize_composite_reference(other_trellis)
         }
       }
