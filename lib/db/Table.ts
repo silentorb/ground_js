@@ -3,7 +3,6 @@
  * Date: 9/19/13
  */
 /// <reference path="../references.ts"/>
-/// <reference path="../../../metahub/metahub.d.ts"/>
 
 module Ground {
   export interface IField {

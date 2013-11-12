@@ -1,14 +1,7 @@
-/**
- * User: Chris Johnson
- * Date: 9/19/13
- */
 
 /// <reference path="core/require.ts"/>
-
 /// <reference path="../defs/when.d.ts"/>
-/// <reference path="../defs/linq.d.ts"/>
-
-/// <reference path="../../metahub/metahub.d.ts"/>
+/// <reference path="../defs/metahub.d.ts"/>
 
 /// <reference path="core/Core.ts"/>
 /// <reference path="db/Table.ts"/>

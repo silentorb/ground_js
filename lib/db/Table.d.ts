@@ -1,5 +1,4 @@
 /// <reference path="../references.d.ts" />
-/// <reference path="../../../metahub/metahub.d.ts" />
 declare module Ground {
     interface IField {
         relationship: string;

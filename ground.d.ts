@@ -1,8 +1,7 @@
-/// <reference path="defs/mysql.d.ts" />
-/// <reference path="defs/when.d.ts" />
-/// <reference path="defs/node.d.ts" />
-/// <reference path="../metahub/metahub.d.ts" />
-/// <reference path="defs/linq.d.ts" />
+
+/// <reference path="when.d.ts" />
+
+/// <reference path="metahub.d.ts" />
 declare var when;
 declare module Ground {
     class Database {
@@ -346,4 +345,7 @@ declare module Ground {
         public query(request: Query_Request): Promise;
         public update(request: Update_Request, uid?): Promise;
     }
+}
+declare module "ground" {
+  export = Ground
 }
