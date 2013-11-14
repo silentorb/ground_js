@@ -758,6 +758,7 @@ var Ground;
             this.override = true;
             this.main_table = 'node';
             this.is_service = false;
+            this.log_queries = false;
             this.seed = seed;
             this.trellis = trellis;
             this.main_table = this.trellis.get_table_name();
@@ -799,6 +800,13 @@ else
             }
         };
 
+        Update.prototype.update_embedded_seed = function (trellis, property, value) {
+            var _this = this;
+            return this.ground.update_object(trellis, value, this.is_service).then(function (entity) {
+                _this.seed[property.name] = entity;
+            });
+        };
+
         Update.prototype.create_record = function (trellis) {
             var _this = this;
             var fields = [];
@@ -812,25 +820,27 @@ else
 
             for (var name in core_properties) {
                 var property = core_properties[name];
-                if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
-                    var temp = function (property) {
-                        return _this.get_field_value(property).then(function (value) {
-                            if (value.length == 0) {
-                                throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
-                            }
-                            fields.push('`' + property.get_field_name() + '`');
-                            values.push(value);
-                        });
-                    };
-                    promises.push(temp(property));
+                var value = this.seed[property.name];
+                if (property.type == 'reference' && value && typeof value === 'object') {
+                    promises.push(this.update_embedded_seed(trellis, property, value));
                 }
             }
 
             return when.all(promises).then(function () {
+                for (var name in core_properties) {
+                    var property = core_properties[name];
+                    if (_this.seed[property.name] !== undefined || _this.is_create_property(property)) {
+                        var value = _this.get_field_value(property);
+
+                        fields.push('`' + property.get_field_name() + '`');
+                        values.push(value);
+                    }
+                }
+
                 var field_string = fields.join(', ');
                 var value_string = values.join(', ');
                 var sql = 'INSERT INTO ' + trellis.get_table_name() + ' (' + field_string + ') VALUES (' + value_string + ");\n";
-                if (Update.log_queries)
+                if (_this.log_queries)
                     console.log(sql);
 
                 return _this.db.query(sql).then(function (result) {
@@ -876,7 +886,7 @@ else
 
                 var sql = 'UPDATE ' + trellis.get_table_name() + "\n" + 'SET ' + updates.join(', ') + "\n" + 'WHERE ' + key_condition + "\n;";
 
-                if (Update.log_queries)
+                if (_this.log_queries)
                     console.log(sql);
 
                 return _this.db.query(sql).then(next);
@@ -1061,7 +1071,7 @@ else
             var invoke_promises = tree.map(function (trellis) {
                 return _this.ground.invoke(trellis.name + '.update', _this, trellis);
             });
-
+            console.log('tree');
             return when.all(invoke_promises).then(function () {
                 console.log('seeeed', _this.seed);
                 var promises = tree.map(function (trellis) {
@@ -1072,7 +1082,6 @@ else
                 });
             });
         };
-        Update.log_queries = false;
         return Update;
     })();
     Ground.Update = Update;
@@ -1137,6 +1146,7 @@ var Ground;
             this.views = [];
             this.property_types = [];
             this.log_queries = false;
+            this.log_updates = false;
             this.db = new Ground.Database(config, db_name);
             var path = require('path');
             var filename = path.resolve(__dirname, 'property_types.json');
@@ -1248,6 +1258,7 @@ var Ground;
             var update = new Ground.Update(trellis, seed, this);
             update.user_id = uid;
             update.is_service = as_service;
+            update.log_queries = this.log_updates;
             return update.run();
         };
 
@@ -1854,7 +1865,6 @@ else if (value === false)
         Property.prototype.get_field_value = function (value, as_service, update) {
             if (typeof as_service === "undefined") { as_service = false; }
             if (typeof update === "undefined") { update = false; }
-            var _this = this;
             if (typeof value === 'string')
                 value = value.replace(/'/g, "\\'", value);
 
@@ -1867,29 +1877,13 @@ else if (value === false)
 else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
                 value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
             } else if (this.type == 'reference') {
-                if (typeof value === 'object') {
-                    var trellis = this.other_trellis;
-                    var ground = this.parent.ground;
-
-                    return ground.update_object(trellis, value, as_service).then(function (entity) {
-                        var other_id = _this.get_other_id(value);
-                        if (other_id !== null)
-                            value = other_id;
-else
-                            value = entity[trellis.primary_key];
-
-                        var other_primary_property = _this.other_trellis.properties[_this.other_trellis.primary_key];
-                        return other_primary_property.get_field_value(value, as_service, update);
-
-                        return value;
-                    });
+                if (typeof value !== 'object') {
+                    var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
+                    value = other_primary_property.get_field_value(value, as_service, update);
                 }
-
-                var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
-                value = other_primary_property.get_field_value(value, as_service, update);
             }
 
-            return when.resolve(value);
+            return value;
         };
 
         Property.prototype.get_other_id = function (entity) {

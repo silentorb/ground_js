@@ -17,7 +17,7 @@ module Ground {
     db:Database;
     is_service:boolean = false;
     user_id
-    static log_queries:boolean = false;
+    log_queries:boolean = false;
 
     constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
       this.seed = seed;
@@ -64,6 +64,22 @@ module Ground {
       }
     }
 
+    private update_embedded_seed(trellis, property, value):Promise {
+      return this.ground.update_object(trellis, value, this.is_service)
+        .then((entity)=> {
+//          var other_id = this.get_other_id(value);
+//          if (other_id !== null)
+//            value = other_id;
+//          else
+//            value = entity[trellis.primary_key];
+//
+//          var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
+//          return other_primary_property.get_field_value(value, as_service, update)
+
+          this.seed[property.name] = entity
+        })
+    }
+
     private create_record(trellis:Trellis):Promise {
       var fields:string[] = [];
       var values = [];
@@ -74,46 +90,49 @@ module Ground {
         this.seed[trellis.primary_key] = uuid.v1()
       }
 
+      // Update any embedded seeds before the main update
       for (var name in core_properties) {
         var property = core_properties[name];
-        if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
-//          console.log('field', name, this.seed[property.name])
-          var temp = (property)=> {
-            return this.get_field_value(property).then((value) => {
-              if (value.length == 0) {
-                throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
-              }
-              fields.push('`' + property.get_field_name() + '`');
-              values.push(value);
-            });
-          }
-          promises.push(temp(property));
+        var value = this.seed[property.name]
+        if (property.type == 'reference' && value && typeof value === 'object') {
+          promises.push(this.update_embedded_seed(trellis, property, value));
         }
       }
 
-
       return when.all(promises)
         .then(()=> {
-          var field_string = fields.join(', ');
-          var value_string = values.join(', ');
+          for (var name in core_properties) {
+            var property = core_properties[name];
+            if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
+              var value = this.get_field_value(property)
+//                  if (value.length == 0) {
+//                    throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
+//                  }
+              fields.push('`' + property.get_field_name() + '`');
+              values.push(value);
+            }
+          }
+
+          var field_string = fields.join(', ')
+          var value_string = values.join(', ')
           var sql = 'INSERT INTO ' + trellis.get_table_name() + ' (' + field_string + ') VALUES (' + value_string + ");\n";
-          if (Update.log_queries)
+          if (this.log_queries)
             console.log(sql);
 
           return this.db.query(sql)
             .then((result) => {
               var id;
               if (this.seed[trellis.primary_key]) {
-                id = this.seed[trellis.primary_key];
+                id = this.seed[trellis.primary_key]
               }
               else {
                 id = result.insertId;
-                this.seed[trellis.primary_key] = id;
+                this.seed[trellis.primary_key] = id
               }
 
               return this.update_links(trellis, id, true)
                 .then(()=> {
-                  return this.ground.invoke(trellis.name + '.created', this.seed, trellis);
+                  return this.ground.invoke(trellis.name + '.created', this.seed, trellis)
                 })
             })
         })
@@ -148,7 +167,7 @@ module Ground {
             'SET ' + updates.join(', ') + "\n" +
             'WHERE ' + key_condition + "\n;";
 
-          if (Update.log_queries)
+          if (this.log_queries)
             console.log(sql);
 
           return this.db.query(sql).then(next);
@@ -186,7 +205,7 @@ module Ground {
         || property.type == 'modified' || property.insert == 'author';
     }
 
-    private get_field_value(property:Property):Promise {
+    private get_field_value(property:Property) {
       var value = this.seed[property.name];
       value = this.apply_insert(property, value);
       this.seed[property.name] = value;
@@ -334,7 +353,7 @@ module Ground {
     public run():Promise {
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
       var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this, trellis));
-
+      console.log('tree')
       return when.all(invoke_promises)
         .then(()=> {
           console.log('seeeed', this.seed)

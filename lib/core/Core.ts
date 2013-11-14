@@ -90,6 +90,7 @@ module Ground {
     property_types:Property_Type[] = []
     db:Database
     log_queries:boolean = false
+    log_updates:boolean = false
 
     constructor(config, db_name:string) {
       super();
@@ -203,6 +204,7 @@ module Ground {
       var update = new Update(trellis, seed, this);
       update.user_id = uid
       update.is_service = as_service;
+      update.log_queries = this.log_updates
       return update.run();
     }
 
