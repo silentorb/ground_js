@@ -64,10 +64,11 @@ module.exports = function (grunt) {
     copy: {
       "ground-def": {
         files: [
-          { src: 'ground.d.ts', dest: '../../defs/ground.d.ts'},
-          { src: 'ground.d.ts', dest: '../lawn/defs/ground.d.ts'},
-          { src: 'ground.d.ts', dest: '../vineyard/defs/ground.d.ts'},
-          { src: 'ground.d.ts', dest: '../fortress/defs/ground.d.ts'}
+          { src: 'ground.d.ts', dest: '../../defs/'},
+          { src: 'ground.d.ts', dest: '../lawn/defs/'},
+          { src: 'ground.d.ts', dest: '../vineyard/defs/'},
+          { src: 'ground.d.ts', dest: '../fortress/defs/'},
+          { src: 'ground.d.ts', dest: '../plantlab/defs/'}
         ]
       }
     },
