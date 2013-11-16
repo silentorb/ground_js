@@ -135,7 +135,7 @@ declare module Ground {
         public process_property_filter(filter): Internal_Query_Source;
         public process_property_filters(): Internal_Query_Source;
         public run(args?: {}): Promise;
-        public run_as_service(arguments?: {}): Promise;
+        public run_single(args?: {}): Promise;
     }
 }
 declare var uuid;
@@ -295,6 +295,7 @@ declare module Ground {
 }
 declare module Ground {
     enum Relationships {
+        none,
         one_to_one,
         one_to_many,
         many_to_many,
@@ -328,24 +329,6 @@ declare module Ground {
         public get_referenced_trellis(): Ground.Trellis;
         public get_relationship(): Relationships;
         public query(): string;
-    }
-}
-declare module Ground {
-    interface Query_Request {
-        trellis: string;
-        filters?: Ground.Query_Filter[];
-        sorts?: Ground.Query_Sort[];
-        expansions?: string[];
-        reductions?: string[];
-    }
-    interface Update_Request {
-        objects: any[];
-    }
-    class Irrigation {
-        public ground: Ground.Core;
-        constructor(ground: Ground.Core);
-        public query(request: Query_Request): Promise;
-        public update(request: Update_Request, uid?): Promise;
     }
 }
 declare module "ground" {

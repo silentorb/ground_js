@@ -50,8 +50,7 @@ module Ground {
     main_table:string
     joins:string[] = []
     filters:string[] = []
-    property_filters:{ [name: string]: Query_Filter;
-    } = {};
+    property_filters:{ [name: string]: Query_Filter;} = {}
     post_clauses:any[] = []
     limit:string
     trellis:Trellis
@@ -106,8 +105,9 @@ module Ground {
     }
 
     add_key_filter(value) {
-      this.filters.push(this.trellis.query_primary_key() + ' = :primary_key');
-      this.add_arguments({ ':primary_key': value });
+      this.add_property_filter(this.trellis.primary_key, value)
+//      this.filters.push(this.trellis.query_primary_key() + ' = :primary_key');
+//      this.add_arguments({ ':primary_key': value });
     }
 
     add_field(clause:string, arguments = null) {
@@ -204,7 +204,7 @@ module Ground {
         sql += "\n" + joins.join("\n");
 
       if (this.filters.length > 0)
-        sql += "\nWHERE " + this.filters.join(" AND ")
+        sql += "\nWHERE " + filters.join(" AND ")
 
       if (this.post_clauses.length > 0)
         sql += " " + this.post_clauses.join(" ")
@@ -293,7 +293,7 @@ module Ground {
       var query = new Query(property.other_trellis, this.get_path(property.name));
       query.include_links = false;
       query.expansions = this.expansions;
-      query.add_filter(property.other_trellis.query_primary_key() + ' = ' + row[property.name]);
+      query.add_key_filter(row[property.name]);
       return query.run()
         .then((rows) => rows[0])
     }
@@ -446,21 +446,26 @@ module Ground {
         })
     }
 
-    run_as_service(arguments = {}):Promise {
-      var properties = this.trellis.get_all_properties();
-      var sql = this.generate_sql(properties);
-      sql = sql.replace(/\r/g, "\n");
-      if (this.ground.log_queries)
-        console.log('query', sql);
-
-      var args = MetaHub.values(this.arguments).concat(arguments);
-      return this.db.query(sql)
-        .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
-        .then((rows):IService_Response => {
-          return {
-            objects: rows
-          }
-        });
+    run_single(args = {}):Promise {
+      return this.run(args)
+        .then((rows)=> rows[0])
     }
+
+//    run_as_service(arguments = {}):Promise {
+//      var properties = this.trellis.get_all_properties();
+//      var sql = this.generate_sql(properties);
+//      sql = sql.replace(/\r/g, "\n");
+//      if (this.ground.log_queries)
+//        console.log('query', sql);
+//
+//      var args = MetaHub.values(this.arguments).concat(arguments);
+//      return this.db.query(sql)
+//        .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
+//        .then((rows):IService_Response => {
+//          return {
+//            objects: rows
+//          }
+//        });
+//    }
   }
 }

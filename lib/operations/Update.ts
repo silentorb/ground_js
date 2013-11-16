@@ -353,7 +353,7 @@ module Ground {
     public run():Promise {
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
       var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this, trellis));
-      console.log('tree')
+
       return when.all(invoke_promises)
         .then(()=> {
           console.log('seeeed', this.seed)

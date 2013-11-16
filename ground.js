@@ -375,8 +375,7 @@ else
         };
 
         Query.prototype.add_key_filter = function (value) {
-            this.filters.push(this.trellis.query_primary_key() + ' = :primary_key');
-            this.add_arguments({ ':primary_key': value });
+            this.add_property_filter(this.trellis.primary_key, value);
         };
 
         Query.prototype.add_field = function (clause, arguments) {
@@ -477,7 +476,7 @@ else
                 sql += "\n" + joins.join("\n");
 
             if (this.filters.length > 0)
-                sql += "\nWHERE " + this.filters.join(" AND ");
+                sql += "\nWHERE " + filters.join(" AND ");
 
             if (this.post_clauses.length > 0)
                 sql += " " + this.post_clauses.join(" ");
@@ -565,7 +564,7 @@ else
             var query = new Query(property.other_trellis, this.get_path(property.name));
             query.include_links = false;
             query.expansions = this.expansions;
-            query.add_filter(property.other_trellis.query_primary_key() + ' = ' + row[property.name]);
+            query.add_key_filter(row[property.name]);
             return query.run().then(function (rows) {
                 return rows[0];
             });
@@ -719,24 +718,10 @@ else
             });
         };
 
-        Query.prototype.run_as_service = function (arguments) {
-            if (typeof arguments === "undefined") { arguments = {}; }
-            var _this = this;
-            var properties = this.trellis.get_all_properties();
-            var sql = this.generate_sql(properties);
-            sql = sql.replace(/\r/g, "\n");
-            if (this.ground.log_queries)
-                console.log('query', sql);
-
-            var args = MetaHub.values(this.arguments).concat(arguments);
-            return this.db.query(sql).then(function (rows) {
-                return when.all(rows.map(function (row) {
-                    return _this.process_row(row, properties);
-                }));
-            }).then(function (rows) {
-                return {
-                    objects: rows
-                };
+        Query.prototype.run_single = function (args) {
+            if (typeof args === "undefined") { args = {}; }
+            return this.run(args).then(function (rows) {
+                return rows[0];
             });
         };
         Query.operators = [
@@ -1071,7 +1056,7 @@ else
             var invoke_promises = tree.map(function (trellis) {
                 return _this.ground.invoke(trellis.name + '.update', _this, trellis);
             });
-            console.log('tree');
+
             return when.all(invoke_promises).then(function () {
                 console.log('seeeed', _this.seed);
                 var promises = tree.map(function (trellis) {
@@ -1683,9 +1668,10 @@ else
 var Ground;
 (function (Ground) {
     (function (Relationships) {
-        Relationships[Relationships["one_to_one"] = 0] = "one_to_one";
-        Relationships[Relationships["one_to_many"] = 1] = "one_to_many";
-        Relationships[Relationships["many_to_many"] = 2] = "many_to_many";
+        Relationships[Relationships["none"] = 0] = "none";
+        Relationships[Relationships["one_to_one"] = 1] = "one_to_one";
+        Relationships[Relationships["one_to_many"] = 2] = "one_to_many";
+        Relationships[Relationships["many_to_many"] = 3] = "many_to_many";
     })(Ground.Relationships || (Ground.Relationships = {}));
     var Relationships = Ground.Relationships;
 
@@ -1900,6 +1886,9 @@ else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
             if (this.other_property) {
                 return this.other_trellis.properties[this.other_property];
             } else {
+                if (!this.other_trellis)
+                    return null;
+
                 for (var name in this.other_trellis.properties) {
                     property = this.other_trellis.properties[name];
                     if (property.other_trellis === this.parent) {
@@ -1940,7 +1929,7 @@ else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
 
             var other_property = this.get_other_property();
             if (!other_property)
-                throw new Error(this.parent.name + '.' + this.name + ' does not have a reciprocal reference.');
+                return Relationships.none;
 
             if (this.type == 'list') {
                 if (other_property.type == 'list')
@@ -1957,57 +1946,6 @@ else
         return Property;
     })();
     Ground.Property = Property;
-})(Ground || (Ground = {}));
-var Ground;
-(function (Ground) {
-    var Irrigation = (function () {
-        function Irrigation(ground) {
-            this.ground = ground;
-        }
-        Irrigation.prototype.query = function (request) {
-            var i, trellis = this.ground.sanitize_trellis_argument(request.trellis);
-            var query = new Ground.Query(trellis);
-
-            if (request.filters) {
-                for (i = 0; i < request.filters.length; ++i) {
-                    var filter = request.filters[i];
-                    query.add_property_filter(filter.property, filter.value, filter.operator);
-                }
-            }
-
-            if (request.sorts) {
-                for (i = 0; i < request.sorts.length; ++i) {
-                    query.add_sort(request.sorts[i]);
-                }
-            }
-
-            if (request.expansions) {
-                for (i = 0; i < request.expansions.length; ++i) {
-                    query.expansions.push(request.expansions[i]);
-                }
-            }
-
-            return query.run();
-        };
-
-        Irrigation.prototype.update = function (request, uid) {
-            if (typeof uid === "undefined") { uid = null; }
-            var promises = [];
-
-            if (!request.objects)
-                throw new Error('Request requires an objects array.');
-
-            for (var i = 0; i < request.objects.length; ++i) {
-                var object = request.objects[i];
-                var promise = this.ground.update_object(object.trellis, object, uid);
-                promises.push(promise);
-            }
-
-            return when.all(promises);
-        };
-        return Irrigation;
-    })();
-    Ground.Irrigation = Irrigation;
 })(Ground || (Ground = {}));
 require('source-map-support').install();
 //# sourceMappingURL=ground.js.map

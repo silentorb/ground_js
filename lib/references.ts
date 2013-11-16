@@ -14,6 +14,4 @@
 /// <reference path="operations/Update.ts"/>
 /// <reference path="operations/Delete.ts"/>
 
-/// <reference path="services/Irrigation.ts"/>
-
 require('source-map-support').install();

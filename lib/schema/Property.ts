@@ -10,6 +10,7 @@
 module Ground {
 
   export enum Relationships {
+    none,
     one_to_one,
     one_to_many,
     many_to_many
@@ -228,6 +229,9 @@ module Ground {
         return this.other_trellis.properties[this.other_property];
       }
       else {
+        if (!this.other_trellis)
+          return null
+
         for (var name in this.other_trellis.properties) {
           property = this.other_trellis.properties[name];
           if (property.other_trellis === this.parent) {
@@ -271,7 +275,9 @@ module Ground {
 
       var other_property = this.get_other_property();
       if (!other_property)
-        throw new Error(this.parent.name + '.' + this.name + ' does not have a reciprocal reference.');
+        return Relationships.none
+
+//        throw new Error(this.parent.name + '.' + this.name + ' does not have a reciprocal reference.');
 
       if (this.type == 'list') {
         if (other_property.type == 'list')
