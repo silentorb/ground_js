@@ -78,7 +78,8 @@ module Ground {
       }
     }
 
-    generate_join(seeds:{}) {
+    generate_join(seeds:{
+    }) {
 //      var sql = "JOIN %table_name ON %table_name.%second_key = " + id +
 //        " AND %table_name.%first_key = %back_id\n";
 
@@ -92,7 +93,8 @@ module Ground {
       return 'DELETE ' + this.table_name + ' ON ' + this.get_condition_string(seeds) + "\n"
     }
 
-    generate_insert(seeds:{}):string {
+    generate_insert(seeds:{
+    }):string {
       var values = [], keys = []
       console.log('seeds', seeds)
 //      console.log('properties', this.identities)
@@ -135,6 +137,9 @@ module Ground {
       if (!seed) {
         console.log('empty key')
       }
+      if (typeof seed === 'string')
+        return this.table_name + '.' + key.name + ' = ' + seed
+
       if (seed[key.property.name] !== undefined) {
         var value = seed[key.property.name]
         if (typeof value === 'function')
@@ -148,22 +153,27 @@ module Ground {
         return null
     }
 
-    get_condition_string(seeds:{}):string {
+    get_condition_string(seeds):string {
       return this.get_conditions(seeds).join(' AND ')
     }
 
-    get_conditions(seeds:{}):string[] {
+    get_conditions(seeds):string[] {
       var conditions = []
       for (var i in this.identities) {
         var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]
-        if (!seed)
-          continue
-
-        for (var p in identity.keys) {
-          var key = identity.keys[p]
-          var condition = this.get_condition(key, seed)
-          if (condition)
-            conditions.push(condition)
+        if (!seed) {
+          for (var p in identity.keys) {
+            var key = identity.keys[p]
+            conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.query_primary_key())
+          }
+        }
+        else {
+          for (var p in identity.keys) {
+            var key = identity.keys[p]
+            var condition = this.get_condition(key, seed)
+            if (condition)
+              conditions.push(condition)
+          }
         }
       }
 

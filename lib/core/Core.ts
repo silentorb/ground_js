@@ -39,6 +39,11 @@ module Ground {
     _deleted?;
   }
 
+  export interface IUpdate {
+    run:()=>Promise
+    get_access_name():string
+  }
+
   interface ISchema_Source {
     trellises?:any[];
     tables?:any[];
@@ -164,10 +169,25 @@ module Ground {
       return new Query(trellis, base_path);
     }
 
+    create_update(trellis, seed:ISeed = {}, user = null):IUpdate {
+      var trellis = this.sanitize_trellis_argument(trellis)
+
+      // If _deleted is an object then it is a list of links
+      // to delete which will be handled by Update.
+      // If _delete is simply true then the seed itself is marked for deletion.
+      if (seed._deleted === true || seed._deleted === 'true')
+        return new Delete(trellis, seed)
+
+      var update = new Update(trellis, seed, this)
+      update.user = user
+      update.log_queries = this.log_updates
+      return update
+    }
+
     delete_object(trellis:Trellis, seed:ISeed):Promise {
-      var trellis = this.sanitize_trellis_argument(trellis);
-      var del = new Delete();
-      return del.run(trellis, seed);
+      var trellis = this.sanitize_trellis_argument(trellis)
+      var del = new Delete(trellis, seed)
+      return del.run()
     }
 
     initialize_trellises(subset:Trellis[], all = null) {
@@ -191,7 +211,7 @@ module Ground {
       return property.is_private || property.is_readonly;
     }
 
-    update_object(trellis, seed:ISeed = {}, uid = null, as_service:boolean = false):Promise {
+    update_object(trellis, seed:ISeed = {}, user = null, as_service:boolean = false):Promise {
       var trellis = this.sanitize_trellis_argument(trellis);
 
       // If _deleted is an object then it is a list of links
@@ -202,7 +222,7 @@ module Ground {
 
       this.invoke(trellis.name + '.update', seed, trellis);
       var update = new Update(trellis, seed, this);
-      update.user_id = uid
+      update.user = user
       update.is_service = as_service;
       update.log_queries = this.log_updates
       return update.run();

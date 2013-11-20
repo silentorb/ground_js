@@ -49,8 +49,6 @@ module Ground {
     ground:Core;
     main_table:string
     joins:string[] = []
-    filters:string[] = []
-    property_filters:{ [name: string]: Query_Filter;} = {}
     post_clauses:any[] = []
     limit:string
     trellis:Trellis
@@ -61,6 +59,10 @@ module Ground {
     arguments = {}
     expansions:string[] = []
     wrappers:Query_Wrapper[] = []
+
+    private filters:string[] = []
+
+    private property_filters:Query_Filter[] = []
 
     public static operators = [
       '=',
@@ -97,11 +99,14 @@ module Ground {
       if (Query.operators.indexOf(operator) === -1)
         throw new Error("Invalid operator: '" + operator + "'.")
 
-      this.property_filters[property] = {
+      if (value === null || value === undefined)
+        throw new Error('Cannot add property filter where value is null')
+
+      this.property_filters.push({
         property: property,
         value: value,
         operator: operator
-      }
+      })
     }
 
     add_key_filter(value) {
@@ -187,12 +192,16 @@ module Ground {
     }
 
     generate_sql(properties):string {
+      var filters
       var data = this.get_fields_and_joins(properties)
       var data2 = this.process_property_filters()
       var fields = data.fields.concat(this.fields)
       var joins = data.joins.concat(this.joins, data2.joins)
       var args = MetaHub.concat(this.arguments, data2.arguments)
-      var filters = this.filters.concat(data2.filters)
+      if (data2.filters)
+        filters = this.filters.concat(data2.filters)
+      else
+        filters = this.filters
 
       if (fields.length == 0)
         throw new Error('No authorized fields found for trellis ' + this.main_table + '.');
@@ -203,7 +212,7 @@ module Ground {
       if (joins.length > 0)
         sql += "\n" + joins.join("\n");
 
-      if (this.filters.length > 0)
+      if (filters.length > 0)
         sql += "\nWHERE " + filters.join(" AND ")
 
       if (this.post_clauses.length > 0)
@@ -215,6 +224,10 @@ module Ground {
         var value = args[pattern];
         sql = sql.replace(new RegExp(pattern), Property.get_field_value_sync(value));
       }
+
+//      if (sql.indexOf(':') > -1) {
+//        throw new Error('Missing prepared statement argument:' + sql)
+//      }
 
       for (var i = 0; i < this.wrappers.length; ++i) {
         var wrapper = this.wrappers[i]
@@ -394,11 +407,16 @@ module Ground {
       if (value !== null)
         value = this.ground.convert_value(value, property.type);
 
-      if (property.get_relationship() == Relationships.many_to_many) {
-        throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
-        var join_seed = {}
-        join_seed[property.name] = ':' + property.name + '_filter'
+      if (value === null || value === undefined) {
+        throw new Error('Query property filter ' + placeholder + ' is null.')
+      }
 
+      if (property.get_relationship() == Relationships.many_to_many) {
+//        throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
+        var join_seed = {}
+        join_seed[property.other_trellis.name] = ':' + property.name + '_filter'
+//        var other_property = property.get_other_property()
+//        join_seed[property.parent.name] =
         result.joins.push(this.generate_property_join(property, join_seed));
       }
       else {
@@ -428,7 +446,7 @@ module Ground {
       return result
     }
 
-    run(args = {}):Promise {
+    run():Promise {
       var properties = this.trellis.get_all_properties();
       var tree = this.trellis.get_tree()
       var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', this));
@@ -440,32 +458,15 @@ module Ground {
           if (this.ground.log_queries)
             console.log('query', sql);
 
-          var args = MetaHub.values(this.arguments).concat(args);
+//          var args = MetaHub.values(this.arguments).concat(args);
           return this.db.query(sql)
             .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
         })
     }
 
-    run_single(args = {}):Promise {
-      return this.run(args)
+    run_single():Promise {
+      return this.run()
         .then((rows)=> rows[0])
     }
-
-//    run_as_service(arguments = {}):Promise {
-//      var properties = this.trellis.get_all_properties();
-//      var sql = this.generate_sql(properties);
-//      sql = sql.replace(/\r/g, "\n");
-//      if (this.ground.log_queries)
-//        console.log('query', sql);
-//
-//      var args = MetaHub.values(this.arguments).concat(arguments);
-//      return this.db.query(sql)
-//        .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
-//        .then((rows):IService_Response => {
-//          return {
-//            objects: rows
-//          }
-//        });
-//    }
   }
 }

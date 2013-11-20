@@ -330,14 +330,14 @@ var Ground;
         function Query(trellis, base_path) {
             if (typeof base_path === "undefined") { base_path = null; }
             this.joins = [];
-            this.filters = [];
-            this.property_filters = {};
             this.post_clauses = [];
             this.include_links = true;
             this.fields = [];
             this.arguments = {};
             this.expansions = [];
             this.wrappers = [];
+            this.filters = [];
+            this.property_filters = [];
             this.links = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
@@ -366,6 +366,9 @@ else
             if (typeof operator === "undefined") { operator = '='; }
             if (Query.operators.indexOf(operator) === -1)
                 throw new Error("Invalid operator: '" + operator + "'.");
+
+            if (value === null || value === undefined)
+                throw new Error('Cannot add property filter where value is null');
 
             this.property_filters[property] = {
                 property: property,
@@ -459,12 +462,16 @@ else
         };
 
         Query.prototype.generate_sql = function (properties) {
+            var filters;
             var data = this.get_fields_and_joins(properties);
             var data2 = this.process_property_filters();
             var fields = data.fields.concat(this.fields);
             var joins = data.joins.concat(this.joins, data2.joins);
             var args = MetaHub.concat(this.arguments, data2.arguments);
-            var filters = this.filters.concat(data2.filters);
+            if (data2.filters)
+                filters = this.filters.concat(data2.filters);
+else
+                filters = this.filters;
 
             if (fields.length == 0)
                 throw new Error('No authorized fields found for trellis ' + this.main_table + '.');
@@ -475,7 +482,7 @@ else
             if (joins.length > 0)
                 sql += "\n" + joins.join("\n");
 
-            if (this.filters.length > 0)
+            if (filters.length > 0)
                 sql += "\nWHERE " + filters.join(" AND ");
 
             if (this.post_clauses.length > 0)
@@ -662,10 +669,13 @@ else
             if (value !== null)
                 value = this.ground.convert_value(value, property.type);
 
+            if (value === null || value === undefined) {
+                throw new Error('Query property filter ' + placeholder + ' is null.');
+            }
+
             if (property.get_relationship() == Ground.Relationships.many_to_many) {
-                throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
                 var join_seed = {};
-                join_seed[property.name] = ':' + property.name + '_filter';
+                join_seed[property.other_trellis.name] = ':' + property.name + '_filter';
 
                 result.joins.push(this.generate_property_join(property, join_seed));
             } else {
@@ -694,8 +704,7 @@ else
             return result;
         };
 
-        Query.prototype.run = function (args) {
-            if (typeof args === "undefined") { args = {}; }
+        Query.prototype.run = function () {
             var _this = this;
             var properties = this.trellis.get_all_properties();
             var tree = this.trellis.get_tree();
@@ -709,7 +718,6 @@ else
                 if (_this.ground.log_queries)
                     console.log('query', sql);
 
-                var args = MetaHub.values(_this.arguments).concat(args);
                 return _this.db.query(sql).then(function (rows) {
                     return when.all(rows.map(function (row) {
                         return _this.process_row(row, properties);
@@ -718,9 +726,8 @@ else
             });
         };
 
-        Query.prototype.run_single = function (args) {
-            if (typeof args === "undefined") { args = {}; }
-            return this.run(args).then(function (rows) {
+        Query.prototype.run_single = function () {
+            return this.run().then(function (rows) {
                 return rows[0];
             });
         };
@@ -750,6 +757,10 @@ var Ground;
             this.ground = ground || this.trellis.ground;
             this.db = ground.db;
         }
+        Update.prototype.get_access_name = function () {
+            return this.trellis + '.update';
+        };
+
         Update.prototype.generate_sql = function (trellis) {
             var _this = this;
             var duplicate = '', primary_keys;
@@ -886,10 +897,10 @@ else
                 return Math.round(new Date().getTime() / 1000);
 
             if (!value && property.insert == 'author') {
-                if (!this.user_id)
+                if (!this.user)
                     throw new Error('Cannot insert author because current user is not set.');
 
-                return this.user_id;
+                return this.user.guid;
             }
 
             return value;
@@ -978,7 +989,7 @@ else
                         }
                     } else {
                         if (other_id === null) {
-                            other = _this.ground.update_object(other_trellis, other, _this.user_id).then(function (other) {
+                            other = _this.ground.update_object(other_trellis, other, _this.user).then(function (other) {
                                 var seeds = {};
                                 seeds[_this.trellis.name] = row;
                                 seeds[other_trellis.name] = other;
@@ -1045,7 +1056,7 @@ else
                 }
             }
 
-            return this.ground.update_object(trellis, other, this.user_id);
+            return this.ground.update_object(trellis, other, this.user);
         };
 
         Update.prototype.run = function () {
@@ -1058,7 +1069,6 @@ else
             });
 
             return when.all(invoke_promises).then(function () {
-                console.log('seeeed', _this.seed);
                 var promises = tree.map(function (trellis) {
                     return _this.generate_sql(trellis);
                 });
@@ -1074,9 +1084,15 @@ else
 var Ground;
 (function (Ground) {
     var Delete = (function () {
-        function Delete() {
+        function Delete(trellis, seed) {
+            this.trellis = trellis;
+            this.seed = seed;
         }
-        Delete.prototype.run = function (trellis, seed) {
+        Delete.prototype.get_access_name = function () {
+            return this.trellis + '.delete';
+        };
+
+        Delete.prototype.run = function () {
             throw new Error('Not implemented yet.');
         };
         return Delete;
@@ -1199,10 +1215,24 @@ var Ground;
             return new Ground.Query(trellis, base_path);
         };
 
+        Core.prototype.create_update = function (trellis, seed, user) {
+            if (typeof seed === "undefined") { seed = {}; }
+            if (typeof user === "undefined") { user = null; }
+            var trellis = this.sanitize_trellis_argument(trellis);
+
+            if (seed._deleted === true || seed._deleted === 'true')
+                return new Ground.Delete(trellis, seed);
+
+            var update = new Ground.Update(trellis, seed, this);
+            update.user = user;
+            update.log_queries = this.log_updates;
+            return update;
+        };
+
         Core.prototype.delete_object = function (trellis, seed) {
             var trellis = this.sanitize_trellis_argument(trellis);
-            var del = new Ground.Delete();
-            return del.run(trellis, seed);
+            var del = new Ground.Delete(trellis, seed);
+            return del.run();
         };
 
         Core.prototype.initialize_trellises = function (subset, all) {
@@ -1230,9 +1260,9 @@ var Ground;
             return property.is_private || property.is_readonly;
         };
 
-        Core.prototype.update_object = function (trellis, seed, uid, as_service) {
+        Core.prototype.update_object = function (trellis, seed, user, as_service) {
             if (typeof seed === "undefined") { seed = {}; }
-            if (typeof uid === "undefined") { uid = null; }
+            if (typeof user === "undefined") { user = null; }
             if (typeof as_service === "undefined") { as_service = false; }
             var trellis = this.sanitize_trellis_argument(trellis);
 
@@ -1241,7 +1271,7 @@ var Ground;
 
             this.invoke(trellis.name + '.update', seed, trellis);
             var update = new Ground.Update(trellis, seed, this);
-            update.user_id = uid;
+            update.user = user;
             update.is_service = as_service;
             update.log_queries = this.log_updates;
             return update.run();
@@ -1628,6 +1658,9 @@ else
             if (!seed) {
                 console.log('empty key');
             }
+            if (typeof seed === 'string')
+                return this.table_name + '.' + key.name + ' = ' + seed;
+
             if (seed[key.property.name] !== undefined) {
                 var value = seed[key.property.name];
                 if (typeof value === 'function')
@@ -1648,14 +1681,18 @@ else
             var conditions = [];
             for (var i in this.identities) {
                 var identity = this.identities[i], seed = seeds[identity.trellis.name];
-                if (!seed)
-                    continue;
-
-                for (var p in identity.keys) {
-                    var key = identity.keys[p];
-                    var condition = this.get_condition(key, seed);
-                    if (condition)
-                        conditions.push(condition);
+                if (!seed) {
+                    for (var p in identity.keys) {
+                        var key = identity.keys[p];
+                        conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.query_primary_key());
+                    }
+                } else {
+                    for (var p in identity.keys) {
+                        var key = identity.keys[p];
+                        var condition = this.get_condition(key, seed);
+                        if (condition)
+                            conditions.push(condition);
+                    }
                 }
             }
 

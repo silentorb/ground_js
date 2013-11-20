@@ -7,7 +7,7 @@
 var uuid = require('node-uuid')
 
 module Ground {
-  export class Update {
+  export class Update implements IUpdate {
     seed:ISeed;
     private fields:any[];
     override:boolean = true;
@@ -16,7 +16,7 @@ module Ground {
     ground:Core;
     db:Database;
     is_service:boolean = false;
-    user_id
+    user
     log_queries:boolean = false;
 
     constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
@@ -25,6 +25,10 @@ module Ground {
       this.main_table = this.trellis.get_table_name();
       this.ground = ground || this.trellis.ground;
       this.db = ground.db;
+    }
+
+    get_access_name():string {
+      return this.trellis + '.update'
     }
 
     private generate_sql(trellis:Trellis):Promise {
@@ -182,10 +186,10 @@ module Ground {
         return Math.round(new Date().getTime() / 1000)
 
       if (!value && property.insert == 'author') {
-        if (!this.user_id)
+        if (!this.user)
           throw new Error('Cannot insert author because current user is not set.')
 
-        return this.user_id
+        return this.user.guid
 //        throw new Error('Inserting author not yet supported');
       }
 
@@ -281,7 +285,7 @@ module Ground {
             }
             else {
               if (other_id === null) {
-                other = this.ground.update_object(other_trellis, other, this.user_id)
+                other = this.ground.update_object(other_trellis, other, this.user)
                   .then((other)=> {
                     var seeds = {}
                     seeds[this.trellis.name] = row
@@ -347,7 +351,7 @@ module Ground {
         }
       }
 
-      return this.ground.update_object(trellis, other, this.user_id);
+      return this.ground.update_object(trellis, other, this.user);
     }
 
     public run():Promise {
@@ -356,7 +360,6 @@ module Ground {
 
       return when.all(invoke_promises)
         .then(()=> {
-          console.log('seeeed', this.seed)
           var promises = tree.map((trellis:Trellis) => this.generate_sql(trellis));
           return when.all(promises)
             .then(()=> {
