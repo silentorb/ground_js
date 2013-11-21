@@ -32,9 +32,16 @@ module Ground {
     end:string
   }
 
-  export interface External_Query_Source {
-    fields?
-    filters?:any[]
+  export interface Property_Query_Source {
+    filters?:Query_Filter[]
+    sorts?:Query_Sort[]
+    expansions?:string[]
+    reductions?:string[]
+    properties?:Property_Query_Source[]
+  }
+
+  export interface External_Query_Source extends Property_Query_Source {
+    trellis:string;
   }
 
   export interface Internal_Query_Source {
@@ -59,17 +66,21 @@ module Ground {
     arguments = {}
     expansions:string[] = []
     wrappers:Query_Wrapper[] = []
+    private row_cache
+    type:string = 'query'
+    properties
+    source:External_Query_Source
 
-    private filters:string[] = []
+    filters:string[] = []
 
-    private property_filters:Query_Filter[] = []
+    property_filters:Query_Filter[] = []
 
     public static operators = [
       '=',
       'LIKE',
       '!='
     ]
-
+    each
     private links:ILink[] = []
 
     constructor(trellis:Trellis, base_path:string = null) {
@@ -277,11 +288,24 @@ module Ground {
       return join.generate_join(seeds);
     }
 
-    get_many_list(seed, id, property:Property, relationship:Relationships):Promise {
-      var other_property = property.get_other_property();
-      var query = new Query(other_property.parent, this.get_path(property.name));
+    create_sub_query(trellis:Trellis, property:Property):Query {
+      var query = new Query(trellis, this.get_path(property.name));
       query.include_links = false;
       query.expansions = this.expansions;
+      var source = this.source
+      if (typeof source === 'object'
+        && typeof source.properties === 'object'
+        && typeof source.properties[property.name] === 'object') {
+        query.extend(source.properties[property.name])
+      }
+
+      return query
+    }
+
+    get_many_list(seed, property:Property, relationship:Relationships):Promise {
+      var id = seed[property.parent.primary_key]
+      var other_property = property.get_other_property();
+      var query = this.create_sub_query(other_property.parent, property);
       if (relationship === Relationships.many_to_many) {
         var seeds = {}
         seeds[this.trellis.name] = seed
@@ -303,9 +327,7 @@ module Ground {
     }
 
     get_reference_object(row, property:Property) {
-      var query = new Query(property.other_trellis, this.get_path(property.name));
-      query.include_links = false;
-      query.expansions = this.expansions;
+      var query = this.create_sub_query(property.other_trellis, property)
       query.add_key_filter(row[property.name]);
       return query.run()
         .then((rows) => rows[0])
@@ -328,17 +350,8 @@ module Ground {
       return false;
     }
 
-    process_row(row, authorized_properties = null):Promise {
+    process_row(row):Promise {
       var name, property
-      // Map field names to Trellis property names
-//      for (name in this.trellis.properties) {
-//        property = this.trellis.properties[name];
-//        var field_name = property.get_field_name();
-//        if (property.name != field_name && row[field_name] !== undefined) {
-//          row[property] = row[field_name];
-//          delete row[field_name];
-//        }
-//      }
 
       var properties = this.trellis.get_core_properties()
       for (name in properties) {
@@ -346,36 +359,13 @@ module Ground {
         row[property.name] = this.ground.convert_value(row[property.name], property.type)
       }
 
-      if (authorized_properties) {
-        for (name in authorized_properties) {
-          property = authorized_properties[name]
-          if (row[property.name] !== undefined)
-            row[property.name] = this.ground.convert_value(row[property.name], property.type);
-        }
-      }
-
       var links = this.trellis.get_all_links((p)=> !p.is_virtual);
 
       var promises = MetaHub.map_to_array(links, (property, name) => {
-        var promise, path = this.get_path(property.name)
-        if (authorized_properties && authorized_properties[name] === undefined)
-          return null
+        var path = this.get_path(property.name)
 
         if (this.include_links || this.has_expansion(path)) {
-          var id = row[property.parent.primary_key]
-          var relationship = property.get_relationship()
-
-          switch (relationship) {
-            case Relationships.one_to_one:
-              promise = this.get_reference_object(row, property)
-              break
-            case Relationships.one_to_many:
-            case Relationships.many_to_many:
-              promise = this.get_many_list(row, id, property, relationship)
-              break
-          }
-
-          return promise.then((value) => {
+          return this.query_link_property(row, property).then((value) => {
             row[name] = value
             return row
           })
@@ -387,6 +377,22 @@ module Ground {
       return when.all(promises)
         .then(()=> this.ground.invoke(this.trellis.name + '.process.row', row, this, this.trellis))
         .then(()=> row)
+    }
+
+    query_link_property(seed, property):Promise{
+      var relationship = property.get_relationship()
+
+      switch (relationship) {
+        case Relationships.one_to_one:
+          return this.get_reference_object(seed, property)
+          break
+        case Relationships.one_to_many:
+        case Relationships.many_to_many:
+          return this.get_many_list(seed, property, relationship)
+          break
+      }
+
+      throw new Error('Could not find relationship: ' + relationship +'.')
     }
 
     process_property_filter(filter):Internal_Query_Source {
@@ -446,8 +452,44 @@ module Ground {
       return result
     }
 
-    run():Promise {
-      var properties = this.trellis.get_all_properties();
+    extend(source:External_Query_Source) {
+      var i
+
+      this.source = source
+
+      if (source.filters) {
+        for (i = 0; i < source.filters.length; ++i) {
+          var filter = source.filters[i]
+          this.add_property_filter(filter.property, filter.value, filter.operator)
+        }
+      }
+
+      if (source.sorts) {
+        for (i = 0; i < source.sorts.length; ++i) {
+          this.add_sort(source.sorts[i])
+        }
+      }
+
+      if (source.properties) {
+        var properties = this.trellis.get_all_properties()
+        this.properties = {}
+        for (var key in source.properties) {
+          if (properties[key])
+            this.properties[key] = properties[key]
+        }
+      }
+    }
+
+    run_core():Promise {
+      if (this.row_cache)
+        return when.resolve(this.row_cache)
+
+      var properties
+      if (this.properties && this.properties.length > 0)
+        properties = this.properties
+      else
+        properties = this.trellis.get_all_properties();
+
       var tree = this.trellis.get_tree()
       var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', this));
 
@@ -460,8 +502,17 @@ module Ground {
 
 //          var args = MetaHub.values(this.arguments).concat(args);
           return this.db.query(sql)
-            .then((rows) => when.all(rows.map((row) => this.process_row(row, properties))))
+            .then((rows)=> {
+              this.row_cache = rows
+              return rows
+            })
         })
+    }
+
+    run():Promise {
+      var properties = this.trellis.get_all_properties();
+      return this.run_core()
+        .then((rows) => when.all(rows.map((row) => this.process_row(row))))
     }
 
     run_single():Promise {
