@@ -133,21 +133,21 @@ module Ground {
       return property_type.get_field_type();
     }
 
-    static get_field_value_sync(value) {
-      if (typeof value === 'string') {
-        value = value.replace(/'/g, "\\'", value);
-        value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
-//        console.log('value', value)
-      }
-      else if (value === true)
-        value = 'TRUE';
-      else if (value === false)
-        value = 'FALSE';
-      if (value === null || value === undefined)
-        value = 'NULL';
-
-      return value;
-    }
+//    static get_field_value_sync(value) {
+//      if (typeof value === 'string') {
+//        value = value.replace(/'/g, "\\'", value);
+//        value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
+////        console.log('value', value)
+//      }
+//      else if (value === true)
+//        value = 'TRUE';
+//      else if (value === false)
+//        value = 'FALSE';
+//      if (value === null || value === undefined)
+//        value = 'NULL';
+//
+//      return value;
+//    }
 
     get_sql_value(value, type = null) {
       type = type || this.type
@@ -160,13 +160,22 @@ module Ground {
         return this.get_sql_value(value, property_type.parent.name);
 
       switch (type) {
+        case 'guid':
+          if (!value)
+            return 'NULL'
+
+          // Strip the guid of hyphens and any invalid characters.  Normalize the case.
+          // Also convert from hex to binary within the SQL.
+          value = "UNHEX('" + value.toUpperCase().replace(/[^A-Z0-9]/g, '') + "')"
         case 'list':
 //          throw new Error('Cannot call get_sql_value on a list property')
         case 'reference':
-          if (typeof value === 'object') {
-            value = value[this.other_trellis.primary_key]
-          }
-          return value || 'NULL';
+          var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
+          value = other_primary_property.get_sql_value(value);
+//          if (typeof value === 'object') {
+//            value = value[this.other_trellis.primary_key]
+//          }
+//          return value || 'NULL';
         case 'int':
           if (!value)
             return 0
@@ -192,28 +201,28 @@ module Ground {
       throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')')
     }
 
-    get_field_value(value, as_service:boolean = false, update:boolean = false) {
-      if (typeof value === 'string')
-        value = value.replace(/'/g, "\\'", value);
-
-      if (value === true)
-        value = 'TRUE';
-      else if (value === false)
-        value = 'FALSE';
-      if (value === null || value === undefined)
-        value = 'NULL';
-      else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
-        value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
-      }
-      else if (this.type == 'reference') {
-        if (typeof value !== 'object') {
-          var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
-          value = other_primary_property.get_field_value(value, as_service, update)
-        }
-      }
-
-      return value
-    }
+//    get_field_value(value, as_service:boolean = false, update:boolean = false) {
+//      if (typeof value === 'string')
+//        value = value.replace(/'/g, "\\'", value);
+//
+//      if (value === true)
+//        value = 'TRUE';
+//      else if (value === false)
+//        value = 'FALSE';
+//      if (value === null || value === undefined)
+//        value = 'NULL';
+//      else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
+//        value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
+//      }
+//      else if (this.type == 'reference') {
+//        if (typeof value !== 'object') {
+//          var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
+//          value = other_primary_property.get_field_value(value, as_service, update)
+//        }
+//      }
+//
+//      return value
+//    }
 
     get_other_id(entity) {
       var value = entity[this.other_trellis.primary_key];

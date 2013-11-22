@@ -149,6 +149,9 @@ declare module Ground {
         public run_core(): Promise;
         public run(): Promise;
         public run_single(): Promise;
+        static query_path(path: string, args, ground: Ground.Core): Promise;
+        static follow_path(path: string, args, ground: Ground.Core): string;
+        private static process_tokens(tokens, args, ground);
     }
 }
 declare var uuid;
@@ -343,9 +346,7 @@ declare module Ground {
         public get_field_name(): string;
         public get_field_override(create_if_missing?: boolean): Ground.IField;
         public get_field_type();
-        static get_field_value_sync(value);
         public get_sql_value(value, type?);
-        public get_field_value(value, as_service?: boolean, update?: boolean);
         public get_other_id(entity);
         public get_other_property(create_if_none?: boolean): Property;
         public get_property_type(): Ground.Property_Type;

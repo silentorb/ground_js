@@ -52,7 +52,6 @@
     "parent": "string"
   },
   "guid": {
-    "parent": "string",
-    "field_type": "CHAR(32) BINARY"
+    "field_type": "BINARY (16)"
   }
 }

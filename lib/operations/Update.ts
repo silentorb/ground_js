@@ -48,8 +48,11 @@ module Ground {
         var ids = [];
         for (var i in primary_keys) {
           var key = primary_keys[i]
-          ids[key] = this.seed[key];
-          conditions.push(key + ' = ' + Property.get_field_value_sync(ids[key]));
+          ids[key] = this.seed[key]
+          // Note I'm not referencing key against all of the trellis properties because
+          // I'm assuming that the key is a part of the trellis core properties since
+          // it is a primary key.
+          conditions.push(key + ' = ' + trellis.properties[key].get_sql_value(ids[key]));
         }
         var condition_string = conditions.join(' AND ');
         if (!condition_string)
@@ -189,7 +192,7 @@ module Ground {
         if (!this.user)
           throw new Error('Cannot insert author because current user is not set.')
 
-        return this.user.guid
+        return this.user.id
 //        throw new Error('Inserting author not yet supported');
       }
 
@@ -214,7 +217,7 @@ module Ground {
       value = this.apply_insert(property, value);
       this.seed[property.name] = value;
 
-      return property.get_field_value(value, this.is_service);
+      return property.get_sql_value(value);
     }
 
     private is_update_property(property:Property):boolean {

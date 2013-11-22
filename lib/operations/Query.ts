@@ -217,11 +217,11 @@ module Ground {
       if (fields.length == 0)
         throw new Error('No authorized fields found for trellis ' + this.main_table + '.');
 
-      var sql = 'SELECT ';
-      sql += fields.join(",\n");
-      sql += "\nFROM " + this.main_table;
+      var sql = 'SELECT '
+      sql += fields.join(",\n")
+      sql += "\nFROM " + this.main_table
       if (joins.length > 0)
-        sql += "\n" + joins.join("\n");
+        sql += "\n" + joins.join("\n")
 
       if (filters.length > 0)
         sql += "\nWHERE " + filters.join(" AND ")
@@ -231,11 +231,6 @@ module Ground {
 
       // Temporary fix to simulate prepared statements.  Banking on the mysql module supporting them soon.
 
-      for (var pattern in args) {
-        var value = args[pattern];
-        sql = sql.replace(new RegExp(pattern), Property.get_field_value_sync(value));
-      }
-
 //      if (sql.indexOf(':') > -1) {
 //        throw new Error('Missing prepared statement argument:' + sql)
 //      }
@@ -244,6 +239,13 @@ module Ground {
         var wrapper = this.wrappers[i]
         sql = wrapper.start + sql + wrapper.end
       }
+
+      for (var pattern in args) {
+        var value = args[pattern];
+//        sql = sql.replace(new RegExp(pattern), Property.get_sql_value(value));
+        sql = sql.replace(new RegExp(pattern), value);
+      }
+
       return sql;
     }
 
@@ -379,7 +381,7 @@ module Ground {
         .then(()=> row)
     }
 
-    query_link_property(seed, property):Promise{
+    query_link_property(seed, property):Promise {
       var relationship = property.get_relationship()
 
       switch (relationship) {
@@ -392,7 +394,7 @@ module Ground {
           break
       }
 
-      throw new Error('Could not find relationship: ' + relationship +'.')
+      throw new Error('Could not find relationship: ' + relationship + '.')
     }
 
     process_property_filter(filter):Internal_Query_Source {
@@ -437,6 +439,7 @@ module Ground {
       }
 
       if (value !== null) {
+        value = property.get_sql_value(value)
         result.arguments[placeholder] = value;
       }
 
@@ -518,6 +521,50 @@ module Ground {
     run_single():Promise {
       return this.run()
         .then((rows)=> rows[0])
+    }
+
+    static query_path(path:string, args, ground:Core):Promise {
+      var sql = Query.follow_path(path, args, ground)
+      return ground.db.query(sql)
+    }
+
+    // Returns a sql query string
+    // The first token in the path is required to have an args entry
+    // Or the
+    static follow_path(path:string, args, ground:Core):string {
+      var trellis
+
+      if (typeof path !== 'string')
+        throw new Error('query path must be a string.')
+
+      path = path.trim()
+
+      if (!path)
+        throw new Error('Empty query path.')
+
+      var tokens = path.split('/')
+      var sql = 'SELECT '
+
+      var parts = Query.process_tokens(tokens, args, ground)
+      for (var i = 0; i < parts.length; ++i) {
+        var part = parts[i]
+      }
+
+      return sql
+    }
+
+    private static process_tokens(tokens:string[], args, ground) {
+      var result = []
+      var trellis
+      for (var i = 0; i < tokens.length; ++i) {
+        var token = tokens[i]
+        if (token[0] == ':') {
+          var arg = args[token]
+          trellis = arg.trellis
+        }
+      }
+
+      return result
     }
   }
 }

@@ -489,15 +489,17 @@ else
             if (this.post_clauses.length > 0)
                 sql += " " + this.post_clauses.join(" ");
 
-            for (var pattern in args) {
-                var value = args[pattern];
-                sql = sql.replace(new RegExp(pattern), Ground.Property.get_field_value_sync(value));
-            }
-
             for (var i = 0; i < this.wrappers.length; ++i) {
                 var wrapper = this.wrappers[i];
                 sql = wrapper.start + sql + wrapper.end;
             }
+
+            for (var pattern in args) {
+                var value = args[pattern];
+
+                sql = sql.replace(new RegExp(pattern), value);
+            }
+
             return sql;
         };
 
@@ -691,6 +693,7 @@ else
             }
 
             if (value !== null) {
+                value = property.get_sql_value(value);
                 result.arguments[placeholder] = value;
             }
 
@@ -778,6 +781,47 @@ else
                 return rows[0];
             });
         };
+
+        Query.query_path = function (path, args, ground) {
+            var sql = Query.follow_path(path, args, ground);
+            return ground.db.query(sql);
+        };
+
+        Query.follow_path = function (path, args, ground) {
+            var trellis;
+
+            if (typeof path !== 'string')
+                throw new Error('query path must be a string.');
+
+            path = path.trim();
+
+            if (!path)
+                throw new Error('Empty query path.');
+
+            var tokens = path.split('/');
+            var sql = 'SELECT ';
+
+            var parts = Query.process_tokens(tokens, args, ground);
+            for (var i = 0; i < parts.length; ++i) {
+                var part = parts[i];
+            }
+
+            return sql;
+        };
+
+        Query.process_tokens = function (tokens, args, ground) {
+            var result = [];
+            var trellis;
+            for (var i = 0; i < tokens.length; ++i) {
+                var token = tokens[i];
+                if (token[0] == ':') {
+                    var arg = args[token];
+                    trellis = arg.trellis;
+                }
+            }
+
+            return result;
+        };
         Query.operators = [
             '=',
             'LIKE',
@@ -826,7 +870,8 @@ else
                 for (var i in primary_keys) {
                     var key = primary_keys[i];
                     ids[key] = this.seed[key];
-                    conditions.push(key + ' = ' + Ground.Property.get_field_value_sync(ids[key]));
+
+                    conditions.push(key + ' = ' + trellis.properties[key].get_sql_value(ids[key]));
                 }
                 var condition_string = conditions.join(' AND ');
                 if (!condition_string)
@@ -947,7 +992,7 @@ else
                 if (!this.user)
                     throw new Error('Cannot insert author because current user is not set.');
 
-                return this.user.guid;
+                return this.user.id;
             }
 
             return value;
@@ -969,7 +1014,7 @@ else
             value = this.apply_insert(property, value);
             this.seed[property.name] = value;
 
-            return property.get_field_value(value, this.is_service);
+            return property.get_sql_value(value);
         };
 
         Update.prototype.is_update_property = function (property) {
@@ -1874,20 +1919,6 @@ var Ground;
             return property_type.get_field_type();
         };
 
-        Property.get_field_value_sync = function (value) {
-            if (typeof value === 'string') {
-                value = value.replace(/'/g, "\\'", value);
-                value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
-            } else if (value === true)
-                value = 'TRUE';
-else if (value === false)
-                value = 'FALSE';
-            if (value === null || value === undefined)
-                value = 'NULL';
-
-            return value;
-        };
-
         Property.prototype.get_sql_value = function (value, type) {
             if (typeof type === "undefined") { type = null; }
             type = type || this.type;
@@ -1900,13 +1931,17 @@ else if (value === false)
                 return this.get_sql_value(value, property_type.parent.name);
 
             switch (type) {
+                case 'guid':
+                    if (!value)
+                        return 'NULL';
+
+                    value = "UNHEX('" + value.toUpperCase().replace(/[^A-Z0-9]/g, '') + "')";
                 case 'list':
 
                 case 'reference':
-                    if (typeof value === 'object') {
-                        value = value[this.other_trellis.primary_key];
-                    }
-                    return value || 'NULL';
+                    var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
+                    value = other_primary_property.get_sql_value(value);
+
                 case 'int':
                     if (!value)
                         return 0;
@@ -1930,30 +1965,6 @@ else if (value === false)
             }
 
             throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')');
-        };
-
-        Property.prototype.get_field_value = function (value, as_service, update) {
-            if (typeof as_service === "undefined") { as_service = false; }
-            if (typeof update === "undefined") { update = false; }
-            if (typeof value === 'string')
-                value = value.replace(/'/g, "\\'", value);
-
-            if (value === true)
-                value = 'TRUE';
-else if (value === false)
-                value = 'FALSE';
-            if (value === null || value === undefined)
-                value = 'NULL';
-else if (this.type == 'string' || this.type == 'text' || this.type == 'guid') {
-                value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
-            } else if (this.type == 'reference') {
-                if (typeof value !== 'object') {
-                    var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
-                    value = other_primary_property.get_field_value(value, as_service, update);
-                }
-            }
-
-            return value;
         };
 
         Property.prototype.get_other_id = function (entity) {
