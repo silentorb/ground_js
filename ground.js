@@ -514,11 +514,7 @@ else
                     continue;
 
                 if (property.name != this.trellis.primary_key || include_primary_key) {
-                    var field_name = property.get_field_name();
-                    var sql = property.query();
-                    if (field_name != property.name)
-                        sql += ' AS `' + property.name + '`';
-
+                    var sql = property.get_field_query();
                     fields.push(sql);
                     trellises[property.parent.name] = property.parent;
                 }
@@ -556,6 +552,9 @@ else
 
         Query.prototype.get_many_list = function (seed, property, relationship) {
             var id = seed[property.parent.primary_key];
+            if (id === undefined || id === null)
+                throw new Error('Cannot get many-to-many list when seed id is null.');
+
             var other_property = property.get_other_property();
             var query = this.create_sub_query(other_property.parent, property);
             if (relationship === Ground.Relationships.many_to_many) {
@@ -1281,6 +1280,8 @@ var Ground;
                 return this.convert_value(value, property_type.parent.name);
 
             switch (type) {
+                case 'guid':
+                    return value;
                 case 'list':
                 case 'reference':
                     return value;
@@ -1297,7 +1298,7 @@ var Ground;
                     return parseFloat(value.toString());
             }
 
-            return null;
+            throw new Error('Not sure how to convert sql type of ' + type + '.');
         };
 
         Core.prototype.create_query = function (trellis_name, base_path) {
@@ -1774,9 +1775,11 @@ else
             for (var i in this.identities) {
                 var identity = this.identities[i], seed = seeds[identity.trellis.name];
                 if (!seed) {
+                    var other_identity = this.identities[1 - i];
                     for (var p in identity.keys) {
-                        var key = identity.keys[p];
-                        conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.query_primary_key());
+                        var key = identity.keys[p], other_key = other_identity.keys[p];
+
+                        conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.get_table_name() + '.' + key.property.name);
                     }
                 } else {
                     for (var p in identity.keys) {
@@ -1935,12 +1938,12 @@ var Ground;
                     if (!value)
                         return 'NULL';
 
-                    value = "UNHEX('" + value.toUpperCase().replace(/[^A-Z0-9]/g, '') + "')";
+                    return "UNHEX('" + value.toUpperCase().replace(/[^A-Z0-9]/g, '') + "')";
                 case 'list':
 
                 case 'reference':
                     var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
-                    value = other_primary_property.get_sql_value(value);
+                    return other_primary_property.get_sql_value(value);
 
                 case 'int':
                     if (!value)
@@ -2033,6 +2036,17 @@ else
                     return Relationships.one_to_many;
             }
             return Relationships.one_to_one;
+        };
+
+        Property.prototype.get_field_query = function () {
+            var field_name = this.get_field_name();
+            var sql = this.query();
+            if (this.type == 'guid')
+                sql = "INSERT(INSERT(INSERT(INSERT(HEX(" + sql + ")" + ",9,0,'-')" + ",14,0,'-')" + ",19,0,'-')" + ",24,0,'-') AS `" + this.name + '`';
+else if (field_name != this.name)
+                sql += ' AS `' + this.name + '`';
+
+            return sql;
         };
 
         Property.prototype.query = function () {

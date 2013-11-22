@@ -352,6 +352,7 @@ declare module Ground {
         public get_property_type(): Ground.Property_Type;
         public get_referenced_trellis(): Ground.Trellis;
         public get_relationship(): Relationships;
+        public get_field_query(): string;
         public query(): string;
     }
 }

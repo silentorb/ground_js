@@ -262,11 +262,7 @@ module Ground {
           continue;
 
         if (property.name != this.trellis.primary_key || include_primary_key) {
-          var field_name = property.get_field_name();
-          var sql = property.query();
-          if (field_name != property.name)
-            sql += ' AS `' + property.name + '`';
-
+          var sql = property.get_field_query()
           fields.push(sql);
           trellises[property.parent.name] = property.parent;
         }
@@ -306,6 +302,9 @@ module Ground {
 
     get_many_list(seed, property:Property, relationship:Relationships):Promise {
       var id = seed[property.parent.primary_key]
+      if (id === undefined || id === null)
+        throw new Error('Cannot get many-to-many list when seed id is null.')
+
       var other_property = property.get_other_property();
       var query = this.create_sub_query(other_property.parent, property);
       if (relationship === Relationships.many_to_many) {

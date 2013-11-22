@@ -162,9 +162,11 @@ module Ground {
       for (var i in this.identities) {
         var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]
         if (!seed) {
+          var other_identity:Identity = this.identities[1 - i]
           for (var p in identity.keys) {
-            var key = identity.keys[p]
-            conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.query_primary_key())
+            var key = identity.keys[p], other_key = other_identity.keys[p]
+//            conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.query_primary_key())
+            conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.get_table_name() + '.' + key.property.name)
           }
         }
         else {
@@ -179,56 +181,6 @@ module Ground {
 
       return conditions
     }
-
-    /*
-     Went to all this work and now I'm not sure it's necessary for many-to-many connections
-
-     // Very important function.  Determines the primary key values of
-     // the referenced seed based on a referring seed.  Uses two different
-     // possible methods to determine this.
-
-     // property_index can be either zero or one.
-     // It determines whether the provided seed belongs
-     // to the first or second trellis of this cross table
-     get_other_seed(seed, property_index = 0) {
-     if (property_index !== 0 && property_index !== 1)
-     throw new Error('get_other_seed()\'s property_index can only be 0 or 1.')
-
-     var result = {}, i, other_property
-     var property = this.identities[property_index]
-     var other_property_list = this.identities[1 - property_index]
-     var other_trellis = property.other_trellis
-     var reference_value = seed[property.name]
-
-     // First consider explicit composite reference properties.
-     // This is done first so they can be overriden by the reference object.
-     for (i = 0; i < other_property_list.length; ++i) {
-     other_property = other_property_list[i]
-     var reference_name = other_trellis.name + '_' + other_property.name
-     if (seed[reference_name] !== undefined)
-     result[other_property.name] = seed[reference_name]
-     }
-
-     // Next consider the referenced value
-     if (typeof reference_value === 'object') {
-     for (i = 0; i < other_property_list.length; ++i) {
-     other_property = other_property_list[i]
-     if (reference_value[other_property.name] !== undefined)
-     result[other_property.name] = reference_value[other_property.name]
-     }
-     }
-     else {
-     result[other_trellis.primary_key] = reference_value
-     }
-
-     for (i = 0; i < other_property_list.length; ++i) {
-     other_property = other_property_list[i]
-     if (result[other_property.name] === undefined)
-     throw new Error('Link reference seed for ' + property.parent.name + ' has incomplete reference to ' + other_trellis.name + '.')
-     }
-     return result
-     }
-     */
   }
 
 }

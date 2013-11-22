@@ -166,12 +166,12 @@ module Ground {
 
           // Strip the guid of hyphens and any invalid characters.  Normalize the case.
           // Also convert from hex to binary within the SQL.
-          value = "UNHEX('" + value.toUpperCase().replace(/[^A-Z0-9]/g, '') + "')"
+          return "UNHEX('" + value.toUpperCase().replace(/[^A-Z0-9]/g, '') + "')"
         case 'list':
 //          throw new Error('Cannot call get_sql_value on a list property')
         case 'reference':
           var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
-          value = other_primary_property.get_sql_value(value);
+          return other_primary_property.get_sql_value(value);
 //          if (typeof value === 'object') {
 //            value = value[this.other_trellis.primary_key]
 //          }
@@ -297,8 +297,24 @@ module Ground {
       return Relationships.one_to_one;
     }
 
+    get_field_query():string {
+      var field_name = this.get_field_name()
+      var sql = this.query()
+      if (this.type == 'guid')
+        sql = "INSERT(INSERT(INSERT(INSERT(HEX(" + sql + ")"
+          + ",9,0,'-')"
+          + ",14,0,'-')"
+          + ",19,0,'-')"
+          + ",24,0,'-') AS `" + this.name + '`'
+//      sql = 'HEX(' + sql + ') AS `' + this.name + '`'
+      else if (field_name != this.name)
+        sql += ' AS `' + this.name + '`'
+
+      return sql
+    }
+
     query():string {
-      return this.parent.get_table_name() + '.' + this.get_field_name();
+      return this.parent.get_table_name() + '.' + this.get_field_name()
     }
 
 //    get_referenced_trellis():Trellis {

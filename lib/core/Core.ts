@@ -140,6 +140,8 @@ module Ground {
         return this.convert_value(value, property_type.parent.name);
 
       switch (type) {
+        case 'guid':
+          return value
         case 'list':
         case 'reference':
           return value;
@@ -156,7 +158,8 @@ module Ground {
           return parseFloat(value.toString());
       }
 
-      return null;
+      throw new Error('Not sure how to convert sql type of ' + type + '.')
+//      return null;
     }
 
 //    create_query(trellis:Trellis, base_path = '') {
