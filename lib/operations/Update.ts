@@ -7,6 +7,10 @@
 var uuid = require('node-uuid')
 
 module Ground {
+  export interface IUser {
+    id
+  }
+
   export class Update implements IUpdate {
     seed:ISeed;
     private fields:any[];
@@ -15,8 +19,7 @@ module Ground {
     main_table:string = 'node';
     ground:Core;
     db:Database;
-    is_service:boolean = false;
-    user
+    user:IUser
     log_queries:boolean = false;
 
     constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
@@ -71,8 +74,8 @@ module Ground {
       }
     }
 
-    private update_embedded_seed(trellis, property, value):Promise {
-      return this.ground.update_object(trellis, value, this.is_service)
+    private update_embedded_seed(property, value):Promise {
+      return this.ground.update_object(property.other_trellis, value, this.user)
         .then((entity)=> {
 //          var other_id = this.get_other_id(value);
 //          if (other_id !== null)
@@ -102,23 +105,32 @@ module Ground {
         var property = core_properties[name];
         var value = this.seed[property.name]
         if (property.type == 'reference' && value && typeof value === 'object') {
-          promises.push(this.update_embedded_seed(trellis, property, value));
+          promises.push(this.update_embedded_seed(property, value));
         }
       }
 
       return when.all(promises)
         .then(()=> {
-          for (var name in core_properties) {
-            var property = core_properties[name];
-            if (this.seed[property.name] !== undefined || this.is_create_property(property)) {
-              var value = this.get_field_value(property)
-//                  if (value.length == 0) {
-//                    throw new Error('Field value was empty for inserting ' + property.name + ' in ' + trellis.name + '.');
-//                  }
+          var add_fields = (properties, seed) => {
+            for (var name in properties) {
+              var property = properties[name];
+              var seed_name = property.get_seed_name()
+              if (seed[seed_name] === undefined && !this.is_create_property(property))
+                continue
+
+              var value = this.get_field_value(property, seed)
               fields.push('`' + property.get_field_name() + '`');
               values.push(value);
+
+              var composite_properties = property.composite_properties
+              var composite_seed = seed[seed_name]
+              if (composite_properties && composite_properties.length > 0 && typeof composite_seed === 'object') {
+                add_fields(composite_properties, composite_seed)
+              }
             }
           }
+
+          add_fields(core_properties, this.seed)
 
           var field_string = fields.join(', ')
           var value_string = values.join(', ')
@@ -153,7 +165,7 @@ module Ground {
         var property = core_properties[name];
         if (this.seed[property.name] !== undefined) {
           var field_string = '`' + property.get_field_name() + '`';
-          promises.push(this.get_field_value(property).then((value) => {
+          promises.push(this.get_field_value(property, this.seed).then((value) => {
             updates.push(field_string + ' = ' + value);
           }));
         }
@@ -190,10 +202,9 @@ module Ground {
 
       if (!value && property.insert == 'author') {
         if (!this.user)
-          throw new Error('Cannot insert author because current user is not set.')
+          throw new Error('Cannot insert author into ' + property.parent.name + '.' + property.name + ' because current user is not set.')
 
         return this.user.id
-//        throw new Error('Inserting author not yet supported');
       }
 
       return value
@@ -212,10 +223,11 @@ module Ground {
         || property.type == 'modified' || property.insert == 'author';
     }
 
-    private get_field_value(property:Property) {
-      var value = this.seed[property.name];
+    private get_field_value(property:Property, seed) {
+      var name = property.get_seed_name()
+      var value = seed[name];
       value = this.apply_insert(property, value);
-      this.seed[property.name] = value;
+      seed[name] = value;
 
       return property.get_sql_value(value);
     }
@@ -240,7 +252,7 @@ module Ground {
       var promises = [];
       for (var name in links) {
         var property = links[name];
-        if (this.is_service && !create) {
+        if (!create) {
           if (property.is_readonly || property.is_private)
             continue;
         }
@@ -249,7 +261,7 @@ module Ground {
         // because they don't need to be fired in any particular order;
         switch (property.get_relationship()) {
           case Relationships.one_to_many:
-            promises.push(this.update_one_to_many(property, id));
+            promises.push(this.update_one_to_many(property));
             break;
           case Relationships.many_to_many:
             promises.push(this.update_many_to_many(property, create));
@@ -312,7 +324,7 @@ module Ground {
       return when.all(promises)
     }
 
-    private update_one_to_many(property:Property, id):Promise {
+    private update_one_to_many(property:Property):Promise {
       var seed = this.seed
       var list = seed[property.name]
       if (!MetaHub.is_array(list))

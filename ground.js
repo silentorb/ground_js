@@ -839,7 +839,6 @@ var Ground;
             if (typeof ground === "undefined") { ground = null; }
             this.override = true;
             this.main_table = 'node';
-            this.is_service = false;
             this.log_queries = false;
             this.seed = seed;
             this.trellis = trellis;
@@ -887,9 +886,9 @@ else
             }
         };
 
-        Update.prototype.update_embedded_seed = function (trellis, property, value) {
+        Update.prototype.update_embedded_seed = function (property, value) {
             var _this = this;
-            return this.ground.update_object(trellis, value, this.is_service).then(function (entity) {
+            return this.ground.update_object(property.other_trellis, value, this.user).then(function (entity) {
                 _this.seed[property.name] = entity;
             });
         };
@@ -909,20 +908,32 @@ else
                 var property = core_properties[name];
                 var value = this.seed[property.name];
                 if (property.type == 'reference' && value && typeof value === 'object') {
-                    promises.push(this.update_embedded_seed(trellis, property, value));
+                    promises.push(this.update_embedded_seed(property, value));
                 }
             }
 
             return when.all(promises).then(function () {
-                for (var name in core_properties) {
-                    var property = core_properties[name];
-                    if (_this.seed[property.name] !== undefined || _this.is_create_property(property)) {
-                        var value = _this.get_field_value(property);
+                var add_fields = function (properties, seed) {
+                    for (var name in properties) {
+                        var property = properties[name];
+                        var seed_name = property.get_seed_name();
+                        if (seed[seed_name] === undefined && !_this.is_create_property(property))
+                            continue;
 
+                        var value = _this.get_field_value(property, seed);
                         fields.push('`' + property.get_field_name() + '`');
                         values.push(value);
+
+                        var composite_properties = property.composite_properties;
+                        var composite_seed = seed[seed_name];
+                        if (composite_properties && composite_properties.length > 0 && typeof composite_seed === 'object') {
+                            add_fields(composite_properties, composite_seed);
+                        }
+                      _this.get_field_value(property, seed);
                     }
-                }
+                };
+
+                add_fields(core_properties, _this.seed);
 
                 var field_string = fields.join(', ');
                 var value_string = values.join(', ');
@@ -955,7 +966,7 @@ else
                 var property = core_properties[name];
                 if (this.seed[property.name] !== undefined) {
                     var field_string = '`' + property.get_field_name() + '`';
-                    promises.push(this.get_field_value(property).then(function (value) {
+                    promises.push(this.get_field_value(property, this.seed).then(function (value) {
                         updates.push(field_string + ' = ' + value);
                     }));
                 }
@@ -989,7 +1000,7 @@ else
 
             if (!value && property.insert == 'author') {
                 if (!this.user)
-                    throw new Error('Cannot insert author because current user is not set.');
+                    throw new Error('Cannot insert author into ' + property.parent.name + '.' + property.name + ' because current user is not set.');
 
                 return this.user.id;
             }
@@ -1008,10 +1019,11 @@ else
             return property.insert == 'trellis' || property.type == 'created' || property.type == 'modified' || property.insert == 'author';
         };
 
-        Update.prototype.get_field_value = function (property) {
-            var value = this.seed[property.name];
+        Update.prototype.get_field_value = function (property, seed) {
+            var name = property.get_seed_name();
+            var value = seed[name];
             value = this.apply_insert(property, value);
-            this.seed[property.name] = value;
+            seed[name] = value;
 
             return property.get_sql_value(value);
         };
@@ -1036,14 +1048,14 @@ else
             var promises = [];
             for (var name in links) {
                 var property = links[name];
-                if (this.is_service && !create) {
+                if (!create) {
                     if (property.is_readonly || property.is_private)
                         continue;
                 }
 
                 switch (property.get_relationship()) {
                     case Ground.Relationships.one_to_many:
-                        promises.push(this.update_one_to_many(property, id));
+                        promises.push(this.update_one_to_many(property));
                         break;
                     case Ground.Relationships.many_to_many:
                         promises.push(this.update_many_to_many(property, create));
@@ -1104,7 +1116,7 @@ else
             return when.all(promises);
         };
 
-        Update.prototype.update_one_to_many = function (property, id) {
+        Update.prototype.update_one_to_many = function (property) {
             var _this = this;
             var seed = this.seed;
             var list = seed[property.name];
@@ -1338,11 +1350,11 @@ var Ground;
             }
         };
 
-        Core.prototype.insert_object = function (trellis, seed, uid, as_service) {
+        Core.prototype.insert_object = function (trellis, seed, user, as_service) {
             if (typeof seed === "undefined") { seed = {}; }
-            if (typeof uid === "undefined") { uid = null; }
+            if (typeof user === "undefined") { user = null; }
             if (typeof as_service === "undefined") { as_service = false; }
-            return this.update_object(trellis, seed, uid, as_service);
+            return this.update_object(trellis, seed, user, as_service);
         };
 
         Core.is_private = function (property) {
@@ -1365,7 +1377,6 @@ var Ground;
             this.invoke(trellis.name + '.update', seed, trellis);
             var update = new Ground.Update(trellis, seed, this);
             update.user = user;
-            update.is_service = as_service;
             update.log_queries = this.log_updates;
             return update.run();
         };
@@ -1725,7 +1736,6 @@ else
 
         Link_Trellis.prototype.generate_insert = function (seeds) {
             var values = [], keys = [];
-            console.log('seeds', seeds);
 
             for (var i in this.identities) {
                 var identity = this.identities[i], seed = seeds[identity.trellis.name];
@@ -1819,6 +1829,7 @@ var Ground;
             this.other_trellis_name = null;
             this.is_private = false;
             this.is_virtual = false;
+            this.is_composite_sub = false;
             this.composite_properties = null;
             for (var i in source) {
                 if (this.hasOwnProperty(i))
@@ -1844,6 +1855,7 @@ var Ground;
                         new_property.other_property = key;
                         new_property.other_trellis_name = this.parent.name;
                         new_property.other_trellis = this.parent;
+                        new_property.is_composite_sub = true;
                         this.composite_properties = this.composite_properties || [];
                         this.composite_properties.push(new_property);
                     }
@@ -1922,6 +1934,13 @@ var Ground;
             return property_type.get_field_type();
         };
 
+        Property.prototype.get_seed_name = function () {
+            if (this.is_composite_sub)
+                return this.other_property;
+else
+                return this.name;
+        };
+
         Property.prototype.get_sql_value = function (value, type) {
             if (typeof type === "undefined") { type = null; }
             type = type || this.type;
@@ -1943,6 +1962,11 @@ var Ground;
 
                 case 'reference':
                     var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
+                    if (typeof value === 'object') {
+                        value = value[this.other_trellis.primary_key];
+                        if (!value)
+                            return null;
+                    }
                     return other_primary_property.get_sql_value(value);
 
                 case 'int':

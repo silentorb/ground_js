@@ -28,6 +28,7 @@ module Ground {
     other_trellis_name:string = null;
     is_private:boolean = false;
     is_virtual:boolean = false;
+    is_composite_sub:boolean = false
     composite_properties:any[] = null
 
     constructor(name:string, source:IProperty_Source, trellis:Trellis) {
@@ -56,6 +57,7 @@ module Ground {
             new_property.other_property = key
             new_property.other_trellis_name = this.parent.name
             new_property.other_trellis = this.parent
+            new_property.is_composite_sub = true
             this.composite_properties = this.composite_properties || []
             this.composite_properties.push(new_property)
           }
@@ -149,6 +151,13 @@ module Ground {
 //      return value;
 //    }
 
+    get_seed_name():string {
+      if (this.is_composite_sub)
+        return this.other_property
+      else
+        return this.name
+    }
+
     get_sql_value(value, type = null) {
       type = type || this.type
       var property_type = this.parent.ground.property_types[type];
@@ -170,8 +179,13 @@ module Ground {
         case 'list':
 //          throw new Error('Cannot call get_sql_value on a list property')
         case 'reference':
-          var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
-          return other_primary_property.get_sql_value(value);
+          var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
+          if (typeof value === 'object') {
+            value = value[this.other_trellis.primary_key]
+            if (!value)
+              return null
+          }
+          return other_primary_property.get_sql_value(value)
 //          if (typeof value === 'object') {
 //            value = value[this.other_trellis.primary_key]
 //          }

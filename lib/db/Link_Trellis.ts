@@ -96,7 +96,7 @@ module Ground {
     generate_insert(seeds:{
     }):string {
       var values = [], keys = []
-      console.log('seeds', seeds)
+//      console.log('seeds', seeds)
 //      console.log('properties', this.identities)
       for (var i in this.identities) {
         var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]

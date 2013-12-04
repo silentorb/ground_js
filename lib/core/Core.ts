@@ -172,7 +172,7 @@ module Ground {
       return new Query(trellis, base_path);
     }
 
-    create_update(trellis, seed:ISeed = {}, user = null):IUpdate {
+    create_update(trellis, seed:ISeed = {}, user:IUser = null):IUpdate {
       var trellis = this.sanitize_trellis_argument(trellis)
 
       // If _deleted is an object then it is a list of links
@@ -202,8 +202,8 @@ module Ground {
       }
     }
 
-    insert_object(trellis, seed:ISeed = {}, uid = null, as_service = false):Promise {
-      return this.update_object(trellis, seed, uid, as_service);
+    insert_object(trellis, seed:ISeed = {}, user:IUser = null, as_service = false):Promise {
+      return this.update_object(trellis, seed, user, as_service);
     }
 
     static is_private(property:Property):boolean {
@@ -214,7 +214,7 @@ module Ground {
       return property.is_private || property.is_readonly;
     }
 
-    update_object(trellis, seed:ISeed = {}, user = null, as_service:boolean = false):Promise {
+    update_object(trellis, seed:ISeed = {}, user:IUser = null, as_service:boolean = false):Promise {
       var trellis = this.sanitize_trellis_argument(trellis);
 
       // If _deleted is an object then it is a list of links
@@ -226,7 +226,6 @@ module Ground {
       this.invoke(trellis.name + '.update', seed, trellis);
       var update = new Update(trellis, seed, this);
       update.user = user
-      update.is_service = as_service;
       update.log_queries = this.log_updates
       return update.run();
     }
