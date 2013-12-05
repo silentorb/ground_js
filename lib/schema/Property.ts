@@ -264,18 +264,19 @@ module Ground {
       }
 
       if (this.other_trellis === this.parent)
-        return null;
+        return null
 
       if (!create_if_none)
-        return null;
+        return null
 
       // If there is no existing connection defined in this trellis, create a dummy
       // connection and assume that it is a list.  This means that implicit connections
       // are either one-to-many or many-to-many, never one-to-one.
       var attributes:IProperty_Source = <IProperty_Source>{}
-      attributes.type = 'list';
-      attributes.trellis = this.parent.name;
-      return new Property('_' + this.other_trellis.name, attributes, this.other_trellis);
+      attributes.type = 'list'
+      attributes.is_virtual = true
+      attributes.trellis = this.parent.name
+      return new Property(this.other_trellis.name, attributes, this.other_trellis)
     }
 
     get_property_type():Property_Type {

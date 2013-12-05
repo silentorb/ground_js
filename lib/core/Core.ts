@@ -106,7 +106,17 @@ module Ground {
     }
 
     add_trellis(name:string, source:ITrellis_Source, initialize_parent = true):Trellis {
-      var trellis = new Trellis(name, this);
+      var trellis = this.trellises[name]
+
+      if (trellis) {
+        trellis = this.trellises[name]
+        if (source)
+          trellis.load_from_object(source)
+
+        return trellis
+      }
+
+      trellis = new Trellis(name, this);
       if (source)
         trellis.load_from_object(source);
 
@@ -302,7 +312,7 @@ module Ground {
       return object;
     }
 
-    sanitize_trellis_argument(trellis) {
+    sanitize_trellis_argument(trellis):Trellis {
       if (!trellis)
         throw new Error('Trellis is empty');
 

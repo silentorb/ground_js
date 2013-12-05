@@ -10,17 +10,13 @@ module.exports = function (grunt) {
     ts: {
       ground: {                                 // a particular target
         src: ["lib/export.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
-        html: [], // The source html files, https://github.com/basarat/grunt-ts#html-2-typescript-support
-//        reference: "app/code/reference.ts",  // If specified, generate this file that you can use for your reference management
         out: 'ground.js',                // If specified, generate an out.js file which is the merged js file
 //        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
-//        watch: 'test',                     // If specified, watches this directory for changes, and re-runs the current target
         options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
           target: 'es5',            // 'es3' (default) | 'es5'
           module: 'commonjs',       // 'amd' (default) | 'commonjs'
           sourcemap: true,          // true  (default) | false
           declaration: true,       // true | false  (default)
-          comments: false,           // true | false (default)
           verbose: true
         }
       }

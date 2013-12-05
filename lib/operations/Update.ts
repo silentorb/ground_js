@@ -280,19 +280,19 @@ module Ground {
 
       var join = Link_Trellis.create_from_property(property);
       var other_trellis = property.get_referenced_trellis()
-      var promises = []
 
-      for (var i = 0; i < list.length; i++) {
-        var other = list[i]
-        var other_id = other_trellis.get_id(other)
+      var update = (other)=> {
+        var sql, other_id = other_trellis.get_id(other)
         // First updated the embedded list object into the database, then link it to the main seed.
-        var promise = this.update_reference_object(other, property)
+        return this.update_reference_object(other, property)
           .then(() => {
-//        var other_seed = join.get_other_seed(other)
             // Clients can use the _remove flag to detach items from lists without deleting them
             if (typeof other === 'object' && other._remove) {
               if (other_id !== null) {
-                var sql = join.generate_delete_row([row, other])
+                sql = join.generate_delete_row([row, other])
+                if (this.log_queries)
+                  console.log(sql)
+
                 return this.ground.invoke(join.table_name + '.delete', property, row, other, join)
                   .then(() => this.db.query(sql))
 
@@ -305,7 +305,11 @@ module Ground {
                     var seeds = {}
                     seeds[this.trellis.name] = row
                     seeds[other_trellis.name] = other
-                    return this.db.query(join.generate_insert(seeds))
+                    sql = join.generate_insert(seeds)
+                    if (this.log_queries)
+                      console.log(sql)
+
+                    return this.db.query(sql)
                       .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
                   })
               }
@@ -313,15 +317,18 @@ module Ground {
                 var seeds = {}
                 seeds[this.trellis.name] = row
                 seeds[other_trellis.name] = other
-                return this.db.query(join.generate_insert(seeds))
+                sql = join.generate_insert(seeds)
+                if (this.log_queries)
+                  console.log(sql)
+
+                return this.db.query(sql)
                   .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
               }
             }
           })
-        promises.push(promise)
       }
 
-      return when.all(promises)
+      return when.all(list.map(update))
     }
 
     private update_one_to_many(property:Property):Promise {

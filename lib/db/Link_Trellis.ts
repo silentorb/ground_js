@@ -20,7 +20,7 @@ module Ground {
     property:Property
   }
 
-  export class Link_Trellis {
+  export class Link_Trellis implements ITrellis {
     properties
     seed
     table_name:string
@@ -93,17 +93,21 @@ module Ground {
       return 'DELETE ' + this.table_name + ' ON ' + this.get_condition_string(seeds) + "\n"
     }
 
-    generate_insert(seeds:{
-    }):string {
+    generate_insert(seeds):string {
       var values = [], keys = []
 //      console.log('seeds', seeds)
 //      console.log('properties', this.identities)
       for (var i in this.identities) {
         var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]
         for (var p in identity.keys) {
-          var key = identity.keys[p]
+          var key = identity.keys[p], value
           keys.push(key.name)
-          values.push(key.property.get_sql_value(seed[key.property.name]))
+          if (typeof seed === 'object')
+            value = seed[key.property.name]
+          else
+            value = seed
+
+          values.push(key.property.get_sql_value(value))
         }
       }
 //      for (var i in this.identities) {
@@ -133,7 +137,7 @@ module Ground {
       this.table_name = temp.join('_')
     }
 
-    get_condition(key:Identity_Key, seed) {
+    get_key_condition(key:Identity_Key, seed, fill_blanks:boolean = false) {
       if (!seed) {
         console.log('empty key')
       }
@@ -149,12 +153,27 @@ module Ground {
 
         return this.table_name + '.' + key.name + ' = ' + value
       }
-      else
-        return null
+      else if (fill_blanks) {
+        return this.table_name + '.' + key.name + ' = ' + key.property.query()
+      }
+
+      return null
     }
 
     get_condition_string(seeds):string {
       return this.get_conditions(seeds).join(' AND ')
+    }
+
+    get_identity_conditions(identity:Identity, seed, fill_blanks:boolean = false) {
+      var conditions = []
+      for (var p in identity.keys) {
+        var key = identity.keys[p]
+        var condition = this.get_key_condition(key, seed, fill_blanks)
+        if (condition)
+          conditions.push(condition)
+      }
+
+      return conditions
     }
 
     get_conditions(seeds):string[] {
@@ -170,16 +189,21 @@ module Ground {
           }
         }
         else {
-          for (var p in identity.keys) {
-            var key = identity.keys[p]
-            var condition = this.get_condition(key, seed)
-            if (condition)
-              conditions.push(condition)
-          }
+          conditions = conditions.concat(this.get_identity_conditions(identity, seed))
         }
       }
 
       return conditions
+    }
+
+    get_identity_by_trellis(trellis:Trellis):Identity {
+      for (var i = 0; i < this.identities.length; ++i) {
+        var identity = this.identities[i]
+        if (identity.trellis === trellis)
+          return identity
+      }
+
+      return null
     }
   }
 

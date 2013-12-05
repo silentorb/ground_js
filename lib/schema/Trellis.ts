@@ -7,7 +7,12 @@
 /// <reference path="../references.ts"/>
 
 module Ground {
-  export class Trellis {
+
+  export interface ITrellis {
+
+  }
+
+  export class Trellis implements ITrellis {
     plural:string = null;
     parent:Trellis = null;
     ground:Core;
@@ -97,7 +102,7 @@ module Ground {
       return source;
     }
 
-    get_join(main_table:string):string {
+    get_parent_join(main_table:string):string {
       if (!this.parent)
         return null;
 
@@ -131,6 +136,17 @@ module Ground {
       }
 
       return [ this.properties[this.primary_key] ]
+    }
+
+    get_reference_property(other_trellis:Trellis):Property {
+      var properties = this.get_all_properties()
+      for (var i in properties) {
+        var property = properties[i]
+        if (property.other_trellis === other_trellis)
+          return property
+      }
+
+      return null
     }
 
     get_table_name():string {

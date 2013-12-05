@@ -270,7 +270,7 @@ module Ground {
       var joins = [];
       for (name in trellises) {
         var trellis = trellises[name];
-        var join = trellis.get_join(this.main_table);
+        var join = trellis.get_parent_join(this.main_table);
         if (join)
           joins.push(join);
       }
@@ -281,7 +281,15 @@ module Ground {
       }
     }
 
-    generate_property_join(property:Property, seeds) {
+    get_primary_key_value() {
+      var filters = this.property_filters.filter((filter)=>filter.property == this.trellis.primary_key)
+      if (filters.length > 0)
+        return filters[0].value
+
+      return undefined
+    }
+
+    static generate_property_join(property:Property, seeds) {
       var join = Link_Trellis.create_from_property(property);
       return join.generate_join(seeds);
     }
@@ -310,7 +318,7 @@ module Ground {
       if (relationship === Relationships.many_to_many) {
         var seeds = {}
         seeds[this.trellis.name] = seed
-        query.add_join(query.generate_property_join(property, seeds))
+        query.add_join(Query.generate_property_join(property, seeds))
       }
       else if (relationship === Relationships.one_to_many)
         query.add_property_filter(other_property.name, id)
@@ -424,7 +432,7 @@ module Ground {
         join_seed[property.other_trellis.name] = ':' + property.name + '_filter'
 //        var other_property = property.get_other_property()
 //        join_seed[property.parent.name] =
-        result.joins.push(this.generate_property_join(property, join_seed));
+        result.joins.push(Query.generate_property_join(property, join_seed));
       }
       else {
         if (filter.operator.toLowerCase() == 'like') {
@@ -522,16 +530,61 @@ module Ground {
         .then((rows)=> rows[0])
     }
 
-    static query_path(path:string, args, ground:Core):Promise {
+    // The trellis parameter is intended to override the normal trellis with a cross-table;
+    // useful for optimizing joins.
+    static generate_join(property:Property, cross_property:Property = null):string {
+      var other_property = property.get_other_property(true)
+//      if (!other_property)
+//        throw new Error('Could not find other property of ' + property.query())
+
+      var other = property.other_trellis
+
+      var relationship = property.get_relationship()
+
+      switch (relationship) {
+        case Relationships.one_to_one:
+        case Relationships.one_to_many:
+          var first_part, second_part
+          if (property.type == 'list') {
+            first_part = other_property.query()
+            var trellis = property.parent
+            second_part = trellis.properties[trellis.primary_key].query()
+          }
+          else {
+            first_part = other.query_primary_key()
+            second_part = property.query()
+          }
+          if (cross_property) {
+            var join = Link_Trellis.create_from_property(cross_property)
+            var identity = join.get_identity_by_trellis(cross_property.other_trellis)
+            return 'JOIN ' + other.get_table_query() +
+              '\nON ' + first_part + ' = '
+              + join.table_name + '.' + identity.name + '\n'
+          }
+          else {
+            return 'JOIN ' + other.get_table_query() +
+              '\nON ' + first_part + ' = ' + second_part + '\n'
+          }
+
+        case Relationships.many_to_many:
+          var seeds = {}
+//          seeds[this.trellis.name] = seed
+          var join = Link_Trellis.create_from_property(property)
+          var identity = join.get_identity_by_trellis(property.parent)
+          return 'JOIN ' + join.table_name + '\nON '
+            + join.get_identity_conditions(identity, {}, true).join(' AND ') + '\n'
+//          return Query.generate_property_join(property, seeds)
+      }
+    }
+
+    static query_path(path:string, args:any[], ground:Core):Promise {
       var sql = Query.follow_path(path, args, ground)
-      return ground.db.query(sql)
+      console.log('query_path', sql)
+      return ground.db.query_single(sql)
     }
 
     // Returns a sql query string
-    // The first token in the path is required to have an args entry
-    // Or the
-    static follow_path(path:string, args, ground:Core):string {
-      var trellis
+    static follow_path(path:string, args:any[], ground:Core):string {
 
       if (typeof path !== 'string')
         throw new Error('query path must be a string.')
@@ -542,12 +595,32 @@ module Ground {
         throw new Error('Empty query path.')
 
       var tokens = path.split('/')
-      var sql = 'SELECT '
+      var sql = 'SELECT COUNT(*) AS total\n'
 
-      var parts = Query.process_tokens(tokens, args, ground)
-      for (var i = 0; i < parts.length; ++i) {
-        var part = parts[i]
+//      var parts = Query.process_tokens(tokens, args, ground)
+      var parts = tokens, cross_property:Property = null, first_trellis
+
+      var trellis:Trellis = first_trellis = ground.sanitize_trellis_argument(parts[0])
+      sql += 'FROM ' + trellis.get_plural() + '\n'
+
+      for (var i = 1; i < parts.length; ++i) {
+        var properties = trellis.get_all_properties()
+        var property = properties[parts[i]]
+        if (!property)
+          throw new Error('Could not find ' + trellis.name + '.' + parts[i] + '.')
+
+        sql += Query.generate_join(property, cross_property)
+        cross_property = property.get_relationship() == Relationships.many_to_many ? property : null
+        trellis = property.other_trellis
       }
+
+      if (args[1]) {
+        sql += ' AND ' + trellis.query_primary_key() + ' = '
+          + trellis.properties[trellis.primary_key].get_sql_value(args[1]) + '\n'
+      }
+
+      sql += 'WHERE ' + first_trellis.query_primary_key() + ' = '
+        + first_trellis.properties[first_trellis.primary_key].get_sql_value(args[0]) + '\n'
 
       return sql
     }
