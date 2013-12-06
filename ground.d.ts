@@ -117,6 +117,7 @@ declare module Ground {
         public properties;
         public source: External_Query_Source;
         public filters: string[];
+        public run_stack;
         public property_filters: Query_Filter[];
         static operators: string[];
         public each;
@@ -153,9 +154,10 @@ declare module Ground {
         public run_core(): Promise;
         public run(): Promise;
         public run_single(): Promise;
+        static get_identity_sql(property: Ground.Property, cross_property?: Ground.Property): string;
         static generate_join(property: Ground.Property, cross_property?: Ground.Property): string;
         static query_path(path: string, args: any[], ground: Ground.Core): Promise;
-        static follow_path(path: string, args: any[], ground: Ground.Core): string;
+        static follow_path(path, args: any[], ground: Ground.Core): string;
         private static process_tokens(tokens, args, ground);
     }
 }
@@ -174,6 +176,7 @@ declare module Ground {
         public db: Ground.Database;
         public user: IUser;
         public log_queries: boolean;
+        public run_stack;
         constructor(trellis: Ground.Trellis, seed: Ground.ISeed, ground?: Ground.Core);
         public get_access_name(): string;
         private generate_sql(trellis);
@@ -227,6 +230,7 @@ declare module Ground {
         run: () => Promise;
         get_access_name(): string;
     }
+    function path_to_array(path);
     class Property_Type {
         public name: string;
         public property_class;

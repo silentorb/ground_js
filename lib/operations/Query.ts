@@ -72,6 +72,7 @@ module Ground {
     source:External_Query_Source
 
     filters:string[] = []
+    run_stack
 
     property_filters:Query_Filter[] = []
 
@@ -110,8 +111,10 @@ module Ground {
       if (Query.operators.indexOf(operator) === -1)
         throw new Error("Invalid operator: '" + operator + "'.")
 
-      if (value === null || value === undefined)
-        throw new Error('Cannot add property filter where value is null')
+      if (value === null || value === undefined) {
+        console.log('q', this.run_stack)
+        throw new Error('Cannot add property filter where value is null; property= ' + this.trellis.name + '.' + property + '.')
+      }
 
       this.property_filters.push({
         property: property,
@@ -520,6 +523,11 @@ module Ground {
     }
 
     run():Promise {
+      if (this.ground.log_queries) {
+        var temp = new Error()
+        this.run_stack = temp['stack']
+      }
+
       var properties = this.trellis.get_all_properties();
       return this.run_core()
         .then((rows) => when.all(rows.map((row) => this.process_row(row))))
@@ -530,7 +538,25 @@ module Ground {
         .then((rows)=> rows[0])
     }
 
-    // The trellis parameter is intended to override the normal trellis with a cross-table;
+    // The cross_property parameter is intended to override the normal trellis with a cross-table;
+    // useful for optimizing joins.
+    static get_identity_sql(property:Property, cross_property:Property = null) {
+      if (cross_property) {
+        var join = Link_Trellis.create_from_property(cross_property)
+        var identity = join.get_identity_by_trellis(cross_property.other_trellis)
+        return join.table_name + '.' + identity.name
+      }
+      else if (property.type == 'list') {
+        var trellis = property.parent
+//          return trellis.properties[trellis.primary_key].query()
+        return trellis.query_primary_key()
+      }
+      else {
+        return property.query()
+      }
+    }
+
+    // The cross_property parameter is intended to override the normal trellis with a cross-table;
     // useful for optimizing joins.
     static generate_join(property:Property, cross_property:Property = null):string {
       var other_property = property.get_other_property(true)
@@ -545,26 +571,15 @@ module Ground {
         case Relationships.one_to_one:
         case Relationships.one_to_many:
           var first_part, second_part
-          if (property.type == 'list') {
+          if (property.type == 'list')
             first_part = other_property.query()
-            var trellis = property.parent
-            second_part = trellis.properties[trellis.primary_key].query()
-          }
-          else {
+          else
             first_part = other.query_primary_key()
-            second_part = property.query()
-          }
-          if (cross_property) {
-            var join = Link_Trellis.create_from_property(cross_property)
-            var identity = join.get_identity_by_trellis(cross_property.other_trellis)
-            return 'JOIN ' + other.get_table_query() +
-              '\nON ' + first_part + ' = '
-              + join.table_name + '.' + identity.name + '\n'
-          }
-          else {
-            return 'JOIN ' + other.get_table_query() +
-              '\nON ' + first_part + ' = ' + second_part + '\n'
-          }
+
+          second_part = Query.get_identity_sql(property, cross_property)
+
+          return 'JOIN ' + other.get_table_query() +
+            '\nON ' + first_part + ' = ' + second_part + '\n'
 
         case Relationships.many_to_many:
           var seeds = {}
@@ -584,21 +599,12 @@ module Ground {
     }
 
     // Returns a sql query string
-    static follow_path(path:string, args:any[], ground:Core):string {
-
-      if (typeof path !== 'string')
-        throw new Error('query path must be a string.')
-
-      path = path.trim()
-
-      if (!path)
-        throw new Error('Empty query path.')
-
-      var tokens = path.split('/')
+    static follow_path(path, args:any[], ground:Core):string {
+      var parts = Ground.path_to_array(path)
       var sql = 'SELECT COUNT(*) AS total\n'
 
 //      var parts = Query.process_tokens(tokens, args, ground)
-      var parts = tokens, cross_property:Property = null, first_trellis
+      var cross_property:Property = null, first_trellis
 
       var trellis:Trellis = first_trellis = ground.sanitize_trellis_argument(parts[0])
       sql += 'FROM ' + trellis.get_plural() + '\n'
@@ -615,7 +621,8 @@ module Ground {
       }
 
       if (args[1]) {
-        sql += ' AND ' + trellis.query_primary_key() + ' = '
+//        sql += ' AND ' + trellis.query_primary_key() + ' = '
+        sql += ' AND ' + Query.get_identity_sql(property, cross_property) + ' = '
           + trellis.properties[trellis.primary_key].get_sql_value(args[1]) + '\n'
       }
 
@@ -625,7 +632,8 @@ module Ground {
       return sql
     }
 
-    private static process_tokens(tokens:string[], args, ground) {
+    private static
+      process_tokens(tokens:string[], args, ground) {
       var result = []
       var trellis
       for (var i = 0; i < tokens.length; ++i) {

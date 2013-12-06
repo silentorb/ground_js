@@ -20,7 +20,8 @@ module Ground {
     ground:Core;
     db:Database;
     user:IUser
-    log_queries:boolean = false;
+    log_queries:boolean = false
+    run_stack
 
     constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
       this.seed = seed;
@@ -201,9 +202,9 @@ module Ground {
         return Math.round(new Date().getTime() / 1000)
 
       if (!value && property.insert == 'author') {
-        if (!this.user)
+        if (!this.user) {
           throw new Error('Cannot insert author into ' + property.parent.name + '.' + property.name + ' because current user is not set.')
-
+        }
         return this.user.id
       }
 
@@ -377,6 +378,11 @@ module Ground {
     }
 
     public run():Promise {
+      if (this.log_queries) {
+        var temp = new Error()
+        this.run_stack = temp['stack']
+      }
+
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
       var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this, trellis));
 

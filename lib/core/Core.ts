@@ -50,6 +50,18 @@ module Ground {
     views?:any[];
   }
 
+  export function path_to_array(path) {
+    if (MetaHub.is_array(path))
+      return path
+
+    path = path.trim()
+
+    if (!path)
+      throw new Error('Empty query path.')
+
+    return path.split('/')
+  }
+
   export class Property_Type {
     name:string;
     property_class;

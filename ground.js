@@ -379,8 +379,10 @@ else
             if (Query.operators.indexOf(operator) === -1)
                 throw new Error("Invalid operator: '" + operator + "'.");
 
-            if (value === null || value === undefined)
-                throw new Error('Cannot add property filter where value is null');
+            if (value === null || value === undefined) {
+                console.log('q', this.run_stack);
+                throw new Error('Cannot add property filter where value is null; property= ' + this.trellis.name + '.' + property + '.');
+            }
 
             this.property_filters.push({
                 property: property,
@@ -789,6 +791,11 @@ else
 
         Query.prototype.run = function () {
             var _this = this;
+            if (this.ground.log_queries) {
+                var temp = new Error();
+                this.run_stack = temp['stack'];
+            }
+
             var properties = this.trellis.get_all_properties();
             return this.run_core().then(function (rows) {
                 return when.all(rows.map(function (row) {
@@ -803,6 +810,21 @@ else
             });
         };
 
+        Query.get_identity_sql = function (property, cross_property) {
+            if (typeof cross_property === "undefined") { cross_property = null; }
+            if (cross_property) {
+                var join = Ground.Link_Trellis.create_from_property(cross_property);
+                var identity = join.get_identity_by_trellis(cross_property.other_trellis);
+                return join.table_name + '.' + identity.name;
+            } else if (property.type == 'list') {
+                var trellis = property.parent;
+
+                return trellis.query_primary_key();
+            } else {
+                return property.query();
+            }
+        };
+
         Query.generate_join = function (property, cross_property) {
             if (typeof cross_property === "undefined") { cross_property = null; }
             var other_property = property.get_other_property(true);
@@ -815,21 +837,14 @@ else
                 case Ground.Relationships.one_to_one:
                 case Ground.Relationships.one_to_many:
                     var first_part, second_part;
-                    if (property.type == 'list') {
+                    if (property.type == 'list')
                         first_part = other_property.query();
-                        var trellis = property.parent;
-                        second_part = trellis.properties[trellis.primary_key].query();
-                    } else {
+else
                         first_part = other.query_primary_key();
-                        second_part = property.query();
-                    }
-                    if (cross_property) {
-                        var join = Ground.Link_Trellis.create_from_property(cross_property);
-                        var identity = join.get_identity_by_trellis(cross_property.other_trellis);
-                        return 'JOIN ' + other.get_table_query() + '\nON ' + first_part + ' = ' + join.table_name + '.' + identity.name + '\n';
-                    } else {
-                        return 'JOIN ' + other.get_table_query() + '\nON ' + first_part + ' = ' + second_part + '\n';
-                    }
+
+                    second_part = Query.get_identity_sql(property, cross_property);
+
+                    return 'JOIN ' + other.get_table_query() + '\nON ' + first_part + ' = ' + second_part + '\n';
 
                 case Ground.Relationships.many_to_many:
                     var seeds = {};
@@ -847,18 +862,10 @@ else
         };
 
         Query.follow_path = function (path, args, ground) {
-            if (typeof path !== 'string')
-                throw new Error('query path must be a string.');
-
-            path = path.trim();
-
-            if (!path)
-                throw new Error('Empty query path.');
-
-            var tokens = path.split('/');
+            var parts = Ground.path_to_array(path);
             var sql = 'SELECT COUNT(*) AS total\n';
 
-            var parts = tokens, cross_property = null, first_trellis;
+            var cross_property = null, first_trellis;
 
             var trellis = first_trellis = ground.sanitize_trellis_argument(parts[0]);
             sql += 'FROM ' + trellis.get_plural() + '\n';
@@ -875,7 +882,7 @@ else
             }
 
             if (args[1]) {
-                sql += ' AND ' + trellis.query_primary_key() + ' = ' + trellis.properties[trellis.primary_key].get_sql_value(args[1]) + '\n';
+                sql += ' AND ' + Query.get_identity_sql(property, cross_property) + ' = ' + trellis.properties[trellis.primary_key].get_sql_value(args[1]) + '\n';
             }
 
             sql += 'WHERE ' + first_trellis.query_primary_key() + ' = ' + first_trellis.properties[first_trellis.primary_key].get_sql_value(args[0]) + '\n';
@@ -1073,9 +1080,9 @@ else
                 return Math.round(new Date().getTime() / 1000);
 
             if (!value && property.insert == 'author') {
-                if (!this.user)
+                if (!this.user) {
                     throw new Error('Cannot insert author into ' + property.parent.name + '.' + property.name + ' because current user is not set.');
-
+                }
                 return this.user.id;
             }
 
@@ -1246,6 +1253,11 @@ else
 
         Update.prototype.run = function () {
             var _this = this;
+            if (this.log_queries) {
+                var temp = new Error();
+                this.run_stack = temp['stack'];
+            }
+
             var tree = this.trellis.get_tree().filter(function (t) {
                 return !t.is_virtual;
             });
@@ -1292,6 +1304,19 @@ var __extends = this.__extends || function (d, b) {
 };
 var Ground;
 (function (Ground) {
+    function path_to_array(path) {
+        if (MetaHub.is_array(path))
+            return path;
+
+        path = path.trim();
+
+        if (!path)
+            throw new Error('Empty query path.');
+
+        return path.split('/');
+    }
+    Ground.path_to_array = path_to_array;
+
     var Property_Type = (function () {
         function Property_Type(name, info, types) {
             if (info.parent) {
@@ -2095,6 +2120,8 @@ else
                     return Math.round(value);
                 case 'string':
                 case 'text':
+                    if (typeof value === 'object')
+                        console.log('v', value);
                     value = value.replace(/'/g, "\\'", value);
                     return "'" + value.replace(/[\r\n]+/, "\n") + "'";
                 case 'bool':

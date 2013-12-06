@@ -197,6 +197,8 @@ module Ground {
           return Math.round(value);
         case 'string':
         case 'text':
+          if (typeof value === 'object')
+            console.log('v', value)
           value = value.replace(/'/g, "\\'", value);
           return "'" + value.replace(/[\r\n]+/, "\n") + "'";
         case 'bool':
