@@ -111,10 +111,8 @@ module Ground {
       if (Query.operators.indexOf(operator) === -1)
         throw new Error("Invalid operator: '" + operator + "'.")
 
-      if (value === null || value === undefined) {
-        console.log('q', this.run_stack)
+      if (value === null || value === undefined)
         throw new Error('Cannot add property filter where value is null; property= ' + this.trellis.name + '.' + property + '.')
-      }
 
       this.property_filters.push({
         property: property,
@@ -222,7 +220,7 @@ module Ground {
 
       var sql = 'SELECT '
       sql += fields.join(",\n")
-      sql += "\nFROM " + this.main_table
+      sql += "\nFROM `" + this.main_table + '`'
       if (joins.length > 0)
         sql += "\n" + joins.join("\n")
 
@@ -374,6 +372,9 @@ module Ground {
       var links = this.trellis.get_all_links((p)=> !p.is_virtual);
 
       var promises = MetaHub.map_to_array(links, (property, name) => {
+        if (property.is_composite_sub)
+          return null
+
         var path = this.get_path(property.name)
 
         if (this.include_links || this.has_expansion(path)) {
@@ -607,7 +608,7 @@ module Ground {
       var cross_property:Property = null, first_trellis
 
       var trellis:Trellis = first_trellis = ground.sanitize_trellis_argument(parts[0])
-      sql += 'FROM ' + trellis.get_plural() + '\n'
+      sql += 'FROM `' + trellis.get_plural() + '`\n'
 
       for (var i = 1; i < parts.length; ++i) {
         var properties = trellis.get_all_properties()

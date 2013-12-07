@@ -149,6 +149,13 @@ module Ground {
       return null
     }
 
+    get_root_table():Table {
+      if (this.parent && this.ground.tables[this.parent.name])
+        return this.parent.get_root_table()
+
+      return this.ground.tables[this.name]
+    }
+
     get_table_name():string {
 //      console.log('get_table_name', this.name, this.is_virtual, this.plural, this.table)
       if (this.is_virtual) {
@@ -175,7 +182,7 @@ module Ground {
       if (this.table && this.table.query)
         return this.table.query;
 
-      return this.get_table_name();
+      return '`' + this.get_table_name() + '`'
     }
 
     get_tree():Trellis[] {
@@ -224,7 +231,7 @@ module Ground {
     }
 
     query_primary_key():string {
-      return this.get_table_name() + '.' + this.properties[this.primary_key].get_field_name();
+      return this.get_table_query() + '.' + this.properties[this.primary_key].get_field_name();
     }
 
     sanitize_property(property) {

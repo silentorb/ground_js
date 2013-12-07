@@ -331,7 +331,7 @@ module Ground {
     }
 
     query():string {
-      return this.parent.get_table_name() + '.' + this.get_field_name()
+      return '`' + this.parent.get_table_name() + '`.' + this.get_field_name()
     }
 
 //    get_referenced_trellis():Trellis {

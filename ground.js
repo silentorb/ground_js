@@ -221,6 +221,13 @@ var Ground;
             return null;
         };
 
+        Trellis.prototype.get_root_table = function () {
+            if (this.parent && this.ground.tables[this.parent.name])
+                return this.parent.get_root_table();
+
+            return this.ground.tables[this.name];
+        };
+
         Trellis.prototype.get_table_name = function () {
             if (this.is_virtual) {
                 if (this.parent) {
@@ -245,7 +252,7 @@ else
             if (this.table && this.table.query)
                 return this.table.query;
 
-            return this.get_table_name();
+            return '`' + this.get_table_name() + '`';
         };
 
         Trellis.prototype.get_tree = function () {
@@ -293,7 +300,7 @@ else
         };
 
         Trellis.prototype.query_primary_key = function () {
-            return this.get_table_name() + '.' + this.properties[this.primary_key].get_field_name();
+            return this.get_table_query() + '.' + this.properties[this.primary_key].get_field_name();
         };
 
         Trellis.prototype.sanitize_property = function (property) {
@@ -379,10 +386,8 @@ else
             if (Query.operators.indexOf(operator) === -1)
                 throw new Error("Invalid operator: '" + operator + "'.");
 
-            if (value === null || value === undefined) {
-                console.log('q', this.run_stack);
+            if (value === null || value === undefined)
                 throw new Error('Cannot add property filter where value is null; property= ' + this.trellis.name + '.' + property + '.');
-            }
 
             this.property_filters.push({
                 property: property,
@@ -492,7 +497,7 @@ else
 
             var sql = 'SELECT ';
             sql += fields.join(",\n");
-            sql += "\nFROM " + this.main_table;
+            sql += "\nFROM `" + this.main_table + '`';
             if (joins.length > 0)
                 sql += "\n" + joins.join("\n");
 
@@ -643,6 +648,9 @@ else
             });
 
             var promises = MetaHub.map_to_array(links, function (property, name) {
+                if (property.is_composite_sub)
+                    return null;
+
                 var path = _this.get_path(property.name);
 
                 if (_this.include_links || _this.has_expansion(path)) {
@@ -868,7 +876,7 @@ else
             var cross_property = null, first_trellis;
 
             var trellis = first_trellis = ground.sanitize_trellis_argument(parts[0]);
-            sql += 'FROM ' + trellis.get_plural() + '\n';
+            sql += 'FROM `' + trellis.get_plural() + '`\n';
 
             for (var i = 1; i < parts.length; ++i) {
                 var properties = trellis.get_all_properties();
@@ -922,6 +930,12 @@ var Ground;
             this.override = true;
             this.main_table = 'node';
             this.log_queries = false;
+            if (typeof seed !== 'object')
+                throw new Error('Seed passed to ' + trellis.name + ' is a ' + (typeof seed) + ' when it should be an object.');
+
+            if (!seed)
+                throw new Error('Seed passed to ' + trellis.name + ' is null');
+
             this.seed = seed;
             this.trellis = trellis;
             this.main_table = this.trellis.get_table_name();
@@ -939,7 +953,7 @@ var Ground;
             if (!id && id !== 0) {
                 return this.create_record(trellis);
             } else {
-                var table = this.ground.tables[trellis.name];
+                var table = trellis.get_root_table();
                 if (table && table.primary_keys && table.primary_keys.length > 0)
                     primary_keys = table.primary_keys;
 else
@@ -957,7 +971,7 @@ else
                 if (!condition_string)
                     throw new Error('Conditions string cannot be empty.');
 
-                var sql = 'SELECT ' + primary_keys.join(', ') + ' FROM ' + trellis.get_table_name() + ' WHERE ' + condition_string;
+                var sql = 'SELECT ' + primary_keys.join(', ') + ' FROM `' + trellis.get_table_name() + '` WHERE ' + condition_string;
 
                 return this.db.query_single(sql).then(function (id_result) {
                     if (!id_result)
@@ -975,17 +989,8 @@ else
             });
         };
 
-        Update.prototype.create_record = function (trellis) {
-            var _this = this;
-            var fields = [];
-            var values = [];
-            var core_properties = trellis.get_core_properties();
+        Update.prototype.update_embedded_seeds = function (core_properties) {
             var promises = [];
-
-            if (core_properties[trellis.primary_key].type == 'guid' && !this.seed[trellis.primary_key]) {
-                this.seed[trellis.primary_key] = uuid.v1();
-            }
-
             for (var name in core_properties) {
                 var property = core_properties[name];
                 var value = this.seed[property.name];
@@ -994,7 +999,20 @@ else
                 }
             }
 
-            return when.all(promises).then(function () {
+            return when.all(promises);
+        };
+
+        Update.prototype.create_record = function (trellis) {
+            var _this = this;
+            var fields = [];
+            var values = [];
+            var core_properties = trellis.get_core_properties();
+
+            if (core_properties[trellis.primary_key].type == 'guid' && !this.seed[trellis.primary_key]) {
+                this.seed[trellis.primary_key] = uuid.v1();
+            }
+
+            return this.update_embedded_seeds(core_properties).then(function () {
                 var add_fields = function (properties, seed) {
                     for (var name in properties) {
                         var property = properties[name];
@@ -1018,7 +1036,7 @@ else
 
                 var field_string = fields.join(', ');
                 var value_string = values.join(', ');
-                var sql = 'INSERT INTO ' + trellis.get_table_name() + ' (' + field_string + ') VALUES (' + value_string + ");\n";
+                var sql = 'INSERT INTO `' + trellis.get_table_name() + '` (' + field_string + ') VALUES (' + value_string + ");\n";
                 if (_this.log_queries)
                     console.log(sql);
 
@@ -1040,30 +1058,32 @@ else
 
         Update.prototype.update_record = function (trellis, id, key_condition) {
             var _this = this;
-            var updates = [];
-            var promises = [];
-            var core_properties = MetaHub.filter(trellis.get_core_properties(), this.is_update_property);
-            for (var name in core_properties) {
-                var property = core_properties[name];
-                if (this.seed[property.name] !== undefined) {
-                    var field_string = '`' + property.get_field_name() + '`';
-                    promises.push(this.get_field_value(property, this.seed).then(function (value) {
-                        updates.push(field_string + ' = ' + value);
-                    }));
-                }
-            }
+            var core_properties = MetaHub.filter(trellis.get_core_properties(), function (p) {
+                return _this.is_update_property(p);
+            });
 
-            return when.all(promises).then(function () {
+            return this.update_embedded_seeds(core_properties).then(function () {
                 var next = function () {
                     return _this.update_links(trellis, id).then(function () {
                         return _this.ground.invoke(trellis.name + '.updated', _this.seed, trellis);
                     });
                 };
 
+                var updates = [];
+
+                for (var name in core_properties) {
+                    var property = core_properties[name];
+                    if (_this.seed[property.name] !== undefined) {
+                        var field_string = '`' + property.get_field_name() + '`';
+                        var value = _this.get_field_value(property, _this.seed);
+                        updates.push(field_string + ' = ' + value);
+                    }
+                }
+
                 if (updates.length === 0)
                     return next();
 
-                var sql = 'UPDATE ' + trellis.get_table_name() + "\n" + 'SET ' + updates.join(', ') + "\n" + 'WHERE ' + key_condition + "\n;";
+                var sql = 'UPDATE `' + trellis.get_table_name() + "`\n" + 'SET ' + updates.join(', ') + "\n" + 'WHERE ' + key_condition + "\n;";
 
                 if (_this.log_queries)
                     console.log(sql);
@@ -1264,6 +1284,8 @@ else
             var invoke_promises = tree.map(function (trellis) {
                 return _this.ground.invoke(trellis.name + '.update', _this, trellis);
             });
+
+            invoke_promises = invoke_promises.concat(this.ground.invoke('*.update', this, this.trellis));
 
             return when.all(invoke_promises).then(function () {
                 var promises = tree.map(function (trellis) {
@@ -1523,8 +1545,6 @@ var Ground;
 
         Core.prototype.load_tables = function (tables) {
             for (var name in tables) {
-                var table_name;
-
                 var table = new Ground.Table(name, this);
                 table.load_from_schema(tables[name]);
                 this.tables[name] = table;
@@ -1928,7 +1948,7 @@ else
                     for (var p in identity.keys) {
                         var key = identity.keys[p], other_key = other_identity.keys[p];
 
-                        conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.get_table_name() + '.' + key.property.name);
+                        conditions.push(this.table_name + '.' + key.name + ' = `' + identity.trellis.get_table_name() + '`.' + key.property.name);
                     }
                 } else {
                     conditions = conditions.concat(this.get_identity_conditions(identity, seed));
@@ -2221,7 +2241,7 @@ else if (field_name != this.name)
         };
 
         Property.prototype.query = function () {
-            return this.parent.get_table_name() + '.' + this.get_field_name();
+            return '`' + this.parent.get_table_name() + '`.' + this.get_field_name();
         };
         return Property;
     })();

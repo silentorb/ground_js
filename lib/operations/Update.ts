@@ -24,6 +24,12 @@ module Ground {
     run_stack
 
     constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
+      if (typeof seed !== 'object')
+        throw new Error('Seed passed to ' + trellis.name + ' is a ' + (typeof seed) + ' when it should be an object.')
+
+      if (!seed)
+        throw new Error('Seed passed to ' + trellis.name + ' is null')
+
       this.seed = seed;
       this.trellis = trellis;
       this.main_table = this.trellis.get_table_name();
@@ -42,7 +48,7 @@ module Ground {
         return this.create_record(trellis);
       }
       else {
-        var table = this.ground.tables[trellis.name];
+        var table = trellis.get_root_table()
         if (table && table.primary_keys && table.primary_keys.length > 0)
           primary_keys = table.primary_keys;
         else
@@ -62,8 +68,8 @@ module Ground {
         if (!condition_string)
           throw new Error('Conditions string cannot be empty.');
 
-        var sql = 'SELECT ' + primary_keys.join(', ') + ' FROM ' + trellis.get_table_name()
-          + ' WHERE ' + condition_string;
+        var sql = 'SELECT ' + primary_keys.join(', ') + ' FROM `' + trellis.get_table_name()
+          + '` WHERE ' + condition_string;
 
         return this.db.query_single(sql)
           .then((id_result) => {
@@ -91,17 +97,8 @@ module Ground {
         })
     }
 
-    private create_record(trellis:Trellis):Promise {
-      var fields:string[] = [];
-      var values = [];
-      var core_properties = trellis.get_core_properties();
+    private update_embedded_seeds(core_properties) {
       var promises = [];
-
-      if (core_properties[trellis.primary_key].type == 'guid' && !this.seed[trellis.primary_key]) {
-        this.seed[trellis.primary_key] = uuid.v1()
-      }
-
-      // Update any embedded seeds before the main update
       for (var name in core_properties) {
         var property = core_properties[name];
         var value = this.seed[property.name]
@@ -111,6 +108,19 @@ module Ground {
       }
 
       return when.all(promises)
+    }
+
+    private create_record(trellis:Trellis):Promise {
+      var fields:string[] = [];
+      var values = [];
+      var core_properties = trellis.get_core_properties();
+
+      if (core_properties[trellis.primary_key].type == 'guid' && !this.seed[trellis.primary_key]) {
+        this.seed[trellis.primary_key] = uuid.v1()
+      }
+
+      // Update any embedded seeds before the main update
+      return this.update_embedded_seeds(core_properties)
         .then(()=> {
           var add_fields = (properties, seed) => {
             for (var name in properties) {
@@ -135,7 +145,7 @@ module Ground {
 
           var field_string = fields.join(', ')
           var value_string = values.join(', ')
-          var sql = 'INSERT INTO ' + trellis.get_table_name() + ' (' + field_string + ') VALUES (' + value_string + ");\n";
+          var sql = 'INSERT INTO `' + trellis.get_table_name() + '` (' + field_string + ') VALUES (' + value_string + ");\n";
           if (this.log_queries)
             console.log(sql);
 
@@ -159,31 +169,33 @@ module Ground {
     }
 
     private update_record(trellis:Trellis, id, key_condition):Promise {
-      var updates = [];
-      var promises = [];
-      var core_properties = MetaHub.filter(trellis.get_core_properties(), this.is_update_property);
-      for (var name in core_properties) {
-        var property = core_properties[name];
-        if (this.seed[property.name] !== undefined) {
-          var field_string = '`' + property.get_field_name() + '`';
-          promises.push(this.get_field_value(property, this.seed).then((value) => {
-            updates.push(field_string + ' = ' + value);
-          }));
-        }
-      }
+      var core_properties = MetaHub.filter(trellis.get_core_properties(), (p)=> this.is_update_property(p));
 
-      return when.all(promises)
+      return this.update_embedded_seeds(core_properties)
         .then(() => {
           var next = ():Promise => {
             return this.update_links(trellis, id)
               .then(()=>this.ground.invoke(trellis.name + '.updated', this.seed, trellis));
           }
 
+          var updates = [];
+
+          // I don't think we need to be worrying about composite properties
+          // here because this should not be updating any identities.
+          for (var name in core_properties) {
+            var property = core_properties[name];
+            if (this.seed[property.name] !== undefined) {
+              var field_string = '`' + property.get_field_name() + '`';
+              var value = this.get_field_value(property, this.seed)
+              updates.push(field_string + ' = ' + value);
+            }
+          }
+
           // Check if there's nothing to add
           if (updates.length === 0)
             return next();
 
-          var sql = 'UPDATE ' + trellis.get_table_name() + "\n" +
+          var sql = 'UPDATE `' + trellis.get_table_name() + "`\n" +
             'SET ' + updates.join(', ') + "\n" +
             'WHERE ' + key_condition + "\n;";
 
@@ -385,6 +397,8 @@ module Ground {
 
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
       var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this, trellis));
+
+      invoke_promises = invoke_promises.concat(this.ground.invoke('*.update', this, this.trellis))
 
       return when.all(invoke_promises)
         .then(()=> {

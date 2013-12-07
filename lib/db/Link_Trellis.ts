@@ -185,7 +185,7 @@ module Ground {
           for (var p in identity.keys) {
             var key = identity.keys[p], other_key = other_identity.keys[p]
 //            conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.query_primary_key())
-            conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.get_table_name() + '.' + key.property.name)
+            conditions.push(this.table_name + '.' + key.name + ' = `' + identity.trellis.get_table_name() + '`.' + key.property.name)
           }
         }
         else {

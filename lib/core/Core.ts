@@ -276,14 +276,7 @@ module Ground {
     }
 
     load_tables(tables:any[]) {
-//      console.log('tables', tables)
       for (var name in tables) {
-        var table_name;
-//        var trellis = this.trellises[name];
-//        if (trellis)
-//          table_name = trellis.get_table_name();
-//        else
-//          table_name = name;
         var table = new Table(name, this);
         table.load_from_schema(tables[name]);
         this.tables[name] = table;
