@@ -17,7 +17,8 @@ module Ground {
   }
 
   export interface Query_Filter {
-    property:string
+    property?:string
+    path?:string
     value
     operator?:string
   }
@@ -70,6 +71,7 @@ module Ground {
     type:string = 'query'
     properties
     source:External_Query_Source
+    sorts:Query_Sort[] = []
 
     filters:string[] = []
     run_stack
@@ -166,20 +168,47 @@ module Ground {
     }
 
     add_sort(sort:Query_Sort) {
-      if (!this.trellis.properties[sort.property])
-        throw new Error(this.trellis.name + ' does not contain sort property: ' + sort.property)
-
-      var sql = this.trellis.properties[sort.property].name
-
-      if (typeof sort.dir === 'string') {
-        var dir = sort.dir.toUpperCase()
-        if (dir == 'ASC')
-          sql += ' ASC'
-        else if (dir == 'DESC')
-          sql += ' DESC'
+      for (var i = 0; i < this.sorts.length; ++i) {
+        if (this.sorts[i].property == sort.property) {
+          this.sorts.splice(i, 1)
+          break
+        }
       }
 
-      return sql
+      this.sorts.push(sort)
+    }
+
+    static process_sorts(sorts:Query_Sort[], trellis:Trellis):string {
+      if (sorts.length == 0)
+        return ''
+
+      if (trellis)
+        var properties = trellis.get_all_properties()
+
+      var items = sorts.map((sort)=> {
+        var sql
+        if (trellis) {
+          if (!properties[sort.property])
+            throw new Error(trellis.name + ' does not contain sort property: ' + sort.property)
+
+          sql = properties[sort.property].query()
+        }
+        else {
+          sql = sort.property
+        }
+
+        if (typeof sort.dir === 'string') {
+          var dir = sort.dir.toUpperCase()
+          if (dir == 'ASC')
+            sql += ' ASC'
+          else if (dir == 'DESC')
+            sql += ' DESC'
+        }
+
+        return 'ORDER BY ' + sql
+      })
+
+      return items.join(', ')
     }
 
     add_wrapper(wrapper:Query_Wrapper) {
@@ -227,6 +256,9 @@ module Ground {
       if (filters.length > 0)
         sql += "\nWHERE " + filters.join(" AND ")
 
+      if (this.sorts.length > 0)
+        sql += ' ' + Query.process_sorts(this.sorts, this.trellis)
+
       if (this.post_clauses.length > 0)
         sql += " " + this.post_clauses.join(" ")
 
@@ -265,13 +297,14 @@ module Ground {
         if (property.name != this.trellis.primary_key || include_primary_key) {
           var sql = property.get_field_query()
           fields.push(sql);
-          trellises[property.parent.name] = property.parent;
+          if (property.parent.name != this.trellis.name)
+            trellises[property.parent.name] = property.parent
         }
       }
       var joins = [];
       for (name in trellises) {
         var trellis = trellises[name];
-        var join = trellis.get_parent_join(this.main_table);
+        var join = this.trellis.get_ancestor_join(trellis);
         if (join)
           joins.push(join);
       }
@@ -299,11 +332,9 @@ module Ground {
       var query = new Query(trellis, this.get_path(property.name));
       query.include_links = false;
       query.expansions = this.expansions;
-      var source = this.source
-      if (typeof source === 'object'
-        && typeof source.properties === 'object'
-        && typeof source.properties[property.name] === 'object') {
-        query.extend(source.properties[property.name])
+      if (typeof this.properties === 'object'
+        && typeof this.properties[property.name] === 'object') {
+        query.extend(this.properties[property.name])
       }
 
       return query
@@ -338,7 +369,11 @@ module Ground {
 
     get_reference_object(row, property:Property) {
       var query = this.create_sub_query(property.other_trellis, property)
-      query.add_key_filter(row[property.name]);
+      var value = row[property.name]
+      if (!value)
+        return when.resolve(value)
+
+      query.add_key_filter(value);
       return query.run()
         .then((rows) => rows[0])
     }
@@ -366,7 +401,11 @@ module Ground {
       var properties = this.trellis.get_core_properties()
       for (name in properties) {
         property = properties[name]
-        row[property.name] = this.ground.convert_value(row[property.name], property.type)
+        var value = row[property.name]
+        if (value === undefined)
+          continue
+
+        row[property.name] = this.ground.convert_value(value, property.type)
       }
 
       var links = this.trellis.get_all_links((p)=> !p.is_virtual);
@@ -474,7 +513,7 @@ module Ground {
       if (source.filters) {
         for (i = 0; i < source.filters.length; ++i) {
           var filter = source.filters[i]
-          this.add_property_filter(filter.property, filter.value, filter.operator)
+          this.add_property_filter(filter.path || filter.property, filter.value, filter.operator)
         }
       }
 
@@ -488,8 +527,15 @@ module Ground {
         var properties = this.trellis.get_all_properties()
         this.properties = {}
         for (var key in source.properties) {
-          if (properties[key])
-            this.properties[key] = properties[key]
+          var property = source.properties[key]
+          if (typeof property == 'string') {
+            this.properties[property] = {
+            }
+          }
+          else {
+            if (property)
+              this.properties[key] = property
+          }
         }
       }
     }
@@ -499,13 +545,16 @@ module Ground {
         return when.resolve(this.row_cache)
 
       var properties
-      if (this.properties && this.properties.length > 0)
-        properties = this.properties
-      else
-        properties = this.trellis.get_all_properties();
+      if (this.properties && Object.keys(this.properties).length > 0) {
+        properties = this.trellis.get_all_properties()
+        properties = MetaHub.map(this.properties, (property, key)=> properties[key])
+      }
+      else {
+        properties = this.trellis.get_all_properties()
+      }
 
       var tree = this.trellis.get_tree()
-      var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', this));
+      var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', this))
 
       return when.all(promises)
         .then(()=> {

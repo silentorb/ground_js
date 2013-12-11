@@ -102,13 +102,17 @@ module Ground {
       return source;
     }
 
-    get_parent_join(main_table:string):string {
-      if (!this.parent)
-        return null;
+    get_ancestor_join(other:Trellis):string {
+//      if (!this.parent)
+//        return null;
 
-      return 'JOIN  ' + this.parent.get_table_query() +
-        ' ON ' + this.parent.query_primary_key() +
-        ' = ' + main_table + '.' + this.properties[this.primary_key].get_field_name();
+      var conditions = this.get_primary_keys().map((property)=>
+          property.query() +
+            ' = ' + other.properties[property.name].query()
+      )
+
+      return 'JOIN  ' + other.get_table_query() +
+        ' ON ' + conditions.join(' AND ');
     }
 
     get_links():Property[] {
