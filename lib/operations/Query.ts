@@ -34,11 +34,12 @@ module Ground {
   }
 
   export interface Property_Query_Source {
+    name:string
     filters?:Query_Filter[]
     sorts?:Query_Sort[]
     expansions?:string[]
     reductions?:string[]
-    properties?:Property_Query_Source[]
+    properties?:any[]
   }
 
   export interface External_Query_Source extends Property_Query_Source {
@@ -285,8 +286,7 @@ module Ground {
     get_fields_and_joins(properties:{ [name: string]: Property
     }, include_primary_key:boolean = true):Internal_Query_Source {
       var name, fields:string[] = [];
-      var trellises:{ [name: string]: Trellis
-      } = {};
+      var trellises = {};
       for (name in properties) {
         var property = properties[name];
         // Virtual properties aren't saved to the database
@@ -526,16 +526,33 @@ module Ground {
       if (source.properties) {
         var properties = this.trellis.get_all_properties()
         this.properties = {}
-        for (var key in source.properties) {
-          var property = source.properties[key]
+        for (var i in source.properties) {
+          var property = source.properties[i]
           if (typeof property == 'string') {
+            if (!properties[property])
+              throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.')
+
             this.properties[property] = {
             }
           }
           else {
+            if (!properties[property.name])
+              throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property.name + '.')
+
             if (property)
-              this.properties[key] = property
+              this.properties[property.name] = property
           }
+        }
+
+        var identities = [ this.trellis.properties[this.trellis.primary_key] ]
+        if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
+          identities = identities.concat(identities[0].composite_properties)
+        }
+
+        for (var k in identities) {
+          var identity = identities[k]
+          if (!this.properties[identity.name])
+            this.properties[identity.name] = {}
         }
       }
     }
