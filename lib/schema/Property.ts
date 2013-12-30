@@ -217,6 +217,18 @@ module Ground {
       throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')')
     }
 
+    get_type():string {
+      if (this.type == 'reference' || this.type == 'list') {
+        var other_property = this.get_other_property(false)
+        if (other_property)
+          return other_property.type
+
+        return this.other_trellis.properties[this.other_trellis.primary_key].type
+      }
+
+      return this.type
+    }
+
 //    get_field_value(value, as_service:boolean = false, update:boolean = false) {
 //      if (typeof value === 'string')
 //        value = value.replace(/'/g, "\\'", value);
@@ -317,7 +329,8 @@ module Ground {
     get_field_query():string {
       var field_name = this.get_field_name()
       var sql = this.query()
-      if (this.type == 'guid')
+      var type = this.get_type()
+      if (type == 'guid')
         sql = "INSERT(INSERT(INSERT(INSERT(HEX(" + sql + ")"
           + ",9,0,'-')"
           + ",14,0,'-')"

@@ -2225,6 +2225,18 @@ else
             throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')');
         };
 
+        Property.prototype.get_type = function () {
+            if (this.type == 'reference' || this.type == 'list') {
+                var other_property = this.get_other_property(false);
+                if (other_property)
+                    return other_property.type;
+
+                return this.other_trellis.properties[this.other_trellis.primary_key].type;
+            }
+
+            return this.type;
+        };
+
         Property.prototype.get_other_id = function (entity) {
             var value = entity[this.other_trellis.primary_key];
             if (value === undefined)
@@ -2297,7 +2309,8 @@ else
         Property.prototype.get_field_query = function () {
             var field_name = this.get_field_name();
             var sql = this.query();
-            if (this.type == 'guid')
+            var type = this.get_type();
+            if (type == 'guid')
                 sql = "INSERT(INSERT(INSERT(INSERT(HEX(" + sql + ")" + ",9,0,'-')" + ",14,0,'-')" + ",19,0,'-')" + ",24,0,'-') AS `" + this.name + '`';
 else if (field_name != this.name)
                 sql += ' AS `' + this.name + '`';
