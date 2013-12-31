@@ -219,7 +219,7 @@ module Ground {
 
     get_type():string {
       if (this.type == 'reference' || this.type == 'list') {
-        var other_property = this.get_other_property(false)
+        var other_property = this.get_other_property()
         if (other_property)
           return other_property.type
 
@@ -260,7 +260,7 @@ module Ground {
       return value;
     }
 
-    get_other_property(create_if_none:boolean = true):Property {
+    get_other_property(create_if_none:boolean = false):Property {
       var property;
       if (this.other_property) {
         return this.other_trellis.properties[this.other_property];
@@ -306,14 +306,21 @@ module Ground {
     }
 
     get_relationship():Relationships {
+      if (this.type != 'list' && this.type != 'reference')
+        return Relationships.none
+
       var field = this.get_field_override();
       if (field && field.relationship) {
         return Relationships[field.relationship];
       }
 
       var other_property = this.get_other_property();
-      if (!other_property)
-        return Relationships.none
+      if (!other_property) {
+        if (this.type == 'list')
+          return Relationships.one_to_many
+        else
+          return Relationships.one_to_one
+      }
 
 //        throw new Error(this.parent.name + '.' + this.name + ' does not have a reciprocal reference.');
 

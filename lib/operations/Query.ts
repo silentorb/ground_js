@@ -346,6 +346,9 @@ module Ground {
         throw new Error('Cannot get many-to-many list when seed id is null.')
 
       var other_property = property.get_other_property();
+      if (!other_property)
+        return when.resolve()
+
       var query = this.create_sub_query(other_property.parent, property);
       if (relationship === Relationships.many_to_many) {
         var seeds = {}
@@ -473,8 +476,7 @@ module Ground {
 //        throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
         var join_seed = {}
         join_seed[property.other_trellis.name] = ':' + property.name + '_filter'
-//        var other_property = property.get_other_property()
-//        join_seed[property.parent.name] =
+
         result.joins.push(Query.generate_property_join(property, join_seed));
       }
       else {

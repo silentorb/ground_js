@@ -616,6 +616,9 @@ else
                 throw new Error('Cannot get many-to-many list when seed id is null.');
 
             var other_property = property.get_other_property();
+            if (!other_property)
+                return when.resolve();
+
             var query = this.create_sub_query(other_property.parent, property);
             if (relationship === Ground.Relationships.many_to_many) {
                 var seeds = {};
@@ -1328,7 +1331,7 @@ else
                 if (other_property.composite_properties) {
                     for (var i = 0; i < other_property.composite_properties.length; ++i) {
                         var secondary = other_property.composite_properties[i];
-                        other[secondary.name] = this.seed[secondary.get_other_property().name];
+                        other[secondary.name] = this.seed[secondary.get_other_property(true).name];
                     }
                 }
             }
@@ -2227,7 +2230,7 @@ else
 
         Property.prototype.get_type = function () {
             if (this.type == 'reference' || this.type == 'list') {
-                var other_property = this.get_other_property(false);
+                var other_property = this.get_other_property();
                 if (other_property)
                     return other_property.type;
 
@@ -2246,7 +2249,7 @@ else
         };
 
         Property.prototype.get_other_property = function (create_if_none) {
-            if (typeof create_if_none === "undefined") { create_if_none = true; }
+            if (typeof create_if_none === "undefined") { create_if_none = false; }
             var property;
             if (this.other_property) {
                 return this.other_trellis.properties[this.other_property];
@@ -2288,14 +2291,21 @@ else
         };
 
         Property.prototype.get_relationship = function () {
+            if (this.type != 'list' && this.type != 'reference')
+                return Relationships.none;
+
             var field = this.get_field_override();
             if (field && field.relationship) {
                 return Relationships[field.relationship];
             }
 
             var other_property = this.get_other_property();
-            if (!other_property)
-                return Relationships.none;
+            if (!other_property) {
+                if (this.type == 'list')
+                    return Relationships.one_to_many;
+else
+                    return Relationships.one_to_one;
+            }
 
             if (this.type == 'list') {
                 if (other_property.type == 'list')
