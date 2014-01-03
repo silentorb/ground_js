@@ -933,7 +933,7 @@ else
 
         Query.query_path = function (path, args, ground) {
             var sql = Query.follow_path(path, args, ground);
-            console.log('query_path', sql);
+
             return ground.db.query_single(sql);
         };
 

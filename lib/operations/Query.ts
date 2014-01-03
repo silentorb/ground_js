@@ -663,7 +663,7 @@ module Ground {
 
     static query_path(path:string, args:any[], ground:Core):Promise {
       var sql = Query.follow_path(path, args, ground)
-      console.log('query_path', sql)
+//      console.log('query_path', sql)
       return ground.db.query_single(sql)
     }
 

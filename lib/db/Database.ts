@@ -57,14 +57,7 @@ module Ground {
 
 
     drop_all_tables():Promise {
-//      return this.query('SET foreign_key_checks = 0')
-//        .then(when.map(this.get_tables(),(table) => {
-//            console.log('table', table);
-//            return this.query('DROP TABLE IF EXISTS ' + table);
-//          }))
-//        .then(()=> this.query('SET foreign_key_checks = 1'));
       return when.map(this.get_tables(), (table) => {
-//        console.log('table', table);
         return this.query('DROP TABLE IF EXISTS `' + table + '`');
       });
     }
