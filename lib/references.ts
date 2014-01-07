@@ -1,5 +1,4 @@
 
-/// <reference path="core/require.ts"/>
 /// <reference path="../defs/when.d.ts"/>
 /// <reference path="../defs/metahub.d.ts"/>
 

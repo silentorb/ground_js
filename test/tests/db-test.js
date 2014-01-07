@@ -48,5 +48,4 @@ buster.testCase("Database test", {
         });
     }
 });
-
 //# sourceMappingURL=db-test.js.map

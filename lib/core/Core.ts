@@ -195,7 +195,7 @@ module Ground {
     }
 
     create_update(trellis, seed:ISeed = {}, user:IUser = null):IUpdate {
-      var trellis = this.sanitize_trellis_argument(trellis)
+      trellis = this.sanitize_trellis_argument(trellis)
 
       // If _deleted is an object then it is a list of links
       // to delete which will be handled by Update.
@@ -237,7 +237,7 @@ module Ground {
     }
 
     update_object(trellis, seed:ISeed = {}, user:IUser = null, as_service:boolean = false):Promise {
-      var trellis = this.sanitize_trellis_argument(trellis);
+      trellis = this.sanitize_trellis_argument(trellis);
 
       // If _deleted is an object then it is a list of links
       // to delete which will be handled by Update.

@@ -21,5 +21,4 @@ buster.testCase("Database test", {
         assert.greater(Object.keys(this.ground.property_types).length, 10);
     }
 });
-
 //# sourceMappingURL=core-test.js.map

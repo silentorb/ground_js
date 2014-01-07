@@ -38,5 +38,4 @@ buster.testCase("Query test", {
 });
 
 require('source-map-support').install();
-
 //# sourceMappingURL=query-test.js.map

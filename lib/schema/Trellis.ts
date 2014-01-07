@@ -53,8 +53,7 @@ module Ground {
       target_trellis.add_property(property_name, this.properties[property_name]);
     }
 
-    get_all_links(filter:(property:Property)=>boolean = null):{ [name: string]: Property;
-    } {
+    get_all_links(filter:(property:Property)=>boolean = null) {
       var result = {};
       var properties = this.get_all_properties();
       for (var name in properties) {
@@ -66,8 +65,7 @@ module Ground {
       return result;
     }
 
-    get_all_properties():{ [name: string]: Property;
-    } {
+    get_all_properties() {
       var result = {}
       var tree = this.get_tree();
       for (var i = 0; i < tree.length; ++i) {
@@ -80,8 +78,7 @@ module Ground {
       return result;
     }
 
-    get_core_properties():{ [name: string]: Property
-    } {
+    get_core_properties() {
       var result = {}
       for (var i in this.properties) {
         var property = this.properties[i];
