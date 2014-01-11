@@ -245,10 +245,10 @@ module Ground {
       if (seed._deleted === true || seed._deleted === 'true')
         return this.delete_object(trellis, seed);
 
-      this.invoke(trellis.name + '.update', seed, trellis);
       var update = new Update(trellis, seed, this);
       update.user = user
       update.log_queries = this.log_updates
+//      this.invoke(trellis.name + '.update', seed, trellis);
       return update.run();
     }
 

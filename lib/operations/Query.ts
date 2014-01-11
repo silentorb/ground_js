@@ -16,11 +16,17 @@ module Ground {
     objects:any[]
   }
 
-  export interface Query_Filter {
+  export interface Query_Filter_Source {
     property?:string
     path?:string
     value
     operator?:string
+  }
+
+  export interface Query_Filter {
+    property:Property
+    value
+    operator:string
   }
 
   export interface Query_Sort {
@@ -35,7 +41,7 @@ module Ground {
 
   export interface Property_Query_Source {
     name:string
-    filters?:Query_Filter[]
+    filters?:Query_Filter_Source[]
     sorts?:Query_Sort[]
     expansions?:string[]
     reductions?:string[]
@@ -51,12 +57,10 @@ module Ground {
     filters?:any[]
     joins?:string[]
     arguments?
-
   }
 
   export class Query {
     ground:Core;
-    main_table:string
     joins:string[] = []
     post_clauses:any[] = []
     limit:string
@@ -77,7 +81,7 @@ module Ground {
     filters:string[] = []
     run_stack
 
-    property_filters:Query_Filter[] = []
+    property_filters:Query_Filter_Source[] = []
 
     public static operators = [
       '=',
@@ -91,7 +95,6 @@ module Ground {
       this.trellis = trellis;
       this.ground = trellis.ground;
       this.db = this.ground.db;
-      this.main_table = trellis.get_table_name();
       if (base_path)
         this.base_path = base_path;
       else
@@ -246,11 +249,11 @@ module Ground {
         filters = this.filters
 
       if (fields.length == 0)
-        throw new Error('No authorized fields found for trellis ' + this.main_table + '.');
+        throw new Error('No authorized fields found for trellis ' + this.trellis.name + '.');
 
       var sql = 'SELECT '
       sql += fields.join(",\n")
-      sql += "\nFROM `" + this.main_table + '`'
+      sql += "\nFROM `" + this.trellis.get_table_name() + '`'
       if (joins.length > 0)
         sql += "\n" + joins.join("\n")
 
@@ -430,7 +433,7 @@ module Ground {
       })
 
       return when.all(promises)
-        .then(()=> this.ground.invoke(this.trellis.name + '.process.row', row, this, this.trellis))
+        .then(()=> this.ground.invoke(this.trellis.name + '.queried', row, this))
         .then(()=> row)
     }
 
@@ -600,11 +603,6 @@ module Ground {
       var properties = this.trellis.get_all_properties();
       return this.run_core()
         .then((rows) => when.all(rows.map((row) => this.process_row(row))))
-    }
-
-    run_single():Promise {
-      return this.run()
-        .then((rows)=> rows[0])
     }
 
     // The cross_property parameter is intended to override the normal trellis with a cross-table;

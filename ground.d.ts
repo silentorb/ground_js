@@ -1,7 +1,7 @@
-
-/// <reference path="when.d.ts" />
-
-/// <reference path="metahub.d.ts" />
+/// <reference path="defs/mysql.d.ts" />
+/// <reference path="defs/when.d.ts" />
+/// <reference path="defs/node.d.ts" />
+/// <reference path="defs/metahub.d.ts" />
 declare var when: any;
 declare module Ground {
     class Database {
@@ -64,11 +64,16 @@ declare module Ground {
     interface IService_Response {
         objects: any[];
     }
-    interface Query_Filter {
+    interface Query_Filter_Source {
         property?: string;
         path?: string;
         value: any;
         operator?: string;
+    }
+    interface Query_Filter {
+        property: Ground.Property;
+        value: any;
+        operator: string;
     }
     interface Query_Sort {
         property: any;
@@ -80,7 +85,7 @@ declare module Ground {
     }
     interface Property_Query_Source {
         name: string;
-        filters?: Query_Filter[];
+        filters?: Query_Filter_Source[];
         sorts?: Query_Sort[];
         expansions?: string[];
         reductions?: string[];
@@ -97,7 +102,6 @@ declare module Ground {
     }
     class Query {
         public ground: Ground.Core;
-        public main_table: string;
         public joins: string[];
         public post_clauses: any[];
         public limit: string;
@@ -116,7 +120,7 @@ declare module Ground {
         public sorts: Query_Sort[];
         public filters: string[];
         public run_stack: any;
-        public property_filters: Query_Filter[];
+        public property_filters: Query_Filter_Source[];
         static operators: string[];
         public each: any;
         private links;
@@ -353,6 +357,7 @@ declare module Ground {
         public is_virtual: boolean;
         public is_composite_sub: boolean;
         public composite_properties: any[];
+        public access: string;
         constructor(name: string, source: Ground.IProperty_Source, trellis: Ground.Trellis);
         public initialize_composite_reference(other_trellis: Ground.Trellis): void;
         public get_data(): Ground.IProperty_Source;
@@ -372,6 +377,26 @@ declare module Ground {
         public query(): string;
     }
 }
-declare module "ground" {
-  export = Ground
+declare module Ground {
+    interface IPager {
+        limit?: any;
+        offset?: any;
+    }
+    class Query_Builder {
+        public ground: Ground.Core;
+        public trellis: Ground.Trellis;
+        public pager: IPager;
+        public type: string;
+        public properties: any;
+        public sorts: Ground.Query_Sort[];
+        public filters: Ground.Query_Filter[];
+        constructor(trellis: Ground.Trellis);
+        public add_filter(property_name: string, value?: any, operator?: string): void;
+        public add_key_filter(value: any): void;
+        public add_sort(sort: Ground.Query_Sort): void;
+    }
+}
+declare module Ground {
+    class Query_Runner {
+    }
 }

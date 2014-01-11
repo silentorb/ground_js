@@ -62,8 +62,10 @@ module Ground {
           // Note I'm not referencing key against all of the trellis properties because
           // I'm assuming that the key is a part of the trellis core properties since
           // it is a primary key.
-          conditions.push(key + ' = ' + trellis.properties[key].get_sql_value(ids[key]));
+          var value = trellis.properties[key].get_sql_value(ids[key])
+          conditions.push(key + ' = ' + value);
         }
+
         var condition_string = conditions.join(' AND ');
         if (!condition_string)
           throw new Error('Conditions string cannot be empty.');
@@ -162,7 +164,7 @@ module Ground {
 
               return this.update_links(trellis, id, true)
                 .then(()=> {
-                  return this.ground.invoke(trellis.name + '.created', this.seed, trellis)
+                  return this.ground.invoke(trellis.name + '.created', this.seed, this)
                 })
             })
         })
@@ -175,7 +177,7 @@ module Ground {
         .then(() => {
           var next = ():Promise => {
             return this.update_links(trellis, id)
-              .then(()=>this.ground.invoke(trellis.name + '.updated', this.seed, trellis));
+              .then(()=>this.ground.invoke(trellis.name + '.updated', this.seed, this));
           }
 
           var updates = [];
@@ -396,9 +398,9 @@ module Ground {
       }
 
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
-      var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this, trellis));
+      var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this.seed, this));
 
-      invoke_promises = invoke_promises.concat(this.ground.invoke('*.update', this, this.trellis))
+      invoke_promises = invoke_promises.concat(this.ground.invoke('*.update', this.seed, this))
 
       return when.all(invoke_promises)
         .then(()=> {

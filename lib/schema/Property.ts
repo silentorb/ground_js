@@ -30,6 +30,7 @@ module Ground {
     is_virtual:boolean = false;
     is_composite_sub:boolean = false
     composite_properties:any[] = null
+    access:string = 'auto' // 'auto' or 'manual'
 
     constructor(name:string, source:IProperty_Source, trellis:Trellis) {
       for (var i in source) {
