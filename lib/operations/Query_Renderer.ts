@@ -3,10 +3,17 @@
 module Ground {
 
   export class Query_Renderer {
+    ground:Core
     fields:string[] = []
     joins:string[] = []
     arguments = {}
     filters:string[] = []
+    post_clauses:any[] = []
+    wrappers:Query_Wrapper[] = []
+
+    constructor(ground:Core) {
+      this.ground = ground
+    }
 
     static get_properties(source:Query_Builder) {
       if (source.properties && Object.keys(source.properties).length > 0) {
@@ -18,10 +25,15 @@ module Ground {
       }
     }
 
+    static generate_property_join(property:Property, seeds) {
+      var join = Link_Trellis.create_from_property(property);
+      return join.generate_join(seeds);
+    }
+
     generate_sql(source:Query_Builder) {
       var properties = Query_Renderer.get_properties(source)
       var data = Query_Renderer.get_fields_and_joins(source, properties)
-      var data2 = Query_Renderer.process_property_filters(source)
+      var data2 = Query_Renderer.process_property_filters(source, this.ground)
       var fields = data.fields.concat(this.fields)
       var joins = data.joins.concat(this.joins, data2.joins)
       var args = MetaHub.concat(this.arguments, data2.arguments)
@@ -40,8 +52,8 @@ module Ground {
       if (filters.length > 0)
         sql += "\nWHERE " + filters.join(" AND ")
 
-      if (this.sorts.length > 0)
-        sql += ' ' + Query.process_sorts(this.sorts, source.trellis)
+      if (source.sorts.length > 0)
+        sql += ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis)
 
       if (this.post_clauses.length > 0)
         sql += " " + this.post_clauses.join(" ")
@@ -92,7 +104,7 @@ module Ground {
     }
 
 
-    private static process_property_filter(source:Query_Builder, filter):Internal_Query_Source {
+    private static process_property_filter(source:Query_Builder, filter, ground:Core):Internal_Query_Source {
       var result = {
         filters: [],
         arguments: {},
@@ -108,7 +120,7 @@ module Ground {
       }
 
       if (value !== null)
-        value = this.ground.convert_value(value, property.type);
+        value = ground.convert_value(value, property.type);
 
       if (value === null || value === undefined) {
         throw new Error('Query property filter ' + placeholder + ' is null.')
@@ -119,7 +131,7 @@ module Ground {
         var join_seed = {}
         join_seed[property.other_trellis.name] = ':' + property.name + '_filter'
 
-        result.joins.push(Query.generate_property_join(property, join_seed));
+        result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
       }
       else {
         if (filter.operator.toLowerCase() == 'like') {
@@ -140,13 +152,47 @@ module Ground {
       return result;
     }
 
-  static process_property_filters(source:Query_Builder):Internal_Query_Source {
+    static process_property_filters(source:Query_Builder, ground:Core):Internal_Query_Source {
       var result = {}
-      for (var i in this.property_filters) {
-        var filter = this.property_filters[i]
-        MetaHub.extend(result, Query_Renderer.process_property_filter(source, filter))
+      for (var i in source.filters) {
+        var filter = source.filters[i]
+        MetaHub.extend(result, Query_Renderer.process_property_filter(source, filter, ground))
       }
       return result
+    }
+
+
+    static process_sorts(sorts:Query_Sort[], trellis:Trellis):string {
+      if (sorts.length == 0)
+        return ''
+
+      if (trellis)
+        var properties = trellis.get_all_properties()
+
+      var items = sorts.map((sort)=> {
+        var sql
+        if (trellis) {
+          if (!properties[sort.property])
+            throw new Error(trellis.name + ' does not contain sort property: ' + sort.property)
+
+          sql = properties[sort.property].query()
+        }
+        else {
+          sql = sort.property
+        }
+
+        if (typeof sort.dir === 'string') {
+          var dir = sort.dir.toUpperCase()
+          if (dir == 'ASC')
+            sql += ' ASC'
+          else if (dir == 'DESC')
+            sql += ' DESC'
+        }
+
+        return 'ORDER BY ' + sql
+      })
+
+      return items.join(', ')
     }
 
   }

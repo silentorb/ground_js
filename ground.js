@@ -1,4 +1,4 @@
-var when = require('when');
+var MetaHub = require('metahub');var when = require('when');
 
 var Ground;
 (function (Ground) {
@@ -1519,7 +1519,7 @@ var Ground;
             if (typeof base_path === "undefined") { base_path = ''; }
             var trellis = this.sanitize_trellis_argument(trellis_name);
 
-            return new Ground.Query(trellis, base_path);
+            return new Ground.Query_Builder(trellis);
         };
 
         Core.prototype.create_update = function (trellis, seed, user) {
@@ -2092,6 +2092,17 @@ var Ground;
             }
         };
 
+        Property.prototype.fullname = function () {
+            return this.parent.name + '.' + this.name;
+        };
+
+        Property.prototype.get_composite = function () {
+            if (this.composite_properties)
+                return [this].concat(this.composite_properties);
+
+            return [this];
+        };
+
         Property.prototype.get_data = function () {
             var result = {
                 type: this.type
@@ -2161,6 +2172,24 @@ var Ground;
                 throw new Error(this.name + ' could not find valid field type: ' + this.type);
 
             return property_type.get_field_type();
+        };
+
+        Property.prototype.get_identity = function (seed) {
+            var composite = this.get_composite();
+            if (composite.length == 1)
+                return seed[composite[0].name];
+
+            var result = {};
+            for (var i in composite) {
+                var c = composite[i];
+                var other = c.get_other_property(false);
+                if (!other)
+                    throw new Error('Could not get composite identity for ' + c.fullname() + '.');
+
+                result[other.name] = seed[c.name];
+            }
+
+            return result;
         };
 
         Property.prototype.get_seed_name = function () {
@@ -2338,6 +2367,7 @@ var Ground;
         function Query_Builder(trellis) {
             this.type = 'query';
             this.sorts = [];
+            this.include_links = false;
             this.filters = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
@@ -2377,9 +2407,73 @@ var Ground;
             this.sorts.push(sort);
         };
 
+        Query_Builder.prototype.create_runner = function () {
+            return new Ground.Query_Runner(this);
+        };
+
+        Query_Builder.create_join_filter = function (property, seed) {
+            var value = property.get_identity(seed);
+            if (value === undefined || value === null)
+                throw new Error();
+            return {
+                property: property.get_other_property(true),
+                value: value,
+                operator: '='
+            };
+        };
+
+        Query_Builder.prototype.extend = function (source) {
+            var i;
+            this.source = source;
+
+            if (source.filters) {
+                for (i = 0; i < source.filters.length; ++i) {
+                    var filter = source.filters[i];
+                    this.add_filter(filter.path || filter.property, filter.value, filter.operator);
+                }
+            }
+
+            if (source.sorts) {
+                for (i = 0; i < source.sorts.length; ++i) {
+                    this.add_sort(source.sorts[i]);
+                }
+            }
+
+            if (source.properties) {
+                var properties = this.trellis.get_all_properties();
+                this.properties = {};
+                for (var i in source.properties) {
+                    var property = source.properties[i];
+                    if (typeof property == 'string') {
+                        if (!properties[property])
+                            throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.');
+
+                        this.properties[property] = {};
+                    } else {
+                        if (!properties[property.name])
+                            throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property.name + '.');
+
+                        if (property)
+                            this.properties[property.name] = property;
+                    }
+                }
+
+                var identities = [this.trellis.properties[this.trellis.primary_key]];
+                if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
+                    identities = identities.concat(identities[0].composite_properties);
+                }
+
+                for (var k in identities) {
+                    var identity = identities[k];
+                    if (!this.properties[identity.name])
+                        this.properties[identity.name] = {};
+                }
+            }
+        };
+
         Query_Builder.prototype.run = function () {
             var runner = new Ground.Query_Runner(this);
-            return runner.run(this);
+            return runner.run();
         };
 
         Query_Builder.prototype.run_single = function () {
@@ -2394,11 +2488,14 @@ var Ground;
 var Ground;
 (function (Ground) {
     var Query_Renderer = (function () {
-        function Query_Renderer() {
+        function Query_Renderer(ground) {
             this.fields = [];
             this.joins = [];
             this.arguments = {};
             this.filters = [];
+            this.post_clauses = [];
+            this.wrappers = [];
+            this.ground = ground;
         }
         Query_Renderer.get_properties = function (source) {
             if (source.properties && Object.keys(source.properties).length > 0) {
@@ -2411,10 +2508,15 @@ var Ground;
             }
         };
 
+        Query_Renderer.generate_property_join = function (property, seeds) {
+            var join = Ground.Link_Trellis.create_from_property(property);
+            return join.generate_join(seeds);
+        };
+
         Query_Renderer.prototype.generate_sql = function (source) {
             var properties = Query_Renderer.get_properties(source);
             var data = Query_Renderer.get_fields_and_joins(source, properties);
-            var data2 = Query_Renderer.process_property_filters(source);
+            var data2 = Query_Renderer.process_property_filters(source, this.ground);
             var fields = data.fields.concat(this.fields);
             var joins = data.joins.concat(this.joins, data2.joins);
             var args = MetaHub.concat(this.arguments, data2.arguments);
@@ -2432,8 +2534,8 @@ var Ground;
             if (filters.length > 0)
                 sql += "\nWHERE " + filters.join(" AND ");
 
-            if (this.sorts.length > 0)
-                sql += ' ' + Ground.Query.process_sorts(this.sorts, source.trellis);
+            if (source.sorts.length > 0)
+                sql += ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis);
 
             if (this.post_clauses.length > 0)
                 sql += " " + this.post_clauses.join(" ");
@@ -2483,7 +2585,7 @@ var Ground;
             };
         };
 
-        Query_Renderer.process_property_filter = function (source, filter) {
+        Query_Renderer.process_property_filter = function (source, filter, ground) {
             var result = {
                 filters: [],
                 arguments: {},
@@ -2499,7 +2601,7 @@ var Ground;
             }
 
             if (value !== null)
-                value = this.ground.convert_value(value, property.type);
+                value = ground.convert_value(value, property.type);
 
             if (value === null || value === undefined) {
                 throw new Error('Query property filter ' + placeholder + ' is null.');
@@ -2509,7 +2611,7 @@ var Ground;
                 var join_seed = {};
                 join_seed[property.other_trellis.name] = ':' + property.name + '_filter';
 
-                result.joins.push(Ground.Query.generate_property_join(property, join_seed));
+                result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
             } else {
                 if (filter.operator.toLowerCase() == 'like') {
                     result.filters.push(property.query() + ' LIKE ' + placeholder);
@@ -2528,13 +2630,45 @@ var Ground;
             return result;
         };
 
-        Query_Renderer.process_property_filters = function (source) {
+        Query_Renderer.process_property_filters = function (source, ground) {
             var result = {};
-            for (var i in this.property_filters) {
-                var filter = this.property_filters[i];
-                MetaHub.extend(result, Query_Renderer.process_property_filter(source, filter));
+            for (var i in source.filters) {
+                var filter = source.filters[i];
+                MetaHub.extend(result, Query_Renderer.process_property_filter(source, filter, ground));
             }
             return result;
+        };
+
+        Query_Renderer.process_sorts = function (sorts, trellis) {
+            if (sorts.length == 0)
+                return '';
+
+            if (trellis)
+                var properties = trellis.get_all_properties();
+
+            var items = sorts.map(function (sort) {
+                var sql;
+                if (trellis) {
+                    if (!properties[sort.property])
+                        throw new Error(trellis.name + ' does not contain sort property: ' + sort.property);
+
+                    sql = properties[sort.property].query();
+                } else {
+                    sql = sort.property;
+                }
+
+                if (typeof sort.dir === 'string') {
+                    var dir = sort.dir.toUpperCase();
+                    if (dir == 'ASC')
+                        sql += ' ASC';
+                    else if (dir == 'DESC')
+                        sql += ' DESC';
+                }
+
+                return 'ORDER BY ' + sql;
+            });
+
+            return items.join(', ');
         };
         return Query_Renderer;
     })();
@@ -2543,13 +2677,129 @@ var Ground;
 var Ground;
 (function (Ground) {
     var Query_Runner = (function () {
-        function Query_Runner(source) {
+        function Query_Runner(source, include_links) {
+            if (typeof include_links === "undefined") { include_links = true; }
             this.source = source;
             this.ground = source.ground;
-            this.renderer = new Ground.Query_Renderer();
+            this.renderer = new Ground.Query_Renderer(this.ground);
+            this.include_links = include_links;
         }
-        Query_Runner.prototype.run_core = function (source) {
+        Query_Runner.generate_property_join = function (property, seeds) {
+            var join = Ground.Link_Trellis.create_from_property(property);
+            return join.generate_join(seeds);
+        };
+
+        Query_Runner.create_sub_query = function (trellis, property, source) {
+            var query = new Ground.Query_Builder(trellis);
+            query.include_links = false;
+            if (typeof source.properties === 'object' && typeof source.properties[property.name] === 'object') {
+                query.extend(source.properties[property.name]);
+            }
+
+            return query;
+        };
+
+        Query_Runner.get_many_list = function (seed, property, relationship, source) {
+            var id = seed[property.parent.primary_key];
+            if (id === undefined || id === null)
+                throw new Error('Cannot get many-to-many list when seed id is null.');
+
+            var other_property = property.get_other_property();
+            if (!other_property)
+                return when.resolve();
+
+            var query = Query_Runner.create_sub_query(other_property.parent, property, source);
+            if (relationship === 3 /* many_to_many */) {
+                query.filters.push(Ground.Query_Builder.create_join_filter(property, seed));
+            } else if (relationship === 2 /* one_to_many */)
+                query.add_filter(other_property.name, id);
+
+            return query.run();
+        };
+
+        Query_Runner.get_path = function () {
+            var args = [];
+            for (var _i = 0; _i < (arguments.length - 0); _i++) {
+                args[_i] = arguments[_i + 0];
+            }
+            var items = [];
+
+            items = items.concat(args);
+            return items.join('/');
+        };
+
+        Query_Runner.get_reference_object = function (row, property, source) {
+            var query = Query_Runner.create_sub_query(property.other_trellis, property, source);
+            var value = row[property.name];
+            if (!value)
+                return when.resolve(value);
+
+            query.add_key_filter(value);
+            return query.run().then(function (rows) {
+                return rows[0];
+            });
+        };
+
+        Query_Runner.prototype.process_row = function (row, source) {
             var _this = this;
+            var name, property;
+
+            var properties = source.trellis.get_core_properties();
+            for (name in properties) {
+                property = properties[name];
+                var value = row[property.name];
+                if (value === undefined)
+                    continue;
+
+                row[property.name] = this.ground.convert_value(value, property.type);
+            }
+
+            var links = source.trellis.get_all_links(function (p) {
+                return !p.is_virtual;
+            });
+
+            var promises = MetaHub.map_to_array(links, function (property, name) {
+                if (property.is_composite_sub)
+                    return null;
+
+                var path = Query_Runner.get_path(property.name);
+
+                if (_this.include_links) {
+                    return _this.query_link_property(row, property, source).then(function (value) {
+                        row[name] = value;
+                        return row;
+                    });
+                }
+
+                return null;
+            });
+
+            return when.all(promises).then(function () {
+                return _this.ground.invoke(source.trellis.name + '.queried', row, _this);
+            }).then(function () {
+                return row;
+            });
+        };
+
+        Query_Runner.prototype.query_link_property = function (seed, property, source) {
+            var relationship = property.get_relationship();
+
+            switch (relationship) {
+                case 1 /* one_to_one */:
+                    return Query_Runner.get_reference_object(seed, property, source);
+                    break;
+                case 2 /* one_to_many */:
+                case 3 /* many_to_many */:
+                    return Query_Runner.get_many_list(seed, property, relationship, source);
+                    break;
+            }
+
+            throw new Error('Could not find relationship: ' + relationship + '.');
+        };
+
+        Query_Runner.prototype.run_core = function () {
+            var _this = this;
+            var source = this.source;
             if (this.row_cache)
                 return when.resolve(this.row_cache);
 
@@ -2571,23 +2821,24 @@ var Ground;
             });
         };
 
-        Query_Runner.prototype.run = function (source) {
+        Query_Runner.prototype.run = function () {
             var _this = this;
+            var source = this.source;
             if (this.ground.log_queries) {
                 var temp = new Error();
                 this.run_stack = temp['stack'];
             }
 
             var properties = source.trellis.get_all_properties();
-            return this.run_core(source).then(function (rows) {
+            return this.run_core().then(function (rows) {
                 return when.all(rows.map(function (row) {
-                    return _this.process_row(row);
+                    return _this.process_row(row, source);
                 }));
             });
         };
 
-        Query_Runner.prototype.run_single = function (source) {
-            return this.run(source).then(function (rows) {
+        Query_Runner.prototype.run_single = function () {
+            return this.run().then(function (rows) {
                 return rows[0];
             });
         };

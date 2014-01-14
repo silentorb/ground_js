@@ -188,10 +188,10 @@ module Ground {
 //      return new Query(trellis, base_path);
 //    }
 
-    create_query(trellis_name:string, base_path = ''):Query {
+    create_query(trellis_name:string, base_path = ''):Query_Builder {
       var trellis = this.sanitize_trellis_argument(trellis_name);
 
-      return new Query(trellis, base_path);
+      return new Query_Builder(trellis);
     }
 
     create_update(trellis, seed:ISeed = {}, user:IUser = null):IUpdate {

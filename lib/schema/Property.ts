@@ -66,6 +66,17 @@ module Ground {
       }
     }
 
+    fullname():string {
+      return this.parent.name + '.' + this.name
+    }
+
+    get_composite() {
+      if (this.composite_properties)
+      return [ this ].concat(this.composite_properties)
+
+      return [ this ]
+    }
+
     get_data():IProperty_Source {
       var result:IProperty_Source = {
         type: this.type
@@ -134,6 +145,24 @@ module Ground {
         throw new Error(this.name + ' could not find valid field type: ' + this.type);
 
       return property_type.get_field_type();
+    }
+
+    get_identity(seed) {
+      var composite = this.get_composite()
+      if (composite.length == 1)
+        return seed[composite[0].name]
+
+      var result = {}
+      for (var i in composite) {
+        var c = composite[i]
+        var other = c.get_other_property(false)
+        if (!other)
+          throw new Error('Could not get composite identity for ' + c.fullname() + '.');
+
+        result[other.name] = seed[c.name]
+      }
+
+      return result;
     }
 
 //    static get_field_value_sync(value) {

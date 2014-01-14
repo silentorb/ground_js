@@ -23,17 +23,6 @@ module Ground {
     operator?:string
   }
 
-  export interface Query_Filter {
-    property:Property
-    value
-    operator:string
-  }
-
-  export interface Query_Sort {
-    property
-    dir?
-  }
-
   export interface Query_Wrapper {
     start:string
     end:string
