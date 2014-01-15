@@ -147,24 +147,6 @@ module Ground {
       return property_type.get_field_type();
     }
 
-    get_identity(seed) {
-      var composite = this.get_composite()
-      if (composite.length == 1)
-        return seed[composite[0].name]
-
-      var result = {}
-      for (var i in composite) {
-        var c = composite[i]
-        var other = c.get_other_property(false)
-        if (!other)
-          throw new Error('Could not get composite identity for ' + c.fullname() + '.');
-
-        result[other.name] = seed[c.name]
-      }
-
-      return result;
-    }
-
 //    static get_field_value_sync(value) {
 //      if (typeof value === 'string') {
 //        value = value.replace(/'/g, "\\'", value);

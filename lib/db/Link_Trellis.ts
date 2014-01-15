@@ -148,6 +148,8 @@ module Ground {
         var value = seed[key.property.name]
         if (typeof value === 'function')
           value == value()
+        else if (typeof value === 'string' && value[0] == ':')
+          value = value
         else
           value = key.property.get_sql_value(value)
 
@@ -184,7 +186,6 @@ module Ground {
           var other_identity:Identity = this.identities[1 - i]
           for (var p in identity.keys) {
             var key = identity.keys[p], other_key = other_identity.keys[p]
-//            conditions.push(this.table_name + '.' + key.name + ' = ' + identity.trellis.query_primary_key())
             conditions.push(this.table_name + '.' + key.name + ' = `' + identity.trellis.get_table_name() + '`.' + key.property.name)
           }
         }

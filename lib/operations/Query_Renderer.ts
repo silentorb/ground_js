@@ -4,12 +4,13 @@ module Ground {
 
   export class Query_Renderer {
     ground:Core
-    fields:string[] = []
-    joins:string[] = []
-    arguments = {}
-    filters:string[] = []
-    post_clauses:any[] = []
-    wrappers:Query_Wrapper[] = []
+//    fields:string[] = []
+//    joins:string[] = []
+//    arguments = {}
+//    filters:string[] = []
+//    post_clauses:any[] = []
+
+    static counter = 1
 
     constructor(ground:Core) {
       this.ground = ground
@@ -27,6 +28,7 @@ module Ground {
 
     static generate_property_join(property:Property, seeds) {
       var join = Link_Trellis.create_from_property(property);
+      console.log('join', property.name, seeds)
       return join.generate_join(seeds);
     }
 
@@ -34,11 +36,10 @@ module Ground {
       var properties = Query_Renderer.get_properties(source)
       var data = Query_Renderer.get_fields_and_joins(source, properties)
       var data2 = Query_Renderer.process_property_filters(source, this.ground)
-      var fields = data.fields.concat(this.fields)
-      var joins = data.joins.concat(this.joins, data2.joins)
-      var args = MetaHub.concat(this.arguments, data2.arguments)
-      var filters = data2.filters ?
-        this.filters.concat(data2.filters) : []
+      var fields = data.fields
+      var joins = data.joins.concat(data2.joins)
+      var args = data2.arguments
+      var filters = data2.filters || []
 
       if (fields.length == 0)
         throw new Error('No authorized fields found for trellis ' + source.trellis.name + '.');
@@ -55,18 +56,20 @@ module Ground {
       if (source.sorts.length > 0)
         sql += ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis)
 
-      if (this.post_clauses.length > 0)
-        sql += " " + this.post_clauses.join(" ")
+//      if (this.post_clauses.length > 0)
+//        sql += " " + this.post_clauses.join(" ")
 
-      for (var i = 0; i < this.wrappers.length; ++i) {
-        var wrapper = this.wrappers[i]
-        sql = wrapper.start + sql + wrapper.end
+      for (var i = 0; i < source.transforms.length; ++i) {
+        var transform = source.transforms[i]
+        var temp_table = 'transform_' + (i + 1)
+        sql = 'SELECT * FROM (' + sql + ' ) ' + temp_table + ' ' + transform.clause
       }
 
       for (var pattern in args) {
         var value = args[pattern];
+//        console.log('arg', pattern, value)
 //        sql = sql.replace(new RegExp(pattern), Property.get_sql_value(value));
-        sql = sql.replace(new RegExp(pattern), value);
+        sql = sql.replace(new RegExp(pattern, 'g'), value);
       }
 
       return sql;
@@ -103,7 +106,6 @@ module Ground {
       }
     }
 
-
     private static process_property_filter(source:Query_Builder, filter, ground:Core):Internal_Query_Source {
       var result = {
         filters: [],
@@ -113,7 +115,10 @@ module Ground {
       var property = source.trellis.sanitize_property(filter.property);
       var value = filter.value;
 
-      var placeholder = ':' + property.name + '_filter';
+      var placeholder = ':' + property.name + '_filter' + Query_Renderer.counter++;
+      if (Query_Renderer.counter > 10000)
+        Query_Renderer.counter = 1
+
       if (value === 'null' && property.type != 'string') {
         result.filters.push(property.query() + ' IS NULL');
         return result;
@@ -128,8 +133,9 @@ module Ground {
 
       if (property.get_relationship() == Relationships.many_to_many) {
 //        throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
-        var join_seed = {}
-        join_seed[property.other_trellis.name] = ':' + property.name + '_filter'
+        var join_seed = {}, s = {}
+        s[property.other_trellis.primary_key] = placeholder
+        join_seed[property.other_trellis.name] = s
 
         result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
       }

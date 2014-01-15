@@ -18,6 +18,10 @@ module Ground {
     dir?
   }
 
+  export interface Query_Transform{
+    clause:string // A transitional hack.  This isn't something that could be used by a public service.
+  }
+
   export class Query_Builder {
     ground:Core
     trellis:Trellis
@@ -27,7 +31,8 @@ module Ground {
 //    source:External_Query_Source
     sorts:Query_Sort[] = []
     source:External_Query_Source
-    include_links:boolean = false
+    include_links:boolean = true
+    transforms:Query_Transform[] = []
 
     filters:Query_Filter[] = []
 
@@ -37,7 +42,8 @@ module Ground {
     }
 
     add_filter(property_name:string, value = null, operator:string = '=') {
-      var property = this.trellis.properties[property_name]
+      var properties = this.trellis.get_all_properties()
+      var property = properties[property_name]
       if (!property)
         throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.')
 
@@ -69,14 +75,20 @@ module Ground {
       this.sorts.push(sort)
     }
 
+    add_transform_clause(clause:string) {
+      this.transforms.push({
+        clause: clause
+      })
+    }
+
     create_runner():Query_Runner {
       return new Query_Runner(this)
     }
 
     static create_join_filter(property:Property, seed):Query_Filter {
-      var value = property.get_identity(seed)
+      var value = property.parent.get_identity(seed)
       if (value === undefined || value === null)
-        throw new Error()
+        throw new Error(property.fullname() + ' could not get a valid identity from the provided seed.')
       return {
         property: property.get_other_property(true),
         value: value,
@@ -133,6 +145,14 @@ module Ground {
             this.properties[identity.name] = {}
         }
       }
+    }
+
+    get_primary_key_value() {
+      var filters = this.filters.filter((filter)=>filter.property.name == this.trellis.primary_key)
+      if (filters.length > 0)
+        return filters[0].value
+
+      return undefined
     }
 
     run():Promise {

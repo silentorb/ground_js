@@ -8,13 +8,11 @@ module Ground {
     private row_cache
     ground:Core
     renderer:Query_Renderer
-    include_links:boolean
 
-    constructor(source:Query_Builder, include_links:boolean = true) {
+    constructor(source:Query_Builder) {
       this.source = source
       this.ground = source.ground
       this.renderer = new Query_Renderer(this.ground)
-      this.include_links = include_links
     }
 
     private static generate_property_join(property:Property, seeds) {
@@ -96,7 +94,7 @@ module Ground {
 
         var path = Query_Runner.get_path(property.name)
 
-        if (this.include_links) {// || this.has_expansion(path)) {
+        if (source.include_links) {// || this.has_expansion(path)) {
           return this.query_link_property(row, property, source).then((value) => {
             row[name] = value
             return row
@@ -140,7 +138,7 @@ module Ground {
           var sql = this.renderer.generate_sql(source)
           sql = sql.replace(/\r/g, "\n");
           if (this.ground.log_queries)
-            console.log('query', sql);
+            console.log('\nquery', sql + '\n');
 
 //          var args = MetaHub.values(this.arguments).concat(args);
           return this.ground.db.query(sql)

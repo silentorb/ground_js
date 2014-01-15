@@ -176,6 +176,20 @@ var Ground;
             return source;
         };
 
+        Trellis.prototype.get_identity = function (seed) {
+            var composite = this.properties[this.primary_key].get_composite().filter(function (x) {
+                return seed[x.name] !== undefined;
+            });
+
+            var result = {};
+            for (var i in composite) {
+                var c = composite[i];
+                result[c.name] = seed[c.name];
+            }
+
+            return result;
+        };
+
         Trellis.prototype.get_ancestor_join = function (other) {
             var conditions = this.get_primary_keys().map(function (property) {
                 return property.query() + ' = ' + other.properties[property.name].query();
@@ -1975,6 +1989,8 @@ var Ground;
                 var value = seed[key.property.name];
                 if (typeof value === 'function')
                     value == value();
+                else if (typeof value === 'string' && value[0] == ':')
+                    value = value;
                 else
                     value = key.property.get_sql_value(value);
 
@@ -2011,7 +2027,6 @@ var Ground;
                     var other_identity = this.identities[1 - i];
                     for (var p in identity.keys) {
                         var key = identity.keys[p], other_key = other_identity.keys[p];
-
                         conditions.push(this.table_name + '.' + key.name + ' = `' + identity.trellis.get_table_name() + '`.' + key.property.name);
                     }
                 } else {
@@ -2172,24 +2187,6 @@ var Ground;
                 throw new Error(this.name + ' could not find valid field type: ' + this.type);
 
             return property_type.get_field_type();
-        };
-
-        Property.prototype.get_identity = function (seed) {
-            var composite = this.get_composite();
-            if (composite.length == 1)
-                return seed[composite[0].name];
-
-            var result = {};
-            for (var i in composite) {
-                var c = composite[i];
-                var other = c.get_other_property(false);
-                if (!other)
-                    throw new Error('Could not get composite identity for ' + c.fullname() + '.');
-
-                result[other.name] = seed[c.name];
-            }
-
-            return result;
         };
 
         Property.prototype.get_seed_name = function () {
@@ -2367,7 +2364,8 @@ var Ground;
         function Query_Builder(trellis) {
             this.type = 'query';
             this.sorts = [];
-            this.include_links = false;
+            this.include_links = true;
+            this.transforms = [];
             this.filters = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
@@ -2375,7 +2373,8 @@ var Ground;
         Query_Builder.prototype.add_filter = function (property_name, value, operator) {
             if (typeof value === "undefined") { value = null; }
             if (typeof operator === "undefined") { operator = '='; }
-            var property = this.trellis.properties[property_name];
+            var properties = this.trellis.get_all_properties();
+            var property = properties[property_name];
             if (!property)
                 throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.');
 
@@ -2407,14 +2406,20 @@ var Ground;
             this.sorts.push(sort);
         };
 
+        Query_Builder.prototype.add_transform_clause = function (clause) {
+            this.transforms.push({
+                clause: clause
+            });
+        };
+
         Query_Builder.prototype.create_runner = function () {
             return new Ground.Query_Runner(this);
         };
 
         Query_Builder.create_join_filter = function (property, seed) {
-            var value = property.get_identity(seed);
+            var value = property.parent.get_identity(seed);
             if (value === undefined || value === null)
-                throw new Error();
+                throw new Error(property.fullname() + ' could not get a valid identity from the provided seed.');
             return {
                 property: property.get_other_property(true),
                 value: value,
@@ -2471,6 +2476,17 @@ var Ground;
             }
         };
 
+        Query_Builder.prototype.get_primary_key_value = function () {
+            var _this = this;
+            var filters = this.filters.filter(function (filter) {
+                return filter.property.name == _this.trellis.primary_key;
+            });
+            if (filters.length > 0)
+                return filters[0].value;
+
+            return undefined;
+        };
+
         Query_Builder.prototype.run = function () {
             var runner = new Ground.Query_Runner(this);
             return runner.run();
@@ -2489,12 +2505,6 @@ var Ground;
 (function (Ground) {
     var Query_Renderer = (function () {
         function Query_Renderer(ground) {
-            this.fields = [];
-            this.joins = [];
-            this.arguments = {};
-            this.filters = [];
-            this.post_clauses = [];
-            this.wrappers = [];
             this.ground = ground;
         }
         Query_Renderer.get_properties = function (source) {
@@ -2510,6 +2520,7 @@ var Ground;
 
         Query_Renderer.generate_property_join = function (property, seeds) {
             var join = Ground.Link_Trellis.create_from_property(property);
+            console.log('join', property.name, seeds);
             return join.generate_join(seeds);
         };
 
@@ -2517,10 +2528,10 @@ var Ground;
             var properties = Query_Renderer.get_properties(source);
             var data = Query_Renderer.get_fields_and_joins(source, properties);
             var data2 = Query_Renderer.process_property_filters(source, this.ground);
-            var fields = data.fields.concat(this.fields);
-            var joins = data.joins.concat(this.joins, data2.joins);
-            var args = MetaHub.concat(this.arguments, data2.arguments);
-            var filters = data2.filters ? this.filters.concat(data2.filters) : [];
+            var fields = data.fields;
+            var joins = data.joins.concat(data2.joins);
+            var args = data2.arguments;
+            var filters = data2.filters || [];
 
             if (fields.length == 0)
                 throw new Error('No authorized fields found for trellis ' + source.trellis.name + '.');
@@ -2537,18 +2548,16 @@ var Ground;
             if (source.sorts.length > 0)
                 sql += ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis);
 
-            if (this.post_clauses.length > 0)
-                sql += " " + this.post_clauses.join(" ");
-
-            for (var i = 0; i < this.wrappers.length; ++i) {
-                var wrapper = this.wrappers[i];
-                sql = wrapper.start + sql + wrapper.end;
+            for (var i = 0; i < source.transforms.length; ++i) {
+                var transform = source.transforms[i];
+                var temp_table = 'transform_' + (i + 1);
+                sql = 'SELECT * FROM (' + sql + ' ) ' + temp_table + ' ' + transform.clause;
             }
 
             for (var pattern in args) {
                 var value = args[pattern];
 
-                sql = sql.replace(new RegExp(pattern), value);
+                sql = sql.replace(new RegExp(pattern, 'g'), value);
             }
 
             return sql;
@@ -2594,7 +2603,10 @@ var Ground;
             var property = source.trellis.sanitize_property(filter.property);
             var value = filter.value;
 
-            var placeholder = ':' + property.name + '_filter';
+            var placeholder = ':' + property.name + '_filter' + Query_Renderer.counter++;
+            if (Query_Renderer.counter > 10000)
+                Query_Renderer.counter = 1;
+
             if (value === 'null' && property.type != 'string') {
                 result.filters.push(property.query() + ' IS NULL');
                 return result;
@@ -2608,8 +2620,9 @@ var Ground;
             }
 
             if (property.get_relationship() == 3 /* many_to_many */) {
-                var join_seed = {};
-                join_seed[property.other_trellis.name] = ':' + property.name + '_filter';
+                var join_seed = {}, s = {};
+                s[property.other_trellis.primary_key] = placeholder;
+                join_seed[property.other_trellis.name] = s;
 
                 result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
             } else {
@@ -2670,6 +2683,7 @@ var Ground;
 
             return items.join(', ');
         };
+        Query_Renderer.counter = 1;
         return Query_Renderer;
     })();
     Ground.Query_Renderer = Query_Renderer;
@@ -2677,12 +2691,10 @@ var Ground;
 var Ground;
 (function (Ground) {
     var Query_Runner = (function () {
-        function Query_Runner(source, include_links) {
-            if (typeof include_links === "undefined") { include_links = true; }
+        function Query_Runner(source) {
             this.source = source;
             this.ground = source.ground;
             this.renderer = new Ground.Query_Renderer(this.ground);
-            this.include_links = include_links;
         }
         Query_Runner.generate_property_join = function (property, seeds) {
             var join = Ground.Link_Trellis.create_from_property(property);
@@ -2764,7 +2776,7 @@ var Ground;
 
                 var path = Query_Runner.get_path(property.name);
 
-                if (_this.include_links) {
+                if (source.include_links) {
                     return _this.query_link_property(row, property, source).then(function (value) {
                         row[name] = value;
                         return row;
@@ -2812,7 +2824,7 @@ var Ground;
                 var sql = _this.renderer.generate_sql(source);
                 sql = sql.replace(/\r/g, "\n");
                 if (_this.ground.log_queries)
-                    console.log('query', sql);
+                    console.log('\nquery', sql + '\n');
 
                 return _this.ground.db.query(sql).then(function (rows) {
                     _this.row_cache = rows;

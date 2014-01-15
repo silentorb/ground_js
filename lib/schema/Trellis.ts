@@ -99,6 +99,23 @@ module Ground {
       return source;
     }
 
+    get_identity(seed) {
+      var composite = this.properties[this.primary_key].get_composite()
+        .filter((x)=> seed[x.name] !== undefined)
+
+//      if (composite.length == 1)
+//        return seed[composite[0].name]
+
+      var result = {}
+      for (var i in composite) {
+        var c = composite[i]
+        result[c.name] = seed[c.name]
+      }
+
+      return result;
+    }
+
+
     get_ancestor_join(other:Trellis):string {
 //      if (!this.parent)
 //        return null;
