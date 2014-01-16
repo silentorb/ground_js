@@ -117,6 +117,8 @@ module Ground {
       for (var name in core_properties) {
         var property = core_properties[name];
         var field_test = this.properties[property.name];
+        if (property.is_virtual)
+          continue
 
         // Don't duplicate shared fields.
         if (field_test && field_test.share)

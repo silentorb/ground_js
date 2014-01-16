@@ -21,11 +21,15 @@ module Ground {
     }
 
     private static create_sub_query(trellis:Trellis, property:Property, source:Query_Builder):Query_Builder {
-      var query = new Query_Builder(trellis)//, Query_Runner.get_path(property.name));
-      query.include_links = false;
-      if (typeof source.properties === 'object'
-        && typeof source.properties[property.name] === 'object') {
-        query.extend(source.properties[property.name])
+      var query = source.subqueries[property.name]
+
+      if (!query) {
+        query = new Query_Builder(trellis)//, Query_Runner.get_path(property.name));
+        query.include_links = false;
+        if (typeof source.properties === 'object'
+          && typeof source.properties[property.name] === 'object') {
+          query.extend(source.properties[property.name])
+        }
       }
 
       return query
@@ -93,8 +97,9 @@ module Ground {
           return null
 
         var path = Query_Runner.get_path(property.name)
+        var subquery = source.subqueries[property.name]
 
-        if (source.include_links) {// || this.has_expansion(path)) {
+        if (source.include_links || subquery) {
           return this.query_link_property(row, property, source).then((value) => {
             row[name] = value
             return row

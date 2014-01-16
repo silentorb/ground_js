@@ -18,7 +18,7 @@ module Ground {
     dir?
   }
 
-  export interface Query_Transform{
+  export interface Query_Transform {
     clause:string // A transitional hack.  This isn't something that could be used by a public service.
   }
 
@@ -33,6 +33,7 @@ module Ground {
     source:External_Query_Source
     include_links:boolean = true
     transforms:Query_Transform[] = []
+    subqueries = {}
 
     filters:Query_Filter[] = []
 
@@ -75,6 +76,23 @@ module Ground {
       this.sorts.push(sort)
     }
 
+    add_subquery(property_name:string, source:External_Query_Source = null):Query_Builder {
+      var properties = this.trellis.get_all_properties()
+      var property = properties[property_name]
+      if (!property)
+        throw new Error('Cannot create subquery. '
+          + this.trellis.name + ' does not have a property named ' + property_name + '.')
+
+      if (!property.other_trellis)
+        throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.')
+
+      var query = new Query_Builder(property.other_trellis)
+      query.include_links = false
+      query.extend(source)
+      this.subqueries[property_name] = query
+      return query
+    }
+
     add_transform_clause(clause:string) {
       this.transforms.push({
         clause: clause
@@ -89,6 +107,7 @@ module Ground {
       var value = property.parent.get_identity(seed)
       if (value === undefined || value === null)
         throw new Error(property.fullname() + ' could not get a valid identity from the provided seed.')
+
       return {
         property: property.get_other_property(true),
         value: value,
@@ -97,6 +116,9 @@ module Ground {
     }
 
     extend(source:External_Query_Source) {
+      if (!source) // I think it's okay to allow null to be passed to this method
+        return
+
       var i
       this.source = source
 
@@ -131,6 +153,12 @@ module Ground {
 
             if (property)
               this.properties[property.name] = property
+          }
+        }
+
+        if (typeof source.subqueries == 'object') {
+          for (i in source.subqueries) {
+            this.add_subquery(i, source.subqueries[i])
           }
         }
 

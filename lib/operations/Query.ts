@@ -33,8 +33,8 @@ module Ground {
     filters?:Query_Filter_Source[]
     sorts?:Query_Sort[]
     expansions?:string[]
-    reductions?:string[]
     properties?:any[]
+    subqueries?
   }
 
   export interface External_Query_Source extends Property_Query_Source {

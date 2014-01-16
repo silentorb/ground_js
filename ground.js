@@ -1793,6 +1793,8 @@ var Ground;
             for (var name in core_properties) {
                 var property = core_properties[name];
                 var field_test = this.properties[property.name];
+                if (property.is_virtual)
+                    continue;
 
                 if (field_test && field_test.share)
                     continue;
@@ -2231,8 +2233,12 @@ var Ground;
                     return Math.round(value);
                 case 'string':
                 case 'text':
-                    if (typeof value === 'object')
-                        console.log('v', value);
+                    if (!value)
+                        return "''";
+
+                    if (typeof value !== 'string')
+                        value = value.toString();
+
                     value = value.replace(/'/g, "\\'", value);
                     return "'" + value.replace(/[\r\n]+/, "\n") + "'";
                 case 'bool':
@@ -2366,6 +2372,7 @@ var Ground;
             this.sorts = [];
             this.include_links = true;
             this.transforms = [];
+            this.subqueries = {};
             this.filters = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
@@ -2406,6 +2413,23 @@ var Ground;
             this.sorts.push(sort);
         };
 
+        Query_Builder.prototype.add_subquery = function (property_name, source) {
+            if (typeof source === "undefined") { source = null; }
+            var properties = this.trellis.get_all_properties();
+            var property = properties[property_name];
+            if (!property)
+                throw new Error('Cannot create subquery. ' + this.trellis.name + ' does not have a property named ' + property_name + '.');
+
+            if (!property.other_trellis)
+                throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.');
+
+            var query = new Query_Builder(property.other_trellis);
+            query.include_links = false;
+            query.extend(source);
+            this.subqueries[property_name] = query;
+            return query;
+        };
+
         Query_Builder.prototype.add_transform_clause = function (clause) {
             this.transforms.push({
                 clause: clause
@@ -2420,6 +2444,7 @@ var Ground;
             var value = property.parent.get_identity(seed);
             if (value === undefined || value === null)
                 throw new Error(property.fullname() + ' could not get a valid identity from the provided seed.');
+
             return {
                 property: property.get_other_property(true),
                 value: value,
@@ -2428,6 +2453,9 @@ var Ground;
         };
 
         Query_Builder.prototype.extend = function (source) {
+            if (!source)
+                return;
+
             var i;
             this.source = source;
 
@@ -2460,6 +2488,12 @@ var Ground;
 
                         if (property)
                             this.properties[property.name] = property;
+                    }
+                }
+
+                if (typeof source.subqueries == 'object') {
+                    for (i in source.subqueries) {
+                        this.add_subquery(i, source.subqueries[i]);
                     }
                 }
 
@@ -2702,10 +2736,14 @@ var Ground;
         };
 
         Query_Runner.create_sub_query = function (trellis, property, source) {
-            var query = new Ground.Query_Builder(trellis);
-            query.include_links = false;
-            if (typeof source.properties === 'object' && typeof source.properties[property.name] === 'object') {
-                query.extend(source.properties[property.name]);
+            var query = source.subqueries[property.name];
+
+            if (!query) {
+                query = new Ground.Query_Builder(trellis);
+                query.include_links = false;
+                if (typeof source.properties === 'object' && typeof source.properties[property.name] === 'object') {
+                    query.extend(source.properties[property.name]);
+                }
             }
 
             return query;
@@ -2775,8 +2813,9 @@ var Ground;
                     return null;
 
                 var path = Query_Runner.get_path(property.name);
+                var subquery = source.subqueries[property.name];
 
-                if (source.include_links) {
+                if (source.include_links || subquery) {
                     return _this.query_link_property(row, property, source).then(function (value) {
                         row[name] = value;
                         return row;
