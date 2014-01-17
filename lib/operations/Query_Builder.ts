@@ -76,7 +76,7 @@ module Ground {
       this.sorts.push(sort)
     }
 
-    add_subquery(property_name:string, source:External_Query_Source = null):Query_Builder {
+    add_subquery(property_name:string, source = null):Query_Builder {
       var properties = this.trellis.get_all_properties()
       var property = properties[property_name]
       if (!property)
@@ -179,8 +179,8 @@ module Ground {
           var expansion = source.expansions[i]
           var tokens = expansion.split('/')
           var subquery = this
-          for(var k = 0; k < tokens.length; ++k) {
-            subquery = subquery.add_subquery(tokens[k], {})
+          for (var j = 0; j < tokens.length; ++j) {
+            subquery = subquery.add_subquery(tokens[j], {})
           }
         }
       }
