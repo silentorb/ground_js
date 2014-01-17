@@ -156,12 +156,6 @@ module Ground {
           }
         }
 
-        if (typeof source.subqueries == 'object') {
-          for (i in source.subqueries) {
-            this.add_subquery(i, source.subqueries[i])
-          }
-        }
-
         var identities = [ this.trellis.properties[this.trellis.primary_key] ]
         if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
           identities = identities.concat(identities[0].composite_properties)
@@ -173,6 +167,13 @@ module Ground {
             this.properties[identity.name] = {}
         }
       }
+
+      if (typeof source.subqueries == 'object') {
+        for (i in source.subqueries) {
+          this.add_subquery(i, source.subqueries[i])
+        }
+      }
+
     }
 
     get_primary_key_value() {
