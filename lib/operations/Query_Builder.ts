@@ -174,6 +174,16 @@ module Ground {
         }
       }
 
+      if (MetaHub.is_array(source.expansions)){
+        for(i = 0; i < source.expansions.length; ++i) {
+          var expansion = source.expansions[i]
+          var tokens = expansion.split('/')
+          var subquery = this
+          for(var k = 0; k < tokens.length; ++k) {
+            subquery = subquery.add_subquery(tokens[k], {})
+          }
+        }
+      }
     }
 
     get_primary_key_value() {

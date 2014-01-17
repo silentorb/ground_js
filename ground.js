@@ -1,4 +1,4 @@
-var MetaHub = require('metahub');var when = require('when');
+var when = require('when');
 
 var Ground;
 (function (Ground) {
@@ -2505,6 +2505,17 @@ var Ground;
             if (typeof source.subqueries == 'object') {
                 for (i in source.subqueries) {
                     this.add_subquery(i, source.subqueries[i]);
+                }
+            }
+
+            if (MetaHub.is_array(source.expansions)) {
+                for (i = 0; i < source.expansions.length; ++i) {
+                    var expansion = source.expansions[i];
+                    var tokens = expansion.split('/');
+                    var subquery = this;
+                    for (var k = 0; k < tokens.length; ++k) {
+                        subquery = subquery.add_subquery(tokens[k], {});
+                    }
                 }
             }
         };
