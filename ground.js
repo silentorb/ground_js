@@ -254,7 +254,7 @@ var Ground;
             if (this.table) {
                 if (this.table.db_name)
                     return this.table.db_name + '.' + this.table.name;
-else
+                else
                     return this.table.name;
             }
             if (this.plural)
@@ -379,7 +379,7 @@ var Ground;
             this.db = this.ground.db;
             if (base_path)
                 this.base_path = base_path;
-else
+            else
                 this.base_path = this.trellis.name;
         }
         Query.prototype.add_arguments = function (args) {
@@ -489,7 +489,7 @@ else
                     var dir = sort.dir.toUpperCase();
                     if (dir == 'ASC')
                         sql += ' ASC';
-else if (dir == 'DESC')
+                    else if (dir == 'DESC')
                         sql += ' DESC';
                 }
 
@@ -511,7 +511,7 @@ else if (dir == 'DESC')
             if (!offset) {
                 if (!limit)
                     return '';
-else
+                else
                     return ' LIMIT ' + limit;
             } else {
                 if (!limit)
@@ -530,7 +530,7 @@ else
             var args = MetaHub.concat(this.arguments, data2.arguments);
             if (data2.filters)
                 filters = this.filters.concat(data2.filters);
-else
+            else
                 filters = this.filters;
 
             if (fields.length == 0)
@@ -633,11 +633,11 @@ else
                 return when.resolve();
 
             var query = this.create_sub_query(other_property.parent, property);
-            if (relationship === Ground.Relationships.many_to_many) {
+            if (relationship === 3 /* many_to_many */) {
                 var seeds = {};
                 seeds[this.trellis.name] = seed;
                 query.add_join(Query.generate_property_join(property, seeds));
-            } else if (relationship === Ground.Relationships.one_to_many)
+            } else if (relationship === 2 /* one_to_many */)
                 query.add_property_filter(other_property.name, id);
 
             return query.run();
@@ -729,11 +729,11 @@ else
             var relationship = property.get_relationship();
 
             switch (relationship) {
-                case Ground.Relationships.one_to_one:
+                case 1 /* one_to_one */:
                     return this.get_reference_object(seed, property);
                     break;
-                case Ground.Relationships.one_to_many:
-                case Ground.Relationships.many_to_many:
+                case 2 /* one_to_many */:
+                case 3 /* many_to_many */:
                     return this.get_many_list(seed, property, relationship);
                     break;
             }
@@ -763,7 +763,7 @@ else
                 throw new Error('Query property filter ' + placeholder + ' is null.');
             }
 
-            if (property.get_relationship() == Ground.Relationships.many_to_many) {
+            if (property.get_relationship() == 3 /* many_to_many */) {
                 var join_seed = {};
                 join_seed[property.other_trellis.name] = ':' + property.name + '_filter';
 
@@ -917,19 +917,19 @@ else
             var relationship = property.get_relationship();
 
             switch (relationship) {
-                case Ground.Relationships.one_to_one:
-                case Ground.Relationships.one_to_many:
+                case 1 /* one_to_one */:
+                case 2 /* one_to_many */:
                     var first_part, second_part;
                     if (property.type == 'list')
                         first_part = other_property.query();
-else
+                    else
                         first_part = other.query_primary_key();
 
                     second_part = Query.get_identity_sql(property, cross_property);
 
                     return 'JOIN ' + other.get_table_query() + '\nON ' + first_part + ' = ' + second_part + '\n';
 
-                case Ground.Relationships.many_to_many:
+                case 3 /* many_to_many */:
                     var seeds = {};
 
                     var join = Ground.Link_Trellis.create_from_property(property);
@@ -960,7 +960,7 @@ else
                     throw new Error('Could not find ' + trellis.name + '.' + parts[i] + '.');
 
                 sql += Query.generate_join(property, cross_property);
-                cross_property = property.get_relationship() == Ground.Relationships.many_to_many ? property : null;
+                cross_property = property.get_relationship() == 3 /* many_to_many */ ? property : null;
                 trellis = property.other_trellis;
             }
 
@@ -1031,7 +1031,7 @@ var Ground;
                 var table = trellis.get_root_table();
                 if (table && table.primary_keys && table.primary_keys.length > 0)
                     primary_keys = table.primary_keys;
-else
+                else
                     primary_keys = [trellis.primary_key];
 
                 var conditions = [];
@@ -1053,7 +1053,7 @@ else
                 return this.db.query_single(sql).then(function (id_result) {
                     if (!id_result)
                         return _this.create_record(trellis);
-else
+                    else
                         return _this.update_record(trellis, id, condition_string);
                 });
             }
@@ -1232,10 +1232,10 @@ else
                 }
 
                 switch (property.get_relationship()) {
-                    case Ground.Relationships.one_to_many:
+                    case 2 /* one_to_many */:
                         promises.push(this.update_one_to_many(property));
                         break;
-                    case Ground.Relationships.many_to_many:
+                    case 3 /* many_to_many */:
                         promises.push(this.update_many_to_many(property, create));
                         break;
                 }
@@ -1331,7 +1331,7 @@ else
             var trellis;
             if (other.trellis)
                 trellis = other.trellis;
-else
+            else
                 trellis = property.other_trellis;
 
             var other_property = property.get_other_property();
@@ -1760,7 +1760,7 @@ var Ground;
             if (fields.length == 0) {
                 if (source.length > 0)
                     throw new Error('None of the field arguments for creating ' + table_name + ' have a type.');
-else
+                else
                     throw new Error('Cannot creat a table without fields: ' + table_name + '.');
             }
 
@@ -1885,6 +1885,8 @@ else
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
+    
+
     var Link_Trellis = (function () {
         function Link_Trellis(trellises) {
             var _this = this;
@@ -1913,7 +1915,7 @@ var Ground;
                 property = keys[i];
                 if (property.name == trellis.primary_key)
                     name = trellis.name;
-else
+                else
                     name = trellis.name + '_' + property.name;
 
                 properties.push(Link_Trellis.create_reference(property, name));
@@ -1929,8 +1931,7 @@ else
         Link_Trellis.create_from_property = function (property) {
             var trellises = [
                 property.parent,
-                property.other_trellis
-            ];
+                property.other_trellis];
             return new Link_Trellis(trellises);
         };
 
@@ -1960,7 +1961,7 @@ else
                     keys.push(key.name);
                     if (typeof seed === 'object')
                         value = seed[key.property.name];
-else
+                    else
                         value = seed;
 
                     values.push(key.property.get_sql_value(value));
@@ -1990,9 +1991,9 @@ else
                 var value = seed[key.property.name];
                 if (typeof value === 'function')
                     value == value();
-else if (typeof value === 'string' && value[0] == ':')
+                else if (typeof value === 'string' && value[0] == ':')
                     value = value;
-else
+                else
                     value = key.property.get_sql_value(value);
 
                 return this.table_name + '.' + key.name + ' = ' + value;
@@ -2193,7 +2194,7 @@ var Ground;
         Property.prototype.get_seed_name = function () {
             if (this.is_composite_sub)
                 return this.other_property;
-else
+            else
                 return this.name;
         };
 
@@ -2320,7 +2321,7 @@ else
 
         Property.prototype.get_relationship = function () {
             if (this.type != 'list' && this.type != 'reference')
-                return Relationships.none;
+                return 0 /* none */;
 
             var field = this.get_field_override();
             if (field && field.relationship) {
@@ -2330,18 +2331,18 @@ else
             var other_property = this.get_other_property();
             if (!other_property) {
                 if (this.type == 'list')
-                    return Relationships.one_to_many;
-else
-                    return Relationships.one_to_one;
+                    return 2 /* one_to_many */;
+                else
+                    return 1 /* one_to_one */;
             }
 
             if (this.type == 'list') {
                 if (other_property.type == 'list')
-                    return Relationships.many_to_many;
-else
-                    return Relationships.one_to_many;
+                    return 3 /* many_to_many */;
+                else
+                    return 2 /* one_to_many */;
             }
-            return Relationships.one_to_one;
+            return 1 /* one_to_one */;
         };
 
         Property.prototype.get_field_query = function () {
@@ -2350,7 +2351,7 @@ else
             var type = this.get_type();
             if (type == 'guid')
                 sql = "INSERT(INSERT(INSERT(INSERT(HEX(" + sql + ")" + ",9,0,'-')" + ",14,0,'-')" + ",19,0,'-')" + ",24,0,'-') AS `" + this.name + '`';
-else if (field_name != this.name)
+            else if (field_name != this.name)
                 sql += ' AS `' + this.name + '`';
 
             return sql;
@@ -2422,10 +2423,14 @@ var Ground;
             if (!property.other_trellis)
                 throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.');
 
-            var query = new Query_Builder(property.other_trellis);
-            query.include_links = false;
+            var query = this.subqueries[property_name];
+            if (!query) {
+                query = new Query_Builder(property.other_trellis);
+                query.include_links = false;
+                this.subqueries[property_name] = query;
+            }
+
             query.extend(source);
-            this.subqueries[property_name] = query;
             return query;
         };
 
@@ -2663,7 +2668,7 @@ var Ground;
                 throw new Error('Query property filter ' + placeholder + ' is null.');
             }
 
-            if (property.get_relationship() == Ground.Relationships.many_to_many) {
+            if (property.get_relationship() == 3 /* many_to_many */) {
                 var join_seed = {}, s = {};
                 s[property.other_trellis.primary_key] = placeholder;
                 join_seed[property.other_trellis.name] = s;
@@ -2718,7 +2723,7 @@ var Ground;
                     var dir = sort.dir.toUpperCase();
                     if (dir == 'ASC')
                         sql += ' ASC';
-else if (dir == 'DESC')
+                    else if (dir == 'DESC')
                         sql += ' DESC';
                 }
 
@@ -2769,9 +2774,9 @@ var Ground;
                 return when.resolve();
 
             var query = Query_Runner.create_sub_query(other_property.parent, property, source);
-            if (relationship === Ground.Relationships.many_to_many) {
+            if (relationship === 3 /* many_to_many */) {
                 query.filters.push(Ground.Query_Builder.create_join_filter(property, seed));
-            } else if (relationship === Ground.Relationships.one_to_many)
+            } else if (relationship === 2 /* one_to_many */)
                 query.add_filter(other_property.name, id);
 
             return query.run();
@@ -2846,11 +2851,11 @@ var Ground;
             var relationship = property.get_relationship();
 
             switch (relationship) {
-                case Ground.Relationships.one_to_one:
+                case 1 /* one_to_one */:
                     return Query_Runner.get_reference_object(seed, property, source);
                     break;
-                case Ground.Relationships.one_to_many:
-                case Ground.Relationships.many_to_many:
+                case 2 /* one_to_many */:
+                case 3 /* many_to_many */:
                     return Query_Runner.get_many_list(seed, property, relationship, source);
                     break;
             }
@@ -2868,6 +2873,7 @@ var Ground;
             var promises = tree.map(function (trellis) {
                 return _this.ground.invoke(trellis.name + '.query', source);
             });
+            promises = promises.concat(this.ground.invoke('*.query', source));
 
             return when.all(promises).then(function () {
                 var sql = _this.renderer.generate_sql(source);

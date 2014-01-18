@@ -137,6 +137,7 @@ module Ground {
 
       var tree = source.trellis.get_tree()
       var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', source))
+      promises = promises.concat(this.ground.invoke('*.query', source));
 
       return when.all(promises)
         .then(()=> {
