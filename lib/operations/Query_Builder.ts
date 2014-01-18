@@ -86,10 +86,14 @@ module Ground {
       if (!property.other_trellis)
         throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.')
 
-      var query = new Query_Builder(property.other_trellis)
-      query.include_links = false
+      var query = this.subqueries[property_name]
+      if (!query) {
+        query = new Query_Builder(property.other_trellis)
+        query.include_links = false
+        this.subqueries[property_name] = query
+      }
+
       query.extend(source)
-      this.subqueries[property_name] = query
       return query
     }
 

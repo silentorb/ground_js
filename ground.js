@@ -74,10 +74,10 @@ var Ground;
             connection.query(sql, args, function (err, rows, fields) {
                 if (err) {
                     console.log('error', sql);
-                    throw err;
+                    def.reject(err);
+                } else {
+                    def.resolve(rows, fields);
                 }
-
-                def.resolve(rows, fields);
 
                 return null;
             });
