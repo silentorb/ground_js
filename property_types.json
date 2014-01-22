@@ -19,6 +19,10 @@
     "field_type" : "INT",
     "default" : null
   },
+  "unsigned bigint" : {
+    "parent" : "int",
+    "field_type" : "BIGINT UNSIGNED"
+  },
   "datetime" : {
     "field_type" : "INT(11)",
     "default" : 0,
