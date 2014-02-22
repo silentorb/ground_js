@@ -82,6 +82,7 @@ declare module Ground {
         expansions?: string[];
         properties?: any[];
         subqueries?: any;
+        pager?: any;
     }
     interface External_Query_Source extends Property_Query_Source {
         trellis: string;
@@ -425,6 +426,7 @@ declare module Ground {
         private static process_property_filter(source, filter, ground);
         static process_property_filters(source: Ground.Query_Builder, ground: Ground.Core): Ground.Internal_Query_Source;
         static process_sorts(sorts: Ground.Query_Sort[], trellis: Ground.Trellis): string;
+        static render_pager(pager: Ground.IPager): string;
     }
 }
 declare module Ground {

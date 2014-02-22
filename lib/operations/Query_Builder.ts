@@ -139,6 +139,10 @@ module Ground {
         }
       }
 
+      if (source.pager) {
+        this.pager = source.pager
+      }
+
       if (source.properties) {
         var properties = this.trellis.get_all_properties()
         this.properties = {}

@@ -35,6 +35,7 @@ module Ground {
     expansions?:string[]
     properties?:any[]
     subqueries?
+    pager?
   }
 
   export interface External_Query_Source extends Property_Query_Source {
