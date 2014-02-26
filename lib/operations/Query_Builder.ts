@@ -87,6 +87,7 @@ module Ground {
         throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.')
 
       var query = this.subqueries[property_name]
+      console.log('subquery', property_name, query != null)
       if (!query) {
         query = new Query_Builder(property.other_trellis)
         query.include_links = false
@@ -183,10 +184,11 @@ module Ground {
       }
 
       if (MetaHub.is_array(source.expansions)){
-        for(i = 0; i < source.expansions.length; ++i) {
+        for (i = 0; i < source.expansions.length; ++i) {
           var expansion = source.expansions[i]
           var tokens = expansion.split('/')
           var subquery = this
+          console.log('expansion', tokens)
           for (var j = 0; j < tokens.length; ++j) {
             subquery = subquery.add_subquery(tokens[j], {})
           }

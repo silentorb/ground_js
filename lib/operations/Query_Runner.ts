@@ -21,16 +21,18 @@ module Ground {
     }
 
     private static create_sub_query(trellis:Trellis, property:Property, source:Query_Builder):Query_Builder {
-      var query = source.subqueries[property.name]
-
-      if (!query) {
-        query = new Query_Builder(trellis)//, Query_Runner.get_path(property.name));
-        query.include_links = false;
-        if (typeof source.properties === 'object'
-          && typeof source.properties[property.name] === 'object') {
-          query.extend(source.properties[property.name])
-        }
+      var query = new Query_Builder(trellis)
+      var original_query = source.subqueries[property.name]
+      if (original_query) {
+        MetaHub.extend(query.subqueries, original_query.subqueries)
+        if (original_query.source)
+          query.extend(original_query.source)
       }
+      else if (typeof source.properties === 'object'
+        && typeof source.properties[property.name] === 'object') {
+        query.extend(source.properties[property.name])
+      }
+      query.include_links = false;
 
       return query
     }
@@ -162,7 +164,6 @@ module Ground {
         this.run_stack = temp['stack']
       }
 
-      var properties = source.trellis.get_all_properties();
       return this.run_core()
         .then((rows) => when.all(rows.map((row) => this.process_row(row, source))))
     }

@@ -5,9 +5,10 @@
 declare var when: any;
 declare module Ground {
     class Database {
-        public settings: {};
+        public settings: any;
         public database: string;
         public log_queries: boolean;
+        public pool: any;
         constructor(settings: {}, database: string);
         public add_table_to_database(table: Ground.Table, ground: Ground.Core): Promise;
         public add_non_trellis_tables_to_database(tables: Ground.Table[], ground: Ground.Core): Promise;
