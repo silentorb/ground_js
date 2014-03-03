@@ -1,5 +1,6 @@
 declare module "mysql" {
   export function createConnection(config): Connection;
+  export function createPool(config)
 
   interface Connection {
     connect();

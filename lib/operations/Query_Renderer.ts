@@ -72,6 +72,10 @@ module Ground {
         sql = sql.replace(new RegExp(pattern, 'g'), value);
       }
 
+      if (source.pager) {
+        sql += ' ' + Query_Renderer.render_pager(source.pager)
+      }
+
       return sql;
     }
 
@@ -201,5 +205,21 @@ module Ground {
       return items.join(', ')
     }
 
+  static render_pager(pager:IPager):string {
+      var offset = Math.round(pager.offset);
+      var limit = Math.round(pager.limit);
+      if (!offset) {
+        if (!limit)
+          return '';
+        else
+          return ' LIMIT ' + limit;
+      }
+      else {
+        if (!limit)
+          limit = 18446744073709551615;
+
+        return ' LIMIT ' + offset + ', ' + limit;
+      }
+    }
   }
 }

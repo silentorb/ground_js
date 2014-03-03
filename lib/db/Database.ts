@@ -9,15 +9,17 @@ var when = require('when');
 
 module Ground {
   export class Database {
-    settings:{
-    };
-    database:string;
+    settings
+    database:string
     log_queries:boolean = false
+    pool
 
     constructor(settings:{
     }, database:string) {
       this.settings = settings;
       this.database = database;
+      var mysql = require('mysql')
+      this.pool  = mysql.createPool(this.settings[this.database]);
     }
 
     add_table_to_database(table:Table, ground:Core):Promise {
@@ -72,26 +74,25 @@ module Ground {
     }
 
     query(sql:string, args:any[] = undefined):Promise {
-      var connection, def = when.defer();
-      var mysql = require('mysql')
-      connection = mysql.createConnection(this.settings[this.database]);
-      connection.connect();
+      var def = when.defer()
+//      connection = this.pool.createConnection(this.settings[this.database])
+//      connection.connect()
       if (this.log_queries)
         console.log('start', sql)
 
-      connection.query(sql, args, (err, rows, fields) => {
+      this.pool.query(sql, args, (err, rows, fields) => {
         if (err) {
-          console.log('error', sql);
-          throw err;
+          console.log('error', sql)
+          throw err
         }
 //        console.log('sql', sql)
-        def.resolve(rows, fields);
+        def.resolve(rows, fields)
 
-        return null;
+        return null
       });
-      connection.end();
+//      connection.end()
 
-      return def.promise;
+      return def.promise
     }
 
     query_single(sql:string, args:any[] = undefined):Promise {

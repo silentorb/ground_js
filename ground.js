@@ -7,6 +7,8 @@ var Ground;
             this.log_queries = false;
             this.settings = settings;
             this.database = database;
+            var mysql = require('mysql');
+            this.pool = mysql.createPool(this.settings[this.database]);
         }
         Database.prototype.add_table_to_database = function (table, ground) {
             var sql = table.create_sql(ground);
@@ -64,14 +66,12 @@ var Ground;
 
         Database.prototype.query = function (sql, args) {
             if (typeof args === "undefined") { args = undefined; }
-            var connection, def = when.defer();
-            var mysql = require('mysql');
-            connection = mysql.createConnection(this.settings[this.database]);
-            connection.connect();
+            var def = when.defer();
+
             if (this.log_queries)
                 console.log('start', sql);
 
-            connection.query(sql, args, function (err, rows, fields) {
+            this.pool.query(sql, args, function (err, rows, fields) {
                 if (err) {
                     console.log('error', sql);
                     throw err;
@@ -81,7 +81,6 @@ var Ground;
 
                 return null;
             });
-            connection.end();
 
             return def.promise;
         };
@@ -2259,10 +2258,6 @@ var Ground;
 
         Property.prototype.get_type = function () {
             if (this.type == 'reference' || this.type == 'list') {
-                var other_property = this.get_other_property();
-                if (other_property)
-                    return other_property.type;
-
                 return this.other_trellis.properties[this.other_trellis.primary_key].type;
             }
 
@@ -2424,6 +2419,7 @@ var Ground;
                 throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.');
 
             var query = this.subqueries[property_name];
+            console.log('subquery', property_name, query != null);
             if (!query) {
                 query = new Query_Builder(property.other_trellis);
                 query.include_links = false;
@@ -2476,6 +2472,10 @@ var Ground;
                 }
             }
 
+            if (source.pager) {
+                this.pager = source.pager;
+            }
+
             if (source.properties) {
                 var properties = this.trellis.get_all_properties();
                 this.properties = {};
@@ -2518,6 +2518,7 @@ var Ground;
                     var expansion = source.expansions[i];
                     var tokens = expansion.split('/');
                     var subquery = this;
+                    console.log('expansion', tokens);
                     for (var j = 0; j < tokens.length; ++j) {
                         subquery = subquery.add_subquery(tokens[j], {});
                     }
@@ -2607,6 +2608,10 @@ var Ground;
                 var value = args[pattern];
 
                 sql = sql.replace(new RegExp(pattern, 'g'), value);
+            }
+
+            if (source.pager) {
+                sql += ' ' + Query_Renderer.render_pager(source.pager);
             }
 
             return sql;
@@ -2732,6 +2737,22 @@ var Ground;
 
             return items.join(', ');
         };
+
+        Query_Renderer.render_pager = function (pager) {
+            var offset = Math.round(pager.offset);
+            var limit = Math.round(pager.limit);
+            if (!offset) {
+                if (!limit)
+                    return '';
+                else
+                    return ' LIMIT ' + limit;
+            } else {
+                if (!limit)
+                    limit = 18446744073709551615;
+
+                return ' LIMIT ' + offset + ', ' + limit;
+            }
+        };
         Query_Renderer.counter = 1;
         return Query_Renderer;
     })();
@@ -2751,15 +2772,16 @@ var Ground;
         };
 
         Query_Runner.create_sub_query = function (trellis, property, source) {
-            var query = source.subqueries[property.name];
-
-            if (!query) {
-                query = new Ground.Query_Builder(trellis);
-                query.include_links = false;
-                if (typeof source.properties === 'object' && typeof source.properties[property.name] === 'object') {
-                    query.extend(source.properties[property.name]);
-                }
+            var query = new Ground.Query_Builder(trellis);
+            var original_query = source.subqueries[property.name];
+            if (original_query) {
+                MetaHub.extend(query.subqueries, original_query.subqueries);
+                if (original_query.source)
+                    query.extend(original_query.source);
+            } else if (typeof source.properties === 'object' && typeof source.properties[property.name] === 'object') {
+                query.extend(source.properties[property.name]);
             }
+            query.include_links = false;
 
             return query;
         };
@@ -2896,7 +2918,6 @@ var Ground;
                 this.run_stack = temp['stack'];
             }
 
-            var properties = source.trellis.get_all_properties();
             return this.run_core().then(function (rows) {
                 return when.all(rows.map(function (row) {
                     return _this.process_row(row, source);

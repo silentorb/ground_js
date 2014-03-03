@@ -235,9 +235,9 @@ module Ground {
 
     get_type():string {
       if (this.type == 'reference' || this.type == 'list') {
-        var other_property = this.get_other_property()
-        if (other_property)
-          return other_property.type
+//        var other_property = this.get_other_property()
+//        if (other_property)
+//          return other_property.type
 
         return this.other_trellis.properties[this.other_trellis.primary_key].type
       }
