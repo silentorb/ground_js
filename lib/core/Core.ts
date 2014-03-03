@@ -149,7 +149,7 @@ module Ground {
     }
 
     convert_value(value, type) {
-      if (!value) {
+      if (value === undefined || value === null || value === false) {
         if (type == 'bool')
           return false;
 

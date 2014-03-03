@@ -23,7 +23,7 @@ module Ground {
     is_readonly:boolean = false;
     insert:string = null;
     other_property:string = null;
-    default;
+    "default":any
     other_trellis:Trellis = null;
     other_trellis_name:string = null;
     is_private:boolean = false;
@@ -31,12 +31,15 @@ module Ground {
     is_composite_sub:boolean = false
     composite_properties:any[] = null
     access:string = 'auto' // 'auto' or 'manual'
+    allow_null:boolean = true
 
     constructor(name:string, source:IProperty_Source, trellis:Trellis) {
       for (var i in source) {
         if (this.hasOwnProperty(i))
           this[i] = source[i];
       }
+      if (source['default'] !== undefined )
+        this.default = source['default']
 
       if (source.trellis) {
         this.other_trellis_name = source.trellis;

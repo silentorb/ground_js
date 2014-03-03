@@ -77,6 +77,9 @@ module Ground {
           if (type.search(/INT/) > -1 && primary_keys[0] == name)
             field_sql += ' AUTO_INCREMENT';
         }
+        if (field.allow_null === false) {
+          field_sql += ' NOT NULL'
+        }
         if (field.default !== undefined)
           field_sql += ' DEFAULT ' + Table.format_value(field.default);
 
@@ -127,11 +130,12 @@ module Ground {
         var field = {
           name: property.get_field_name(),
           type: property.get_field_type(),
-          default: undefined
+          "default": property.default,
+          allow_null: property.allow_null
         };
 
-        if (property.default !== undefined)
-          field.default = property.default;
+//        if (property.default !== undefined)
+//          field.default = property.default;
 
         fields.push(field);
       }
