@@ -31,7 +31,7 @@ module Ground {
 //    source:External_Query_Source
     sorts:Query_Sort[] = []
     source:External_Query_Source
-    include_links:boolean = true
+    include_links:boolean = false
     transforms:Query_Transform[] = []
     subqueries = {}
 

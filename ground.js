@@ -2370,7 +2370,7 @@ var Ground;
         function Query_Builder(trellis) {
             this.type = 'query';
             this.sorts = [];
-            this.include_links = true;
+            this.include_links = false;
             this.transforms = [];
             this.subqueries = {};
             this.filters = [];
