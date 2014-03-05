@@ -1060,7 +1060,8 @@ var Ground;
 
         Update.prototype.update_embedded_seed = function (property, value) {
             var _this = this;
-            return this.ground.update_object(property.other_trellis, value, this.user).then(function (entity) {
+            var other_trellis = value.trellis || property.other_trellis;
+            return this.ground.update_object(other_trellis, value, this.user).then(function (entity) {
                 _this.seed[property.name] = entity;
             });
         };

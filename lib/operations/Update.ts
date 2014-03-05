@@ -84,7 +84,8 @@ module Ground {
     }
 
     private update_embedded_seed(property, value):Promise {
-      return this.ground.update_object(property.other_trellis, value, this.user)
+      var other_trellis = value.trellis || property.other_trellis
+      return this.ground.update_object(other_trellis, value, this.user)
         .then((entity)=> {
 //          var other_id = this.get_other_id(value);
 //          if (other_id !== null)
