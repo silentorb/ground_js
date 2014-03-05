@@ -187,11 +187,17 @@ module Ground {
           // here because this should not be updating any identities.
           for (var name in core_properties) {
             var property = core_properties[name];
-            if (this.seed[property.name] !== undefined) {
+            if (this.seed[property.name] === undefined) {
+              if (property.insert == 'trellis') {
+                this.seed[property.name] = this.trellis.name
+              }
+              else
+                continue
+            }
               var field_string = '`' + property.get_field_name() + '`';
               var value = this.get_field_value(property, this.seed)
               updates.push(field_string + ' = ' + value);
-            }
+
           }
 
           // Check if there's nothing to add

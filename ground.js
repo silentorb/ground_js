@@ -1150,11 +1150,15 @@ var Ground;
 
                 for (var name in core_properties) {
                     var property = core_properties[name];
-                    if (_this.seed[property.name] !== undefined) {
-                        var field_string = '`' + property.get_field_name() + '`';
-                        var value = _this.get_field_value(property, _this.seed);
-                        updates.push(field_string + ' = ' + value);
+                    if (_this.seed[property.name] === undefined) {
+                        if (property.insert == 'trellis') {
+                            _this.seed[property.name] = _this.trellis.name;
+                        } else
+                            continue;
                     }
+                    var field_string = '`' + property.get_field_name() + '`';
+                    var value = _this.get_field_value(property, _this.seed);
+                    updates.push(field_string + ' = ' + value);
                 }
 
                 if (updates.length === 0)
