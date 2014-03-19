@@ -1384,7 +1384,9 @@ var Ground;
 var Ground;
 (function (Ground) {
     var Delete = (function () {
-        function Delete(trellis, seed) {
+        function Delete(ground, trellis, seed) {
+            this.max_depth = 20;
+            this.ground = ground;
             this.trellis = trellis;
             this.seed = seed;
         }
@@ -1392,8 +1394,84 @@ var Ground;
             return this.trellis + '.delete';
         };
 
-        Delete.prototype.run = function () {
-            throw new Error('Not implemented yet.');
+        Delete.prototype.delete_child = function (link, id, depth) {
+            if (typeof depth === "undefined") { depth = 0; }
+            var _this = this;
+            var other_property = link.get_other_property();
+            var other_trellis = other_property.parent;
+            var query = other_trellis.ground.create_query(other_trellis.name);
+            query.add_key_filter(id);
+            return query.run().then(function (objects) {
+                return when.all(objects.map(function (object) {
+                    return _this.run_delete(other_trellis, object, depth + 1);
+                }));
+            });
+        };
+
+        Delete.prototype.delete_children = function (trellis, id, depth) {
+            if (typeof depth === "undefined") { depth = 0; }
+            var _this = this;
+            var links = this.get_child_links(trellis);
+            return when.all(links.map(function (link) {
+                return _this.delete_child(link, id, depth);
+            }));
+        };
+
+        Delete.prototype.delete_record = function (trellis, id) {
+            var sql = 'DELETE FROM ' + trellis.get_table_name() + "\nWHERE " + trellis.query_primary_key() + ' = ' + id;
+
+            if (this.ground.log_updates)
+                console.log(sql);
+
+            return this.ground.db.query(sql);
+        };
+
+        Delete.prototype.get_child_links = function (trellis) {
+            var result = [], links = trellis.get_links();
+            for (var i in links) {
+                var link = links[i];
+                var other = link.get_other_property();
+
+                if (other && other.name == 'parent')
+                    result.push(link);
+            }
+
+            return result;
+        };
+
+        Delete.prototype.run = function (depth) {
+            if (typeof depth === "undefined") { depth = 0; }
+            var trellis = this.trellis;
+            var seed = this.seed;
+            return this.run_delete(trellis, seed, depth);
+        };
+
+        Delete.prototype.run_delete = function (trellis, seed, depth) {
+            if (typeof depth === "undefined") { depth = 0; }
+            var _this = this;
+            if (depth > this.max_depth)
+                throw new Error("Max depth of " + this.max_depth + " exceeded.  Possible infinite loop.");
+
+            var id = seed[trellis.primary_key];
+            if (id === null || id === undefined)
+                throw new Error("Object was tagged to be deleted but has no identity.");
+
+            id = trellis.properties[trellis.primary_key].get_sql_value(id);
+
+            var tree = trellis.get_tree().filter(function (t) {
+                return !t.is_virtual;
+            });
+            var invoke_promises = tree.map(function (trellis) {
+                return _this.ground.invoke(trellis.name + '.delete', seed);
+            });
+
+            return when.all(invoke_promises).then(function () {
+                return tree.map(function (trellis) {
+                    return _this.delete_record(trellis, id);
+                });
+            }).then(function () {
+                return _this.delete_children(trellis, id, depth);
+            });
         };
         return Delete;
     })();
@@ -1546,7 +1624,7 @@ var Ground;
             trellis = this.sanitize_trellis_argument(trellis);
 
             if (seed._deleted === true || seed._deleted === 'true')
-                return new Ground.Delete(trellis, seed);
+                return new Ground.Delete(this, trellis, seed);
 
             var update = new Ground.Update(trellis, seed, this);
             update.user = user;
@@ -1556,7 +1634,7 @@ var Ground;
 
         Core.prototype.delete_object = function (trellis, seed) {
             var trellis = this.sanitize_trellis_argument(trellis);
-            var del = new Ground.Delete(trellis, seed);
+            var del = new Ground.Delete(this, trellis, seed);
             return del.run();
         };
 
@@ -2370,6 +2448,8 @@ var Ground;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
+    
+
     var Query_Builder = (function () {
         function Query_Builder(trellis) {
             this.type = 'query';
@@ -2381,6 +2461,10 @@ var Ground;
             this.trellis = trellis;
             this.ground = trellis.ground;
         }
+        Query_Builder.add_operator = function (symbol, action) {
+            Query_Builder.operators[symbol] = action;
+        };
+
         Query_Builder.prototype.add_filter = function (property_name, value, operator) {
             if (typeof value === "undefined") { value = null; }
             if (typeof operator === "undefined") { operator = '='; }
@@ -2388,8 +2472,8 @@ var Ground;
             var property = properties[property_name];
             if (!property)
                 throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.');
-
-            if (Ground.Query.operators.indexOf(operator) === -1)
+            console.log('q', Query_Builder.operators);
+            if (Query_Builder.operators[operator] === undefined)
                 throw new Error("Invalid operator: '" + operator + "'.");
 
             if (value === null || value === undefined)
@@ -2556,6 +2640,15 @@ var Ground;
                 return rows[0];
             });
         };
+        Query_Builder.operators = {
+            '=': null,
+            'LIKE': function (result, filter, property, data) {
+                result.filters.push(property.query() + ' LIKE ' + data.placeholder);
+                if (data.value !== null)
+                    data.value = '%' + data.value + '%';
+            },
+            '!=': null
+        };
         return Query_Builder;
     })();
     Ground.Query_Builder = Query_Builder;
@@ -2689,12 +2782,17 @@ var Ground;
 
                 result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
             } else {
-                if (filter.operator.toLowerCase() == 'like') {
-                    result.filters.push(property.query() + ' LIKE ' + placeholder);
-                    if (value !== null)
-                        value = '%' + value + '%';
+                var operator_action = Ground.Query_Builder.operators[filter.operator];
+                if (!operator_action) {
+                    result.filters.push(property.query() + ' ' + filter.operator + ' ' + placeholder);
                 } else {
-                    result.filters.push(property.query() + ' = ' + placeholder);
+                    var data = {
+                        value: value,
+                        placeholder: placeholder
+                    };
+                    operator_action(result, filter, property, data);
+                    value = data.value;
+                    placeholder = data.placeholder;
                 }
             }
 

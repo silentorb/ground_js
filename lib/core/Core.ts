@@ -201,7 +201,7 @@ module Ground {
       // to delete which will be handled by Update.
       // If _delete is simply true then the seed itself is marked for deletion.
       if (seed._deleted === true || seed._deleted === 'true')
-        return new Delete(trellis, seed)
+        return new Delete(this, trellis, seed)
 
       var update = new Update(trellis, seed, this)
       update.user = user
@@ -211,7 +211,7 @@ module Ground {
 
     delete_object(trellis:Trellis, seed:ISeed):Promise {
       var trellis = this.sanitize_trellis_argument(trellis)
-      var del = new Delete(trellis, seed)
+      var del = new Delete(this, trellis, seed)
       return del.run()
     }
 

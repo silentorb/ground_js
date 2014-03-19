@@ -144,14 +144,27 @@ module Ground {
         result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
       }
       else {
-        if (filter.operator.toLowerCase() == 'like') {
-          result.filters.push(property.query() + ' LIKE ' + placeholder);
-          if (value !== null)
-            value = '%' + value + '%';
+        var operator_action = Query_Builder.operators[filter.operator]
+        if (!operator_action) {
+          result.filters.push(property.query() + ' ' + filter.operator + ' ' + placeholder);
         }
         else {
-          result.filters.push(property.query() + ' = ' + placeholder);
+          var data = {
+            value: value,
+            placeholder: placeholder
+          }
+          operator_action(result, filter, property, data)
+          value = data.value
+          placeholder = data.placeholder
         }
+//        if (filter.operator.toLowerCase() == 'like') {
+//          result.filters.push(property.query() + ' LIKE ' + placeholder);
+//          if (value !== null)
+//            value = '%' + value + '%';
+//        }
+//        else {
+//          result.filters.push(property.query() + ' = ' + placeholder);
+//        }
       }
 
       if (value !== null) {
@@ -205,7 +218,7 @@ module Ground {
       return items.join(', ')
     }
 
-  static render_pager(pager:IPager):string {
+    static render_pager(pager:IPager):string {
       var offset = Math.round(pager.offset);
       var limit = Math.round(pager.limit);
       if (!offset) {

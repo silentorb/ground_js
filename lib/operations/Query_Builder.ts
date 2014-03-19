@@ -18,6 +18,11 @@ module Ground {
     dir?
   }
 
+//  export interface Filter_Operator {
+//    symbol:string
+//    action
+//  }
+
   export interface Query_Transform {
     clause:string // A transitional hack.  This isn't something that could be used by a public service.
   }
@@ -34,6 +39,15 @@ module Ground {
     include_links:boolean = false
     transforms:Query_Transform[] = []
     subqueries = {}
+    public static operators = {
+      '=': null,
+      'LIKE': (result, filter, property, data)=> {
+        result.filters.push(property.query() + ' LIKE ' + data.placeholder)
+        if (data.value !== null)
+          data.value = '%' + data.value + '%'
+      },
+      '!=': null
+    }
 
     filters:Query_Filter[] = []
 
@@ -42,13 +56,17 @@ module Ground {
       this.ground = trellis.ground
     }
 
+    static add_operator(symbol:string, action) {
+      Query_Builder.operators[symbol] = action
+    }
+
     add_filter(property_name:string, value = null, operator:string = '=') {
       var properties = this.trellis.get_all_properties()
       var property = properties[property_name]
       if (!property)
         throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.')
-
-      if (Query.operators.indexOf(operator) === -1)
+console.log('q', Query_Builder.operators)
+      if (Query_Builder.operators[operator] === undefined)
         throw new Error("Invalid operator: '" + operator + "'.")
 
       if (value === null || value === undefined)
@@ -183,7 +201,7 @@ module Ground {
         }
       }
 
-      if (MetaHub.is_array(source.expansions)){
+      if (MetaHub.is_array(source.expansions)) {
         for (i = 0; i < source.expansions.length; ++i) {
           var expansion = source.expansions[i]
           var tokens = expansion.split('/')

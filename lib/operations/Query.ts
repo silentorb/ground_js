@@ -78,7 +78,7 @@ module Ground {
       'LIKE',
       '!='
     ]
-    each
+
     private links:ILink[] = []
 
     constructor(trellis:Trellis, base_path:string = null) {
