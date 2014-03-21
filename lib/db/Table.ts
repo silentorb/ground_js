@@ -42,7 +42,7 @@ module Ground {
       return table;
     }
 
-    create_sql(ground:Core){
+    create_sql(ground:Core) {
       var fields = [];
       for (var name in this.properties) {
         var property = this.properties[name];
@@ -96,8 +96,7 @@ module Ground {
 
       var primary_fields = MetaHub.map_to_array(primary_keys, (key) => '`' + key + '`');
       fields.push('PRIMARY KEY (' + primary_fields.join(', ') + ")\n");
-      fields = fields.concat(MetaHub.map_to_array(indexes,
-        (index, key) => Table.generate_index_sql(key, index)));
+      fields = fields.concat(indexes.map((index) => Table.generate_index_sql(index)))
       var sql = 'CREATE TABLE IF NOT EXISTS `' + table_name + "` (\n";
       sql += fields.join(",\n") + "\n";
       sql += ");\n";
@@ -112,6 +111,7 @@ module Ground {
         trellis = this.trellis;
       }
 
+      var indexes = this.indexes ? [].concat(this.indexes) : []
       var core_properties = trellis.get_core_properties();
       if (Object.keys(core_properties).length === 0)
         throw new Error('Cannot create a table for ' + trellis.name + '. It does not have any core properties.');
@@ -134,15 +134,20 @@ module Ground {
           allow_null: property.allow_null
         };
 
-//        if (property.default !== undefined)
-//          field.default = property.default;
+        fields.push(field)
 
-        fields.push(field);
+        if (property.is_unique) {
+          indexes.push({
+            name: name + '_unique_index',
+            fields: [ name ],
+            unique: true
+          })
+        }
       }
 
       var primary_keys = this.get_primary_keys(trellis);
 
-      return Table.create_sql_from_array(this.name, fields, primary_keys, this.indexes);
+      return Table.create_sql_from_array(this.name, fields, primary_keys, indexes);
     }
 
     private get_primary_keys(trellis:Trellis):string[] {
@@ -186,7 +191,8 @@ module Ground {
       return value;
     }
 
-    static generate_index_sql(name:string, index) {
+    static generate_index_sql(index) {
+      var name = index.name || ''
       var name_string, index_fields = index.fields.join('`, `');
       var result = '';
 

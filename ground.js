@@ -1329,8 +1329,10 @@ var Ground;
         };
 
         Update.prototype.update_reference_object = function (other, property) {
-            if (typeof other !== 'object')
+            if (typeof other !== 'object') {
+                property.get_sql_value(other);
                 return when.resolve();
+            }
 
             var trellis;
             if (other.trellis)
@@ -1354,6 +1356,8 @@ var Ground;
 
         Update.prototype.run = function () {
             var _this = this;
+            var pipeline = require('when/pipeline');
+
             if (this.log_queries) {
                 var temp = new Error();
                 this.run_stack = temp['stack'];
@@ -1363,16 +1367,22 @@ var Ground;
                 return !t.is_virtual;
             });
             var invoke_promises = tree.map(function (trellis) {
-                return _this.ground.invoke(trellis.name + '.update', _this.seed, _this);
+                return function () {
+                    return _this.ground.invoke(trellis.name + '.update', _this.seed, _this);
+                };
             });
 
-            invoke_promises = invoke_promises.concat(this.ground.invoke('*.update', this.seed, this));
+            invoke_promises = invoke_promises.concat(function () {
+                return _this.ground.invoke('*.update', _this.seed, _this);
+            });
 
-            return when.all(invoke_promises).then(function () {
+            return pipeline(invoke_promises).then(function () {
                 var promises = tree.map(function (trellis) {
-                    return _this.generate_sql(trellis);
+                    return function () {
+                        return _this.generate_sql(trellis);
+                    };
                 });
-                return when.all(promises).then(function () {
+                return pipeline(promises).then(function () {
                     return _this.seed;
                 });
             });
@@ -1853,8 +1863,8 @@ var Ground;
                 return '`' + key + '`';
             });
             fields.push('PRIMARY KEY (' + primary_fields.join(', ') + ")\n");
-            fields = fields.concat(MetaHub.map_to_array(indexes, function (index, key) {
-                return Table.generate_index_sql(key, index);
+            fields = fields.concat(indexes.map(function (index) {
+                return Table.generate_index_sql(index);
             }));
             var sql = 'CREATE TABLE IF NOT EXISTS `' + table_name + "` (\n";
             sql += fields.join(",\n") + "\n";
@@ -1870,6 +1880,7 @@ var Ground;
                 trellis = this.trellis;
             }
 
+            var indexes = this.indexes ? [].concat(this.indexes) : [];
             var core_properties = trellis.get_core_properties();
             if (Object.keys(core_properties).length === 0)
                 throw new Error('Cannot create a table for ' + trellis.name + '. It does not have any core properties.');
@@ -1892,11 +1903,19 @@ var Ground;
                 };
 
                 fields.push(field);
+
+                if (property.is_unique) {
+                    indexes.push({
+                        name: name + '_unique_index',
+                        fields: [name],
+                        unique: true
+                    });
+                }
             }
 
             var primary_keys = this.get_primary_keys(trellis);
 
-            return Table.create_sql_from_array(this.name, fields, primary_keys, this.indexes);
+            return Table.create_sql_from_array(this.name, fields, primary_keys, indexes);
         };
 
         Table.prototype.get_primary_keys = function (trellis) {
@@ -1937,7 +1956,8 @@ var Ground;
             return value;
         };
 
-        Table.generate_index_sql = function (name, index) {
+        Table.generate_index_sql = function (index) {
+            var name = index.name || '';
             var name_string, index_fields = index.fields.join('`, `');
             var result = '';
 
@@ -2150,14 +2170,15 @@ var Ground;
             this.name = null;
             this.parent = null;
             this.type = null;
-            this.is_readonly = false;
             this.insert = null;
             this.other_property = null;
             this.other_trellis = null;
             this.other_trellis_name = null;
             this.is_private = false;
+            this.is_readonly = false;
             this.is_virtual = false;
             this.is_composite_sub = false;
+            this.is_unique = false;
             this.composite_properties = null;
             this.access = 'auto';
             this.allow_null = true;
@@ -2290,6 +2311,10 @@ var Ground;
             var property_type = this.parent.ground.property_types[type];
             if (value === undefined || value === null) {
                 value = this.get_default();
+                if (value === undefined || value === null) {
+                    if (!this.allow_null)
+                        throw new Error(this.fullname() + ' does not allow null values.');
+                }
             }
 
             if (property_type && property_type.parent)
@@ -2316,6 +2341,9 @@ var Ground;
                     if (!value)
                         return 0;
 
+                    if (typeof value === 'string' && !value.match(/^-?\d+$/))
+                        throw new Error(this.fullname() + ' expected an integer but recieved: ' + value);
+
                     return Math.round(value);
                 case 'string':
                 case 'text':
@@ -2334,7 +2362,11 @@ var Ground;
                     if (!value)
                         return 0;
 
-                    return parseFloat(value);
+                    var num = parseFloat(value);
+                    if (num == NaN)
+                        throw new Error(this.fullname() + ' expected an integer but recieved: ' + value);
+
+                    return num;
                 case 'money':
                     if (typeof value !== 'number')
                         return parseFloat(value.toString());

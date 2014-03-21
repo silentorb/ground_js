@@ -298,7 +298,7 @@ declare module Ground {
         public create_sql_from_trellis(trellis: Ground.Trellis): string;
         private get_primary_keys(trellis);
         static format_value(value: any): any;
-        static generate_index_sql(name: string, index: any): string;
+        static generate_index_sql(index: any): string;
         public load_from_schema(source: any): void;
     }
 }
@@ -346,15 +346,16 @@ declare module Ground {
         public name: string;
         public parent: Ground.Trellis;
         public type: string;
-        public is_readonly: boolean;
         public insert: string;
         public other_property: string;
         public "default": any;
         public other_trellis: Ground.Trellis;
         public other_trellis_name: string;
         public is_private: boolean;
+        public is_readonly: boolean;
         public is_virtual: boolean;
         public is_composite_sub: boolean;
+        public is_unique: boolean;
         public composite_properties: any[];
         public access: string;
         public allow_null: boolean;

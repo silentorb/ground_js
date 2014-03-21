@@ -375,8 +375,11 @@ module Ground {
     }
 
     private update_reference_object(other, property:Property):Promise {
-      if (typeof other !== 'object')
+      if (typeof other !== 'object') {
+        // Test if the value is a valid key.  An error will be thrown if it isn't
+        property.get_sql_value(other)
         return when.resolve()
+      }
 
       var trellis;
       if (other.trellis)
@@ -399,20 +402,22 @@ module Ground {
     }
 
     public run():Promise {
+      var pipeline = require('when/pipeline')
+
       if (this.log_queries) {
         var temp = new Error()
         this.run_stack = temp['stack']
       }
 
       var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
-      var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.update', this.seed, this));
+      var invoke_promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.update', this.seed, this));
 
-      invoke_promises = invoke_promises.concat(this.ground.invoke('*.update', this.seed, this))
+      invoke_promises = invoke_promises.concat(()=> this.ground.invoke('*.update', this.seed, this))
 
-      return when.all(invoke_promises)
+      return pipeline(invoke_promises)
         .then(()=> {
-          var promises = tree.map((trellis:Trellis) => this.generate_sql(trellis));
-          return when.all(promises)
+          var promises = tree.map((trellis:Trellis) => ()=> this.generate_sql(trellis));
+          return pipeline(promises)
             .then(()=> {
               return this.seed
             })

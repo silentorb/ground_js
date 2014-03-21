@@ -20,18 +20,19 @@ module Ground {
     name:string = null;
     parent:Trellis = null;
     type:string = null;
-    is_readonly:boolean = false;
     insert:string = null;
     other_property:string = null;
     "default":any
     other_trellis:Trellis = null;
     other_trellis_name:string = null;
     is_private:boolean = false;
+    is_readonly:boolean = false;
     is_virtual:boolean = false;
     is_composite_sub:boolean = false
+    is_unique:boolean = false
     composite_properties:any[] = null
     access:string = 'auto' // 'auto' or 'manual'
-    allow_null:boolean = true
+    allow_null:boolean = false
 
     constructor(name:string, source:IProperty_Source, trellis:Trellis) {
       for (var i in source) {
@@ -178,6 +179,10 @@ module Ground {
       var property_type = this.parent.ground.property_types[type];
       if (value === undefined || value === null) {
         value = this.get_default()
+        if (value === undefined || value === null) {
+          if (!this.allow_null)
+            throw new Error(this.fullname() + ' does not allow null values.')
+        }
       }
 
       if (property_type && property_type.parent)
@@ -209,7 +214,10 @@ module Ground {
           if (!value)
             return 0
 
-          return Math.round(value);
+          if (typeof value === 'string' && !value.match(/^-?\d+$/))
+            throw new Error(this.fullname() + ' expected an integer but recieved: ' + value)
+
+          return Math.round(value)
         case 'string':
         case 'text':
           if (!value)
@@ -227,7 +235,11 @@ module Ground {
           if (!value)
             return 0
 
-          return parseFloat(value)
+          var num = parseFloat(value)
+          if (num == NaN)
+            throw new Error(this.fullname() + ' expected an integer but recieved: ' + value)
+
+          return num
         case 'money':
           if (typeof value !== 'number')
             return parseFloat(value.toString());
