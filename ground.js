@@ -1991,7 +1991,8 @@ var Ground;
     
 
     var Link_Trellis = (function () {
-        function Link_Trellis(trellises) {
+        function Link_Trellis(trellises, table_name) {
+            if (typeof table_name === "undefined") { table_name = null; }
             var _this = this;
             this.trellises = [];
             this.trellis_dictionary = {};
@@ -2002,7 +2003,7 @@ var Ground;
                 this.trellis_dictionary[trellis.name] = trellis;
             }
 
-            this.table_name = trellises.map(function (t) {
+            this.table_name = table_name || trellises.map(function (t) {
                 return t.get_plural();
             }).sort().join('_');
 
@@ -2032,10 +2033,13 @@ var Ground;
         };
 
         Link_Trellis.create_from_property = function (property) {
+            var field = property.get_field_override();
+            var table_name = field ? field.other_table : null;
+
             var trellises = [
                 property.parent,
                 property.other_trellis];
-            return new Link_Trellis(trellises);
+            return new Link_Trellis(trellises, table_name);
         };
 
         Link_Trellis.create_reference = function (property, name) {
@@ -2181,7 +2185,7 @@ var Ground;
             this.is_unique = false;
             this.composite_properties = null;
             this.access = 'auto';
-            this.allow_null = true;
+            this.allow_null = false;
             for (var i in source) {
                 if (this.hasOwnProperty(i))
                     this[i] = source[i];
@@ -2247,10 +2251,18 @@ var Ground;
         };
 
         Property.prototype.get_default = function () {
+            var result;
             if (this.default == undefined && this.parent.parent && this.parent.parent.properties[this.name])
-                return this.parent.parent.properties[this.name].get_default();
+                result = this.parent.parent.properties[this.name].get_default();
+            else
+                result = this.default;
 
-            return this.default;
+            if (result === undefined) {
+                var type = this.get_property_type();
+                if (type)
+                    result = type.default_value;
+            }
+            return result;
         };
 
         Property.prototype.get_field_name = function () {
@@ -2305,20 +2317,21 @@ var Ground;
                 return this.name;
         };
 
-        Property.prototype.get_sql_value = function (value, type) {
+        Property.prototype.get_sql_value = function (value, type, is_reference) {
             if (typeof type === "undefined") { type = null; }
+            if (typeof is_reference === "undefined") { is_reference = false; }
             type = type || this.type;
             var property_type = this.parent.ground.property_types[type];
             if (value === undefined || value === null) {
                 value = this.get_default();
                 if (value === undefined || value === null) {
-                    if (!this.allow_null)
+                    if (!this.allow_null && !is_reference)
                         throw new Error(this.fullname() + ' does not allow null values.');
                 }
             }
 
             if (property_type && property_type.parent)
-                return this.get_sql_value(value, property_type.parent.name);
+                return this.get_sql_value(value, property_type.parent.name, is_reference);
 
             switch (type) {
                 case 'guid':
@@ -2335,7 +2348,7 @@ var Ground;
                         if (!value)
                             return null;
                     }
-                    return other_primary_property.get_sql_value(value);
+                    return other_primary_property.get_sql_value(value, null, true);
 
                 case 'int':
                     if (!value)

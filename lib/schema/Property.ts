@@ -101,10 +101,18 @@ module Ground {
     }
 
     get_default():any {
+      var result
       if (this.default == undefined && this.parent.parent && this.parent.parent.properties[this.name])
-        return this.parent.parent.properties[this.name].get_default()
+        result = this.parent.parent.properties[this.name].get_default()
+      else
+        result = this.default
 
-      return this.default
+      if (result === undefined) {
+        var type = this.get_property_type()
+        if (type)
+          result = type.default_value
+      }
+      return result
     }
 
     get_field_name():string {
@@ -174,19 +182,19 @@ module Ground {
         return this.name
     }
 
-    get_sql_value(value, type = null) {
+    get_sql_value(value, type = null, is_reference = false) {
       type = type || this.type
       var property_type = this.parent.ground.property_types[type];
       if (value === undefined || value === null) {
         value = this.get_default()
         if (value === undefined || value === null) {
-          if (!this.allow_null)
+          if (!this.allow_null && !is_reference)
             throw new Error(this.fullname() + ' does not allow null values.')
         }
       }
 
       if (property_type && property_type.parent)
-        return this.get_sql_value(value, property_type.parent.name);
+        return this.get_sql_value(value, property_type.parent.name, is_reference);
 
       switch (type) {
         case 'guid':
@@ -205,7 +213,7 @@ module Ground {
             if (!value)
               return null
           }
-          return other_primary_property.get_sql_value(value)
+          return other_primary_property.get_sql_value(value, null, true)
 //          if (typeof value === 'object') {
 //            value = value[this.other_trellis.primary_key]
 //          }

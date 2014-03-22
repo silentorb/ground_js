@@ -28,7 +28,7 @@ module Ground {
     trellis_dictionary = {} // Should contain the same values as trellises, just keyed by trellis name
     identities:Identity[]
 
-    constructor(trellises:Trellis[]) {
+    constructor(trellises:Trellis[], table_name:string = null) {
       this.trellises = trellises
 
       for (var i = 0; i < trellises.length; ++i) {
@@ -36,7 +36,7 @@ module Ground {
         this.trellis_dictionary[trellis.name] = trellis
       }
 
-      this.table_name = trellises.map((t)=> t.get_plural())
+      this.table_name = table_name || trellises.map((t)=> t.get_plural())
         .sort().join('_')
 
       this.identities = trellises.map((x)=> this.create_identity(x))
@@ -64,10 +64,13 @@ module Ground {
     }
 
     static create_from_property(property:Property):Link_Trellis {
+      var field = property.get_field_override()
+      var table_name = field ? field.other_table : null
+
       var trellises = [
         property.parent,
         property.other_trellis]
-      return new Link_Trellis(trellises)
+      return new Link_Trellis(trellises, table_name)
     }
 
     static create_reference(property:Property, name:string):Identity_Key {

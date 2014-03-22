@@ -4,8 +4,8 @@
   "description": "Ground Libraries for Node.js",
   "main": "ground.js",
   "dependencies": {
-    "when": "2.7.x",
-    "mysql": "2.0.x",
+    "when": "x.x.x",
+    "mysql": "2.x.x",
     "express": "3.4.x",
     "source-map-support":"0.2.3",
     "node-uuid": "~1.4.1"

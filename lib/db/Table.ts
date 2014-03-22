@@ -6,9 +6,10 @@
 
 module Ground {
   export interface IField {
-    relationship:string;
-    name:string;
-    share:string;
+    relationship?:string
+    name:string
+    share?:string
+    other_table?:string
   }
 
   export class Table {
