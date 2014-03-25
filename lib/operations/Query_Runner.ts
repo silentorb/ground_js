@@ -138,15 +138,26 @@ module Ground {
         return when.resolve(this.row_cache)
 
       var tree = source.trellis.get_tree()
-      var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', source))
-      promises = promises.concat(this.ground.invoke('*.query', source));
+      var promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
+      promises = promises.concat(()=> this.ground.invoke('*.query', source))
+      if (source.filters) {
+        for (var i in source.filters) {
+          var filter = source.filters[i]
+          var operator_action = Query_Builder.operators[filter.operator]
+          if (operator_action && typeof operator_action.prepare === 'function') {
+            var property = source.trellis.sanitize_property(filter.property);
+            promises.push(()=> operator_action.prepare(filter, property))
+          }
+        }
+      }
 
-      return when.all(promises)
+      var sequence = require('when/sequence')
+      return sequence(promises)
         .then(()=> {
           var sql = this.renderer.generate_sql(source)
-          sql = sql.replace(/\r/g, "\n");
+          sql = sql.replace(/\r/g, "\n")
           if (this.ground.log_queries)
-            console.log('\nquery', sql + '\n');
+            console.log('\nquery', sql + '\n')
 
 //          var args = MetaHub.values(this.arguments).concat(args);
           return this.ground.db.query(sql)

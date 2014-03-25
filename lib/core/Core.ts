@@ -69,6 +69,7 @@ module Ground {
     default_value;
     parent:Property_Type;
     db:Database;
+    allow_null:boolean = false
 
     constructor(name:string, info, types:Property_Type[]) {
       if (info.parent) {
@@ -80,11 +81,13 @@ module Ground {
         this.field_type = info.field_type;
       }
 
-      this.name = name;
-      this.property_class = 'Property';
-      if (info.default) {
-        this.default_value = info.default;
-      }
+      this.name = name
+      this.property_class = 'Property'
+      if (info.default !== undefined)
+        this.default_value = info.default
+
+      if (info.allow_null !== undefined)
+        this.allow_null = info.allow_null
     }
 
     get_field_type() {

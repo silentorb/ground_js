@@ -73,15 +73,21 @@ module Ground {
           throw new Error('Field ' + name + ' is missing a type.');
         }
 
+        var auto_increment =
+          primary_keys.indexOf(name) > -1
+          && type.search(/INT/) > -1
+          && primary_keys[0] == name
+
         var field_sql = '`' + name + '` ' + type;
-        if (primary_keys.indexOf(name) > -1) {
-          if (type.search(/INT/) > -1 && primary_keys[0] == name)
-            field_sql += ' AUTO_INCREMENT';
-        }
+        if (auto_increment)
+          field_sql += ' AUTO_INCREMENT';
+
         if (field.allow_null === false) {
           field_sql += ' NOT NULL'
         }
-        if (field.default !== undefined)
+
+        // auto_increment fields should not have a default
+        if (!auto_increment && field.default !== undefined)
           field_sql += ' DEFAULT ' + Table.format_value(field.default);
 
         return field_sql;
@@ -128,11 +134,28 @@ module Ground {
         if (field_test && field_test.share)
           continue;
 
+        var allow_null = property.get_allow_null()
+        // If a property is set to allow nulls, it should default to null unless a default
+        // is directly set for that property.
+        // If a property is set to not allow nulls, try to use the property default, and if that
+        // isn't set, use the property type default as a fallback.
+        var default_value
+        if (allow_null) {
+          default_value = property.default !== undefined ? property.default : null
+        }
+        else {
+          default_value = property.get_default()
+
+          // If allow_null is false, then null is an invalid default value
+          if (default_value === null)
+            default_value = undefined
+        }
+
         var field = {
           name: property.get_field_name(),
           type: property.get_field_type(),
-          "default": property.default,
-          allow_null: property.allow_null
+          "default": default_value,
+          allow_null: allow_null
         };
 
         fields.push(field)

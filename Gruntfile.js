@@ -64,7 +64,8 @@ module.exports = function (grunt) {
           { src: 'ground.d.ts', dest: '../lawn/defs/'},
           { src: 'ground.d.ts', dest: '../vineyard/defs/'},
           { src: 'ground.d.ts', dest: '../fortress/defs/'},
-          { src: 'ground.d.ts', dest: '../plantlab/defs/'}
+          { src: 'ground.d.ts', dest: '../plantlab/defs/'},
+          { src: 'ground.d.ts', dest: '../vineyard-solr/defs/'}
         ]
       }
     },

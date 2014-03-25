@@ -33,7 +33,6 @@ module Ground {
     pager:IPager
     type:string = 'query'
     properties
-//    source:External_Query_Source
     sorts:Query_Sort[] = []
     source:External_Query_Source
     include_links:boolean = false
@@ -41,10 +40,12 @@ module Ground {
     subqueries = {}
     public static operators = {
       '=': null,
-      'LIKE': (result, filter, property, data)=> {
-        result.filters.push(property.query() + ' LIKE ' + data.placeholder)
-        if (data.value !== null)
-          data.value = '%' + data.value + '%'
+      'LIKE': {
+        "render": (result, filter, property, data)=> {
+          result.filters.push(property.query() + ' LIKE ' + data.placeholder)
+          if (data.value !== null)
+            data.value = '%' + data.value + '%'
+        }
       },
       '!=': null
     }
@@ -65,7 +66,7 @@ module Ground {
       var property = properties[property_name]
       if (!property)
         throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.')
-console.log('q', Query_Builder.operators)
+      console.log('q', Query_Builder.operators)
       if (Query_Builder.operators[operator] === undefined)
         throw new Error("Invalid operator: '" + operator + "'.")
 

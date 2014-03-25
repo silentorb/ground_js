@@ -1510,6 +1510,7 @@ var Ground;
 
     var Property_Type = (function () {
         function Property_Type(name, info, types) {
+            this.allow_null = false;
             if (info.parent) {
                 var parent = types[info.parent];
                 MetaHub.extend(this, parent);
@@ -1520,9 +1521,11 @@ var Ground;
 
             this.name = name;
             this.property_class = 'Property';
-            if (info.default) {
+            if (info.default !== undefined)
                 this.default_value = info.default;
-            }
+
+            if (info.allow_null !== undefined)
+                this.allow_null = info.allow_null;
         }
         Property_Type.prototype.get_field_type = function () {
             if (this.field_type) {
@@ -1838,15 +1841,17 @@ var Ground;
                     throw new Error('Field ' + name + ' is missing a type.');
                 }
 
+                var auto_increment = primary_keys.indexOf(name) > -1 && type.search(/INT/) > -1 && primary_keys[0] == name;
+
                 var field_sql = '`' + name + '` ' + type;
-                if (primary_keys.indexOf(name) > -1) {
-                    if (type.search(/INT/) > -1 && primary_keys[0] == name)
-                        field_sql += ' AUTO_INCREMENT';
-                }
+                if (auto_increment)
+                    field_sql += ' AUTO_INCREMENT';
+
                 if (field.allow_null === false) {
                     field_sql += ' NOT NULL';
                 }
-                if (field.default !== undefined)
+
+                if (!auto_increment && field.default !== undefined)
                     field_sql += ' DEFAULT ' + Table.format_value(field.default);
 
                 return field_sql;
@@ -1895,11 +1900,23 @@ var Ground;
                 if (field_test && field_test.share)
                     continue;
 
+                var allow_null = property.get_allow_null();
+
+                var default_value;
+                if (allow_null) {
+                    default_value = property.default !== undefined ? property.default : null;
+                } else {
+                    default_value = property.get_default();
+
+                    if (default_value === null)
+                        default_value = undefined;
+                }
+
                 var field = {
                     name: property.get_field_name(),
                     type: property.get_field_type(),
-                    "default": property.default,
-                    allow_null: property.allow_null
+                    "default": default_value,
+                    allow_null: allow_null
                 };
 
                 fields.push(field);
@@ -2185,13 +2202,15 @@ var Ground;
             this.is_unique = false;
             this.composite_properties = null;
             this.access = 'auto';
-            this.allow_null = false;
             for (var i in source) {
                 if (this.hasOwnProperty(i))
                     this[i] = source[i];
             }
             if (source['default'] !== undefined)
                 this.default = source['default'];
+
+            if (source['allow_null'] !== undefined)
+                this.allow_null = source['allow_null'];
 
             if (source.trellis) {
                 this.other_trellis_name = source.trellis;
@@ -2205,6 +2224,17 @@ var Ground;
 
         Property.prototype.fullname = function () {
             return this.parent.name + '.' + this.name;
+        };
+
+        Property.prototype.get_allow_null = function () {
+            if (this.allow_null !== undefined)
+                return this.allow_null;
+
+            var type = this.get_property_type();
+            if (type && type.allow_null !== undefined)
+                return type.allow_null;
+
+            return false;
         };
 
         Property.prototype.get_composite = function () {
@@ -2308,7 +2338,7 @@ var Ground;
             if (value === undefined || value === null) {
                 value = this.get_default();
                 if (value === undefined || value === null) {
-                    if (!this.allow_null && !is_reference)
+                    if (!this.get_allow_null() && !is_reference)
                         throw new Error(this.fullname() + ' does not allow null values.');
                 }
             }
@@ -2326,7 +2356,7 @@ var Ground;
 
                 case 'reference':
                     var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key];
-                    if (typeof value === 'object') {
+                    if (value && typeof value === 'object') {
                         value = value[this.other_trellis.primary_key];
                         if (!value)
                             return null;
@@ -2670,10 +2700,12 @@ var Ground;
         };
         Query_Builder.operators = {
             '=': null,
-            'LIKE': function (result, filter, property, data) {
-                result.filters.push(property.query() + ' LIKE ' + data.placeholder);
-                if (data.value !== null)
-                    data.value = '%' + data.value + '%';
+            'LIKE': {
+                "render": function (result, filter, property, data) {
+                    result.filters.push(property.query() + ' LIKE ' + data.placeholder);
+                    if (data.value !== null)
+                        data.value = '%' + data.value + '%';
+                }
             },
             '!=': null
         };
@@ -2811,16 +2843,16 @@ var Ground;
                 result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
             } else {
                 var operator_action = Ground.Query_Builder.operators[filter.operator];
-                if (!operator_action) {
-                    result.filters.push(property.query() + ' ' + filter.operator + ' ' + placeholder);
-                } else {
+                if (operator_action && typeof operator_action.render === 'function') {
                     var data = {
                         value: value,
                         placeholder: placeholder
                     };
-                    operator_action(result, filter, property, data);
+                    operator_action.render(result, filter, property, data);
                     value = data.value;
                     placeholder = data.placeholder;
+                } else {
+                    result.filters.push(property.query() + ' ' + filter.operator + ' ' + placeholder);
                 }
             }
 
@@ -3028,11 +3060,28 @@ var Ground;
 
             var tree = source.trellis.get_tree();
             var promises = tree.map(function (trellis) {
-                return _this.ground.invoke(trellis.name + '.query', source);
+                return function () {
+                    return _this.ground.invoke(trellis.name + '.query', source);
+                };
             });
-            promises = promises.concat(this.ground.invoke('*.query', source));
+            promises = promises.concat(function () {
+                return _this.ground.invoke('*.query', source);
+            });
+            if (source.filters) {
+                for (var i in source.filters) {
+                    var filter = source.filters[i];
+                    var operator_action = Ground.Query_Builder.operators[filter.operator];
+                    if (operator_action && typeof operator_action.prepare === 'function') {
+                        var property = source.trellis.sanitize_property(filter.property);
+                        promises.push(function () {
+                            return operator_action.prepare(filter, property);
+                        });
+                    }
+                }
+            }
 
-            return when.all(promises).then(function () {
+            var sequence = require('when/sequence');
+            return sequence(promises).then(function () {
                 var sql = _this.renderer.generate_sql(source);
                 sql = sql.replace(/\r/g, "\n");
                 if (_this.ground.log_queries)

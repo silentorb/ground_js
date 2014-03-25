@@ -145,26 +145,18 @@ module Ground {
       }
       else {
         var operator_action = Query_Builder.operators[filter.operator]
-        if (!operator_action) {
-          result.filters.push(property.query() + ' ' + filter.operator + ' ' + placeholder);
-        }
-        else {
+        if (operator_action && typeof operator_action.render === 'function') {
           var data = {
             value: value,
             placeholder: placeholder
           }
-          operator_action(result, filter, property, data)
+          operator_action.render(result, filter, property, data)
           value = data.value
           placeholder = data.placeholder
         }
-//        if (filter.operator.toLowerCase() == 'like') {
-//          result.filters.push(property.query() + ' LIKE ' + placeholder);
-//          if (value !== null)
-//            value = '%' + value + '%';
-//        }
-//        else {
-//          result.filters.push(property.query() + ' = ' + placeholder);
-//        }
+        else {
+          result.filters.push(property.query() + ' ' + filter.operator + ' ' + placeholder);
+        }
       }
 
       if (value !== null) {

@@ -32,7 +32,7 @@ module Ground {
     is_unique:boolean = false
     composite_properties:any[] = null
     access:string = 'auto' // 'auto' or 'manual'
-    allow_null:boolean = false
+    allow_null:boolean
 
     constructor(name:string, source:IProperty_Source, trellis:Trellis) {
       for (var i in source) {
@@ -41,6 +41,9 @@ module Ground {
       }
       if (source['default'] !== undefined )
         this.default = source['default']
+
+      if (source['allow_null'] !== undefined )
+        this.allow_null = source['allow_null']
 
       if (source.trellis) {
         this.other_trellis_name = source.trellis;
@@ -72,6 +75,17 @@ module Ground {
 
     fullname():string {
       return this.parent.name + '.' + this.name
+    }
+
+    get_allow_null():boolean {
+      if (this.allow_null !== undefined)
+        return this.allow_null
+
+      var type = this.get_property_type()
+      if (type && type.allow_null !== undefined)
+        return type.allow_null
+
+      return false
     }
 
     get_composite() {
@@ -188,7 +202,7 @@ module Ground {
       if (value === undefined || value === null) {
         value = this.get_default()
         if (value === undefined || value === null) {
-          if (!this.allow_null && !is_reference)
+          if (!this.get_allow_null() && !is_reference)
             throw new Error(this.fullname() + ' does not allow null values.')
         }
       }
@@ -208,7 +222,7 @@ module Ground {
 //          throw new Error('Cannot call get_sql_value on a list property')
         case 'reference':
           var other_primary_property = this.other_trellis.properties[this.other_trellis.primary_key]
-          if (typeof value === 'object') {
+          if (value && typeof value === 'object') {
             value = value[this.other_trellis.primary_key]
             if (!value)
               return null

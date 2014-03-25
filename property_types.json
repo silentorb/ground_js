@@ -9,7 +9,7 @@
   },
   "text" : {
     "field_type" : "TEXT",
-    "default" : ""
+    "allow_null" : true
   },
   "bool" : {
     "field_type" : "TINYINT(4)",
