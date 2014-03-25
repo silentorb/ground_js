@@ -2201,23 +2201,6 @@ var Ground;
             this.parent = trellis;
         }
         Property.prototype.initialize_composite_reference = function (other_trellis) {
-            var table = other_trellis.table;
-            if (table && table.primary_keys && table.primary_keys.length > 1) {
-                for (var i = 0; i < table.primary_keys.length; ++i) {
-                    var key = table.primary_keys[i];
-                    var name = other_trellis.name + '_' + key;
-                    if (key != other_trellis.primary_key) {
-                        var other_property = other_trellis.properties[key];
-                        var new_property = this.parent.add_property(name, other_property.get_data());
-                        new_property.other_property = key;
-                        new_property.other_trellis_name = this.parent.name;
-                        new_property.other_trellis = this.parent;
-                        new_property.is_composite_sub = true;
-                        this.composite_properties = this.composite_properties || [];
-                        this.composite_properties.push(new_property);
-                    }
-                }
-            }
         };
 
         Property.prototype.fullname = function () {
