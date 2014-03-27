@@ -40,6 +40,7 @@ module Ground {
 
   export interface External_Query_Source extends Property_Query_Source {
     trellis:string;
+    map?
   }
 
   export interface Internal_Query_Source {

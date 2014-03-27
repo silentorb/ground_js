@@ -80,7 +80,7 @@ module Ground {
     }
 
     process_row(row, source:Query_Builder):Promise {
-      var name, property
+      var name, property, replacement = undefined
 
       var properties = source.trellis.get_core_properties()
       for (name in properties) {
@@ -111,9 +111,39 @@ module Ground {
         return null
       })
 
+      if (typeof source.map === 'object') {
+        var all_properties = source.trellis.get_all_properties()
+        for (var i in source.map) {
+          var expression = source.map[i]
+          if (i == 'this') {
+            if (typeof expression === 'string' && all_properties[expression]) {
+              replacement = row[expression]
+            }
+
+            break
+          }
+        }
+        MetaHub.map_to_array(links, (property, name) => {
+          if (property.is_composite_sub)
+            return null
+
+          var path = Query_Runner.get_path(property.name)
+          var subquery = source.subqueries[property.name]
+
+          if (source.include_links || subquery) {
+            return this.query_link_property(row, property, source).then((value) => {
+              row[name] = value
+              return row
+            })
+          }
+
+          return null
+        })
+      }
+
       return when.all(promises)
         .then(()=> this.ground.invoke(source.trellis.name + '.queried', row, this))
-        .then(()=> row)
+        .then(()=> replacement === undefined ? row : replacement)
     }
 
     query_link_property(seed, property, source:Query_Builder):Promise {

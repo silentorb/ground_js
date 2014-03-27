@@ -38,6 +38,7 @@ module Ground {
     include_links:boolean = false
     transforms:Query_Transform[] = []
     subqueries = {}
+    map = {}
     public static operators = {
       '=': null,
       'LIKE': {
@@ -93,6 +94,10 @@ module Ground {
       }
 
       this.sorts.push(sort)
+    }
+
+    add_map(target:string, source = null) {
+      this.map[target] = source
     }
 
     add_subquery(property_name:string, source = null):Query_Builder {
@@ -176,11 +181,12 @@ module Ground {
             }
           }
           else {
-            if (!properties[property.name])
-              throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property.name + '.')
+            var name = property.name || i
+            if (!properties[name])
+              throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.')
 
             if (property)
-              this.properties[property.name] = property
+              this.properties[name] = property
           }
         }
 
@@ -199,6 +205,12 @@ module Ground {
       if (typeof source.subqueries == 'object') {
         for (i in source.subqueries) {
           this.add_subquery(i, source.subqueries[i])
+        }
+      }
+
+      if (typeof source.map == 'object') {
+        for (i in source.map) {
+          this.add_map(i, source.map[i])
         }
       }
 

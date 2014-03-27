@@ -2515,6 +2515,7 @@ var Ground;
             this.include_links = false;
             this.transforms = [];
             this.subqueries = {};
+            this.map = {};
             this.filters = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
@@ -2557,6 +2558,11 @@ var Ground;
             }
 
             this.sorts.push(sort);
+        };
+
+        Query_Builder.prototype.add_map = function (target, source) {
+            if (typeof source === "undefined") { source = null; }
+            this.map[target] = source;
         };
 
         Query_Builder.prototype.add_subquery = function (property_name, source) {
@@ -2638,11 +2644,12 @@ var Ground;
 
                         this.properties[property] = {};
                     } else {
-                        if (!properties[property.name])
-                            throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property.name + '.');
+                        var name = property.name || i;
+                        if (!properties[name])
+                            throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.');
 
                         if (property)
-                            this.properties[property.name] = property;
+                            this.properties[name] = property;
                     }
                 }
 
@@ -2661,6 +2668,12 @@ var Ground;
             if (typeof source.subqueries == 'object') {
                 for (i in source.subqueries) {
                     this.add_subquery(i, source.subqueries[i]);
+                }
+            }
+
+            if (typeof source.map == 'object') {
+                for (i in source.map) {
+                    this.add_map(i, source.map[i]);
                 }
             }
 
@@ -2996,7 +3009,7 @@ var Ground;
 
         Query_Runner.prototype.process_row = function (row, source) {
             var _this = this;
-            var name, property;
+            var name, property, replacement = undefined;
 
             var properties = source.trellis.get_core_properties();
             for (name in properties) {
@@ -3029,10 +3042,40 @@ var Ground;
                 return null;
             });
 
+            if (typeof source.map === 'object') {
+                var all_properties = source.trellis.get_all_properties();
+                for (var i in source.map) {
+                    var expression = source.map[i];
+                    if (i == 'this') {
+                        if (typeof expression === 'string' && all_properties[expression]) {
+                            replacement = row[expression];
+                        }
+
+                        break;
+                    }
+                }
+                MetaHub.map_to_array(links, function (property, name) {
+                    if (property.is_composite_sub)
+                        return null;
+
+                    var path = Query_Runner.get_path(property.name);
+                    var subquery = source.subqueries[property.name];
+
+                    if (source.include_links || subquery) {
+                        return _this.query_link_property(row, property, source).then(function (value) {
+                            row[name] = value;
+                            return row;
+                        });
+                    }
+
+                    return null;
+                });
+            }
+
             return when.all(promises).then(function () {
                 return _this.ground.invoke(source.trellis.name + '.queried', row, _this);
             }).then(function () {
-                return row;
+                return replacement === undefined ? row : replacement;
             });
         };
 
