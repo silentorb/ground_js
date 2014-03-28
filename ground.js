@@ -3110,6 +3110,9 @@ var Ground;
             promises = promises.concat(function () {
                 return _this.ground.invoke('*.query', source);
             });
+
+            var is_empty = false;
+
             if (source.filters) {
                 for (var i in source.filters) {
                     var filter = source.filters[i];
@@ -3117,7 +3120,10 @@ var Ground;
                     if (operator_action && typeof operator_action.prepare === 'function') {
                         var property = source.trellis.sanitize_property(filter.property);
                         promises.push(function () {
-                            return operator_action.prepare(filter, property);
+                            return operator_action.prepare(filter, property).then(function (result) {
+                                if (result === false)
+                                    is_empty = true;
+                            });
                         });
                     }
                 }
@@ -3125,6 +3131,9 @@ var Ground;
 
             var sequence = require('when/sequence');
             return sequence(promises).then(function () {
+                if (is_empty)
+                    return when.resolve([]);
+
                 var sql = _this.renderer.generate_sql(source);
                 sql = sql.replace(/\r/g, "\n");
                 if (_this.ground.log_queries)

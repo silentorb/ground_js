@@ -170,13 +170,21 @@ module Ground {
       var tree = source.trellis.get_tree()
       var promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
       promises = promises.concat(()=> this.ground.invoke('*.query', source))
+
+      var is_empty = false
+
       if (source.filters) {
         for (var i in source.filters) {
           var filter = source.filters[i]
           var operator_action = Query_Builder.operators[filter.operator]
           if (operator_action && typeof operator_action.prepare === 'function') {
             var property = source.trellis.sanitize_property(filter.property);
-            promises.push(()=> operator_action.prepare(filter, property))
+            promises.push(()=> operator_action.prepare(filter, property)
+                .then((result) => {
+                  if (result === false)
+                    is_empty = true
+                })
+            )
           }
         }
       }
@@ -184,6 +192,9 @@ module Ground {
       var sequence = require('when/sequence')
       return sequence(promises)
         .then(()=> {
+          if (is_empty)
+            return when.resolve([])
+
           var sql = this.renderer.generate_sql(source)
           sql = sql.replace(/\r/g, "\n")
           if (this.ground.log_queries)
