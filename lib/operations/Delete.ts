@@ -57,7 +57,7 @@ module Ground {
         var link = links[i]
         var other = link.get_other_property()
         // The other trellis may not have a reciprocal property
-        if (other && other.name == 'parent')// || other.is_parent)
+        if (other && other.name == 'parent' || other.is_parent)
           result.push(link)
       }
 

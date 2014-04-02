@@ -1442,7 +1442,7 @@ var Ground;
                 var link = links[i];
                 var other = link.get_other_property();
 
-                if (other && other.name == 'parent')
+                if (other && other.name == 'parent' || other.is_parent)
                     result.push(link);
             }
 
@@ -2196,6 +2196,7 @@ var Ground;
             this.other_trellis = null;
             this.other_trellis_name = null;
             this.is_private = false;
+            this.is_parent = false;
             this.is_readonly = false;
             this.is_virtual = false;
             this.is_composite_sub = false;
@@ -2576,7 +2577,6 @@ var Ground;
                 throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.');
 
             var query = this.subqueries[property_name];
-            console.log('subquery', property_name, query != null);
             if (!query) {
                 query = new Query_Builder(property.other_trellis);
                 query.include_links = false;

@@ -17,17 +17,18 @@ module Ground {
   }
 
   export class Property {
-    name:string = null;
-    parent:Trellis = null;
-    type:string = null;
-    insert:string = null;
-    other_property:string = null;
+    name:string = null
+    parent:Trellis = null
+    type:string = null
+    insert:string = null
+    other_property:string = null
     "default":any
-    other_trellis:Trellis = null;
-    other_trellis_name:string = null;
-    is_private:boolean = false;
-    is_readonly:boolean = false;
-    is_virtual:boolean = false;
+    other_trellis:Trellis = null
+    other_trellis_name:string = null
+    is_private:boolean = false
+    is_parent:boolean = false
+    is_readonly:boolean = false
+    is_virtual:boolean = false
     is_composite_sub:boolean = false
     is_unique:boolean = false
     composite_properties:any[] = null
