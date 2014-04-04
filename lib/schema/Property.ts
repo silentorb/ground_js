@@ -5,7 +5,6 @@
  * Time: 5:40 PM
  */
 /// <reference path="../references.ts"/>
-/// <reference path="../../defs/when.d.ts"/>
 
 module Ground {
 

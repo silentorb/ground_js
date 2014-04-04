@@ -1,6 +1,5 @@
 
-/// <reference path="../defs/when.d.ts"/>
-/// <reference path="../defs/metahub.d.ts"/>
+/// <reference path="../../metahub/metahub.d.ts"/>
 
 /// <reference path="core/Core.ts"/>
 /// <reference path="db/Table.ts"/>

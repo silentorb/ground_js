@@ -1,11 +1,7 @@
-/**
- * User: Chris Johnson
- * Date: 9/19/13
- */
 /// <reference path="../references.ts"/>
 /// <reference path="../../defs/mysql.d.ts"/>
-/// <reference path="../../defs/when.d.ts"/>
-var when = require('when');
+//var when = require('when');
+/// <reference path="../../../metahub/metahub.d.ts"/>
 
 module Ground {
   export class Database {

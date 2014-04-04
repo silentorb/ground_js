@@ -1,6 +1,4 @@
-var MetaHub = require('metahub');var when = require('when');
-
-var Ground;
+var MetaHub = require('metahub');var Ground;
 (function (Ground) {
     var Database = (function () {
         function Database(settings, database) {
