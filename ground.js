@@ -29,6 +29,10 @@ var Ground;
             return when.all(promises);
         };
 
+        Database.prototype.close = function () {
+            this.pool.end();
+        };
+
         Database.prototype.create_table = function (trellis) {
             if (!trellis)
                 throw new Error('Empty object was passed to create_table().');
@@ -1769,6 +1773,11 @@ var Ground;
             }
 
             return trellis;
+        };
+
+        Core.prototype.stop = function () {
+            console.log('Closing database connections.');
+            this.db.close();
         };
 
         Core.to_bool = function (input) {

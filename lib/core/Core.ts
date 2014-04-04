@@ -334,6 +334,11 @@ module Ground {
       return trellis;
     }
 
+    stop() {
+      console.log('Closing database connections.')
+      this.db.close()
+    }
+
     static to_bool(input) {
       if (typeof input == 'string') {
         return input.toLowerCase() == 'true';

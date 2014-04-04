@@ -41,6 +41,10 @@ module Ground {
 //        .then(()=>table)
 //    }
 
+    close() {
+      this.pool.end()
+    }
+
     create_table(trellis:Trellis):Promise {
       if (!trellis)
         throw new Error('Empty object was passed to create_table().')
