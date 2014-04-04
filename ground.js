@@ -2703,6 +2703,7 @@ var Ground;
 
         Query_Builder.prototype.run = function () {
             var runner = new Ground.Query_Runner(this);
+            console.log('filters', this.filters);
             return runner.run();
         };
 
@@ -2878,10 +2879,23 @@ var Ground;
         };
 
         Query_Renderer.process_property_filters = function (source, ground) {
-            var result = {};
+            var result = {
+                filters: [],
+                arguments: {},
+                joins: []
+            };
             for (var i in source.filters) {
                 var filter = source.filters[i];
-                MetaHub.extend(result, Query_Renderer.process_property_filter(source, filter, ground));
+                var additions = Query_Renderer.process_property_filter(source, filter, ground);
+
+                if (additions.filters.length)
+                    result.filters = result.filters.concat(additions.filters);
+
+                if (additions.joins.length)
+                    result.joins = result.filters.concat(additions.joins);
+
+                if (Object.keys(additions.arguments).length)
+                    MetaHub.extend(result.arguments, additions.arguments);
             }
             return result;
         };

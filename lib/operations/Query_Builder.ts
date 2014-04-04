@@ -236,6 +236,7 @@ module Ground {
 
     run():Promise {
       var runner = new Query_Runner(this)
+      console.log('filters', this.filters)
       return runner.run()
     }
 
