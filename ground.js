@@ -1,4 +1,6 @@
-var MetaHub = require('metahub');var Ground;
+var MetaHub = require('vineyard-metahub');var when = require('when');
+
+var Ground;
 (function (Ground) {
     var Database = (function () {
         function Database(settings, database) {
@@ -1776,6 +1778,7 @@ var Ground;
         Core.prototype.stop = function () {
             console.log('Closing database connections.');
             this.db.close();
+            console.log('Finished closing database.');
         };
 
         Core.to_bool = function (input) {

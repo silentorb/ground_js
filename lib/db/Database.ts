@@ -1,7 +1,7 @@
 /// <reference path="../references.ts"/>
 /// <reference path="../../defs/mysql.d.ts"/>
-//var when = require('when');
-/// <reference path="../../../metahub/metahub.d.ts"/>
+/// <reference path="../../../vineyard-metahub/metahub.d.ts"/>
+var when = require('when');
 
 module Ground {
   export class Database {

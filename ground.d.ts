@@ -1,6 +1,7 @@
 
-/// <reference path="../metahub/metahub.d.ts" />
+/// <reference path="../vineyard-metahub/metahub.d.ts" />
 
+declare var when: any;
 declare module Ground {
     class Database {
         public settings: any;
@@ -473,8 +474,6 @@ declare module Ground {
         public run_single(): Promise;
     }
 }
-declare module "ground" {
-  export = Ground
-}declare module "ground" {
+declare module "vineyard-ground" {
   export = Ground
 }

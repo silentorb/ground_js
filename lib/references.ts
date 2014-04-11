@@ -1,5 +1,4 @@
-
-/// <reference path="../../metahub/metahub.d.ts"/>
+/// <reference path="../../vineyard-metahub/metahub.d.ts"/>
 
 /// <reference path="core/Core.ts"/>
 /// <reference path="db/Table.ts"/>

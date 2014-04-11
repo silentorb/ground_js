@@ -1,8 +1,3 @@
-/**
- * Created with JetBrains PhpStorm.
- * User: Chris Johnson
- * Date: 9/18/13
- */
 /// <reference path="../references.ts"/>
 
 module Ground {

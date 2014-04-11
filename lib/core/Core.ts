@@ -1,8 +1,3 @@
-/**
- * Created with JetBrains PhpStorm.
- * User: Chris Johnson
- * Date: 9/18/13
- */
 
 /// <reference path="../references.ts"/>
 /// <reference path="../db/Database.ts"/>
@@ -11,7 +6,6 @@
 /// <reference path="../operations/Update.ts"/>
 /// <reference path="../operations/Delete.ts"/>
 /// <reference path="../../defs/node.d.ts"/>
-//var MetaHub = require('metahub');
 
 module Ground {
 
@@ -337,6 +331,7 @@ module Ground {
     stop() {
       console.log('Closing database connections.')
       this.db.close()
+      console.log('Finished closing database.')
     }
 
     static to_bool(input) {
