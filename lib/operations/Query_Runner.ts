@@ -76,7 +76,7 @@ module Ground {
 
       query.add_key_filter(value);
       return query.run()
-        .then((rows) => rows[0])
+        .then((result) => result.objects[0])
     }
 
     process_row(row, source:Query_Builder):Promise {
@@ -159,6 +159,7 @@ module Ground {
         case Relationships.one_to_many:
         case Relationships.many_to_many:
           return Query_Runner.get_many_list(seed, property, relationship, source)
+            .then((result)=> result.objects)
           break
       }
 

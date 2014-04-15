@@ -3083,8 +3083,8 @@ var Ground;
                 return when.resolve(value);
 
             query.add_key_filter(value);
-            return query.run().then(function (rows) {
-                return rows[0];
+            return query.run().then(function (result) {
+                return result.objects[0];
             });
         };
 
@@ -3171,7 +3171,9 @@ var Ground;
                     break;
                 case 2 /* one_to_many */:
                 case 3 /* many_to_many */:
-                    return Query_Runner.get_many_list(seed, property, relationship, source);
+                    return Query_Runner.get_many_list(seed, property, relationship, source).then(function (result) {
+                        return result.objects;
+                    });
                     break;
             }
 
