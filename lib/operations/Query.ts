@@ -1,5 +1,7 @@
 /// <reference path="../references.ts"/>
 
+// !!! THE Query CLASS IS DEPRECATED.  It was broken into multiple smaller classes. !!!
+
 module Ground {
 
   interface ILink {

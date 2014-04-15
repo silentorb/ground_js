@@ -27,6 +27,7 @@ module Ground {
     trellises:Trellis[] = []
     trellis_dictionary = {} // Should contain the same values as trellises, just keyed by trellis name
     identities:Identity[]
+    alias:string
 
     constructor(trellises:Trellis[], table_name:string = null) {
       this.trellises = trellises
@@ -45,7 +46,6 @@ module Ground {
     create_identity(trellis:Trellis):Identity {
       var properties = [], property, name
       var keys = trellis.get_primary_keys()
-//console.log('keys', keys)
       for (var i = 0; i < keys.length; ++i) {
         property = keys[i]
         if (property.name == trellis.primary_key)
@@ -86,7 +86,7 @@ module Ground {
 //      var sql = "JOIN %table_name ON %table_name.%second_key = " + id +
 //        " AND %table_name.%first_key = %back_id\n";
 
-      return 'JOIN ' + this.table_name + ' ON ' + this.get_condition_string(seeds) + "\n"
+      return 'JOIN ' + this.get_table_declaration() + ' ON ' + this.get_condition_string(seeds) + "\n"
     }
 
     generate_delete_row(seeds:any[]):string {
@@ -182,6 +182,7 @@ module Ground {
     }
 
     get_conditions(seeds):string[] {
+      var table_name = typeof this.alias === 'string' ? this.alias : this.table_name
       var conditions = []
       for (var i in this.identities) {
         var identity:Identity = this.identities[i], seed = seeds[identity.trellis.name]
@@ -189,7 +190,7 @@ module Ground {
           var other_identity:Identity = this.identities[1 - i]
           for (var p in identity.keys) {
             var key = identity.keys[p], other_key = other_identity.keys[p]
-            conditions.push(this.table_name + '.' + key.name + ' = `' + identity.trellis.get_table_name() + '`.' + key.property.name)
+            conditions.push(table_name + '.' + key.name + ' = `' + identity.trellis.get_table_name() + '`.' + key.property.name)
           }
         }
         else {
@@ -208,6 +209,12 @@ module Ground {
       }
 
       return null
+    }
+
+    get_table_declaration():string {
+      return typeof this.alias === 'string'
+        ? this.table_name + ' ' + this.alias
+        : this.table_name
     }
   }
 

@@ -7,6 +7,8 @@
 /// <reference path="schema/Property.ts"/>
 /// <reference path="schema/Trellis.ts"/>
 
+/// <reference path="metahub/Expression.ts"/>
+
 /// <reference path="operations/Query.ts"/>
 /// <reference path="operations/Update.ts"/>
 /// <reference path="operations/Delete.ts"/>

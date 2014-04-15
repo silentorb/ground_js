@@ -2,6 +2,12 @@
 
 module Ground {
 
+  interface Join {
+    property?:Property
+    first:Trellis
+    second:Trellis
+  }
+
   export class Query_Renderer {
     ground:Core
 //    fields:string[] = []
@@ -189,7 +195,6 @@ module Ground {
       return result
     }
 
-
     static process_sorts(sorts:Query_Sort[], trellis:Trellis):string {
       if (sorts.length == 0)
         return ''
@@ -237,6 +242,42 @@ module Ground {
           limit = 18446744073709551615;
 
         return ' LIMIT ' + offset + ', ' + limit;
+      }
+    }
+
+    static add_join(joins, join:Join) {
+
+      // Check if a matching join already exists in the list
+      // (I may be pushing my luck with these comparison operators
+      //  and need to write out more detailed comparisons.)
+      for (var i in joins) {
+        var j = <Join>joins[i]
+        if (j.property === join.property
+          && j.first === join.first
+          && j.second === join.second)
+          return
+      }
+
+      joins.push(join)
+    }
+
+    static get_join_table(join:Join):string {
+      if (join.property)
+        return "Join_" + join.first.name + "_" + join.property.name
+
+      return "Composite_Join_" + join.first.name + "_" + join.second.name
+    }
+
+    static render_join(join:Join):string {
+      var table_name = Query_Renderer.get_join_table(join)
+      if (join.property) {
+        var link = Link_Trellis.create_from_property(join.property);
+        link.alias = table_name
+        return link.generate_join({});
+      }
+      else {
+        return 'JOIN ' + join.first.get_table_name() + ' ' + table_name
+          + ' ON ' + this.get_condition_string({}) + "\n"
       }
     }
   }

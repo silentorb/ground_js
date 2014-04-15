@@ -113,15 +113,18 @@ module Ground {
 
       if (typeof source.map === 'object') {
         var all_properties = source.trellis.get_all_properties()
+        var context = {
+//          properties: source.trellis.get_all_properties()
+          properties: row
+        }
         for (var i in source.map) {
           var expression = source.map[i]
+          var value = Expression_Engine.resolve(expression, context)
           if (i == 'this') {
-            if (typeof expression === 'string' && all_properties[expression]) {
-              replacement = row[expression]
-            }
-
+            replacement = value
             break
           }
+          row[i] = value
         }
         MetaHub.map_to_array(links, (property, name) => {
           if (property.is_composite_sub)
