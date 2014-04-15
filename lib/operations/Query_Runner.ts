@@ -198,16 +198,31 @@ module Ground {
           if (is_empty)
             return when.resolve([])
 
-          var sql = this.renderer.generate_sql(source)
+          var parts = this.renderer.generate_parts(source)
+          var sql = this.renderer.generate_sql(parts, source)
           sql = sql.replace(/\r/g, "\n")
           if (this.ground.log_queries)
             console.log('\nquery', sql + '\n')
 
-//          var args = MetaHub.values(this.arguments).concat(args);
           return this.ground.db.query(sql)
             .then((rows)=> {
-              this.row_cache = rows
-              return rows
+              var result = {
+                objects: rows
+              }
+              this.row_cache = result
+              if (source.pager) {
+                var sql = this.renderer.generate_count(parts)
+                if (this.ground.log_queries)
+                  console.log('\nquery', sql + '\n')
+                return this.ground.db.query_single(sql)
+                  .then((count)=> {
+                    result['total'] = count.total_number
+                    return result
+                  })
+              }
+              else {
+                return when.resolve(result)
+              }
             })
         })
     }
@@ -220,12 +235,17 @@ module Ground {
       }
 
       return this.run_core()
-        .then((rows) => when.all(rows.map((row) => this.process_row(row, source))))
+        .then((result) => when.all(result.objects.map((row) => this.process_row(row, source)))
+          .then((rows)=> {
+            result.objects = rows
+            return result
+          })
+      )
     }
 
     run_single():Promise {
       return this.run()
-        .then((rows)=> rows[0])
+        .then((result)=> result.objects[0])
     }
   }
 }

@@ -324,6 +324,7 @@ declare module Ground {
         public trellises: Ground.Trellis[];
         public trellis_dictionary: {};
         public identities: Identity[];
+        public alias: string;
         constructor(trellises: Ground.Trellis[], table_name?: string);
         public create_identity(trellis: Ground.Trellis): Identity;
         static create_from_property(property: Ground.Property): Link_Trellis;
@@ -337,6 +338,7 @@ declare module Ground {
         public get_identity_conditions(identity: Identity, seed: any, fill_blanks?: boolean): any[];
         public get_conditions(seeds: any): string[];
         public get_identity_by_trellis(trellis: Ground.Trellis): Identity;
+        public get_table_declaration(): string;
     }
 }
 declare module Ground {
@@ -384,6 +386,19 @@ declare module Ground {
         public get_relationship(): Relationships;
         public get_field_query(): string;
         public query(): string;
+    }
+}
+declare module Ground {
+    interface Expression {
+        type?: string;
+    }
+    interface Expression_Function extends Expression {
+        name: string;
+        args: any[];
+    }
+    class Expression_Engine {
+        static resolve(expression: any, context: any): any;
+        static resolve_function(expression: Expression_Function, context: any): void;
     }
 }
 declare module Ground {
@@ -440,18 +455,35 @@ declare module Ground {
     }
 }
 declare module Ground {
+    interface Join {
+        property?: Ground.Property;
+        first: Ground.Trellis;
+        second: Ground.Trellis;
+    }
     class Query_Renderer {
         public ground: Ground.Core;
         static counter: number;
         constructor(ground: Ground.Core);
         static get_properties(source: Ground.Query_Builder): {};
         static generate_property_join(property: Ground.Property, seeds: any): string;
-        public generate_sql(source: Ground.Query_Builder): string;
+        public generate_sql(parts: any, source: Ground.Query_Builder): string;
+        public generate_count(parts: any): string;
+        public generate_parts(source: Ground.Query_Builder): {
+            fields: any;
+            from: string;
+            joins: string;
+            filters: string;
+            sorts: string;
+            pager: string;
+            args: any;
+        };
         private static get_fields_and_joins(source, properties, include_primary_key?);
         private static process_property_filter(source, filter, ground);
         static process_property_filters(source: Ground.Query_Builder, ground: Ground.Core): Ground.Internal_Query_Source;
         static process_sorts(sorts: Ground.Query_Sort[], trellis: Ground.Trellis): string;
         static render_pager(pager: Ground.IPager): string;
+        static add_join(joins: any, join: Join): void;
+        static get_join_table(join: Join): string;
     }
 }
 declare module Ground {

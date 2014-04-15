@@ -1,7 +1,3 @@
-/**
- * User: Chris Johnson
- * Date: 9/23/13
- */
 /// <reference path="../references.ts"/>
 
 var uuid = require('node-uuid')

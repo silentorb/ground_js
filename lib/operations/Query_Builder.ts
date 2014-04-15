@@ -67,7 +67,7 @@ module Ground {
       var property = properties[property_name]
       if (!property)
         throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.')
-      console.log('q', Query_Builder.operators)
+//      console.log('q', Query_Builder.operators)
       if (Query_Builder.operators[operator] === undefined)
         throw new Error("Invalid operator: '" + operator + "'.")
 
@@ -236,13 +236,13 @@ module Ground {
 
     run():Promise {
       var runner = new Query_Runner(this)
-      console.log('filters', this.filters)
+//      console.log('filters', this.filters)
       return runner.run()
     }
 
     run_single():Promise {
       return this.run()
-        .then((rows)=> rows[0])
+        .then((result)=> result.objects[0])
     }
   }
 }

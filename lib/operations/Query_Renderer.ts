@@ -2,7 +2,7 @@
 
 module Ground {
 
-  interface Join {
+  export interface Join {
     property?:Property
     first:Trellis
     second:Trellis
@@ -38,7 +38,41 @@ module Ground {
       return join.generate_join(seeds);
     }
 
-    generate_sql(source:Query_Builder) {
+    generate_sql(parts, source:Query_Builder) {
+      var sql = 'SELECT '
+      + parts.fields
+      + parts.from
+      + parts.joins
+      + parts.filters
+      + parts.sorts
+
+      for (var i = 0; i < source.transforms.length; ++i) {
+        var transform = source.transforms[i]
+        var temp_table = 'transform_' + (i + 1)
+        sql = 'SELECT * FROM (' + sql + ' ) ' + temp_table + ' ' + transform.clause
+      }
+
+      var args = parts.args
+      for (var pattern in args) {
+        var value = args[pattern]
+        sql = sql.replace(new RegExp(pattern, 'g'), value)
+      }
+
+      sql += parts.pager
+
+      return sql;
+    }
+
+    generate_count(parts) {
+      var sql = 'SELECT COUNT(*) AS total_number'
+        + parts.from
+        + parts.joins
+        + parts.filters
+
+      return sql;
+    }
+
+    generate_parts(source:Query_Builder) {
       var properties = Query_Renderer.get_properties(source)
       var data = Query_Renderer.get_fields_and_joins(source, properties)
       var data2 = Query_Renderer.process_property_filters(source, this.ground)
@@ -50,39 +84,15 @@ module Ground {
       if (fields.length == 0)
         throw new Error('No authorized fields found for trellis ' + source.trellis.name + '.');
 
-      var sql = 'SELECT '
-      sql += fields.join(",\n")
-      sql += "\nFROM `" + source.trellis.get_table_name() + '`'
-      if (joins.length > 0)
-        sql += "\n" + joins.join("\n")
-
-      if (filters.length > 0)
-        sql += "\nWHERE " + filters.join(" AND ")
-
-      if (source.sorts.length > 0)
-        sql += ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis)
-
-//      if (this.post_clauses.length > 0)
-//        sql += " " + this.post_clauses.join(" ")
-
-      for (var i = 0; i < source.transforms.length; ++i) {
-        var transform = source.transforms[i]
-        var temp_table = 'transform_' + (i + 1)
-        sql = 'SELECT * FROM (' + sql + ' ) ' + temp_table + ' ' + transform.clause
+      return {
+        fields: fields.join(",\n"),
+        from: "\nFROM `" + source.trellis.get_table_name() + '`',
+        joins: joins.length > 0 ? "\n" + joins.join("\n") : '',
+        filters: filters.length > 0 ? "\nWHERE " + filters.join(" AND ") : '',
+        sorts: source.sorts.length > 0 ? ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis) : '',
+        pager: source.pager ? ' ' + Query_Renderer.render_pager(source.pager) : '',
+        args: args
       }
-
-      for (var pattern in args) {
-        var value = args[pattern];
-//        console.log('arg', pattern, value)
-//        sql = sql.replace(new RegExp(pattern), Property.get_sql_value(value));
-        sql = sql.replace(new RegExp(pattern, 'g'), value);
-      }
-
-      if (source.pager) {
-        sql += ' ' + Query_Renderer.render_pager(source.pager)
-      }
-
-      return sql;
     }
 
     private static get_fields_and_joins(source:Query_Builder, properties, include_primary_key:boolean = true):Internal_Query_Source {
@@ -268,17 +278,17 @@ module Ground {
       return "Composite_Join_" + join.first.name + "_" + join.second.name
     }
 
-    static render_join(join:Join):string {
-      var table_name = Query_Renderer.get_join_table(join)
-      if (join.property) {
-        var link = Link_Trellis.create_from_property(join.property);
-        link.alias = table_name
-        return link.generate_join({});
-      }
-      else {
-        return 'JOIN ' + join.first.get_table_name() + ' ' + table_name
-          + ' ON ' + this.get_condition_string({}) + "\n"
-      }
-    }
+//    static render_join(join:Join):string {
+//      var table_name = Query_Renderer.get_join_table(join)
+//      if (join.property) {
+//        var link = Link_Trellis.create_from_property(join.property);
+//        link.alias = table_name
+//        return link.generate_join({});
+//      }
+//      else {
+//        return 'JOIN ' + join.first.get_table_name() + ' ' + table_name
+//          + ' ON ' + this.get_condition_string({}) + "\n"
+//      }
+//    }
   }
 }
