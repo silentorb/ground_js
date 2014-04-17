@@ -308,12 +308,11 @@ module Ground {
             if (typeof other === 'object' && other._remove) {
               if (other_id !== null) {
                 sql = join.generate_delete_row([row, other])
-                if (this.log_queries)
+                if (this.log_updates)
                   console.log(sql)
 
                 return this.ground.invoke(join.table_name + '.delete', property, row, other, join)
                   .then(() => this.db.query(sql))
-
               }
             }
             else {
@@ -321,10 +320,10 @@ module Ground {
                 other = this.ground.update_object(other_trellis, other, this.user)
                   .then((other)=> {
                     var seeds = {}
-                    seeds[this.trellis.name] = row
+                    seeds[property.parent.name] = row
                     seeds[other_trellis.name] = other
                     sql = join.generate_insert(seeds)
-                    if (this.log_queries)
+                    if (this.log_updates)
                       console.log(sql)
 
                     return this.db.query(sql)
@@ -333,10 +332,10 @@ module Ground {
               }
               else {
                 var seeds = {}
-                seeds[this.trellis.name] = row
+                seeds[property.parent.name] = row
                 seeds[other_trellis.name] = other
                 sql = join.generate_insert(seeds)
-                if (this.log_queries)
+                if (this.log_updates)
                   console.log(sql)
 
                 return this.db.query(sql)
