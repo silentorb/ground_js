@@ -589,6 +589,4 @@ declare module Ground {
 }
 declare module "vineyard-ground" {
   export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
 }

@@ -1,4 +1,4 @@
-var MetaHub = require('vineyard-metahub');var MetaHub = require('vineyard-metahub');var when = require('when');
+var MetaHub = require('vineyard-metahub');var when = require('when');
 
 var Ground;
 (function (Ground) {
@@ -1298,9 +1298,9 @@ var Ground;
                         if (other_id === null) {
                             other = _this.ground.update_object(other_trellis, other, _this.user).then(function (other) {
                                 var seeds = {};
+                                var cross = new Ground.Cross_Trellis(property);
                                 seeds[property.parent.name] = row;
                                 seeds[other_trellis.name] = other;
-                                var cross = new Ground.Cross_Trellis(property);
                                 sql = cross.generate_insert(seeds);
                                 if (_this.ground.log_updates)
                                     console.log(sql);
@@ -2397,6 +2397,7 @@ var Ground;
                             return null;
                     }
                     return other_primary_property.get_sql_value(value, null, true);
+
                 case 'int':
                     if (!value)
                         return 0;
