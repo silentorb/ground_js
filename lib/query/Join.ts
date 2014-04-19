@@ -177,7 +177,7 @@ module Ground {
     }
 
     private static convert(branch:Join_Tree, previous:Join_Trellis, result:IJoin[]):Join_Trellis {
-      var join_property:Join_Property, cross:Cross_Trellis
+      var join_property:Join_Property, cross:Cross_Trellis, join_trellis
       if (branch.property.get_relationship() == Relationships.many_to_many) {
         cross = new Cross_Trellis(branch.property)
         result.push(new Reference_Join(cross.properties[0], previous, cross))
@@ -189,25 +189,25 @@ module Ground {
         Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property()))
       }
 
-      var join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property)
+      var other_property = branch.property.get_other_property()
 
-      if (branch.property.type == 'list') {
-        var other_property = branch.property.get_other_property()
-        if (other_property.parent !== branch.trellis) {
-          var join_trellis2 = new Join_Trellis_Wrapper(branch.property.parent, 'composite_' + join_trellis.alias + '_' + branch.property.parent.name)
-          result.push(new Composite_Join(join_trellis, join_trellis2))
-          previous = join_trellis2
-//        join_trellis = join_trellis2
+      // joined trellises usually require two trellis properties to be useful, and sometimes those properties
+      // are not in the same table, so composite join must be added to bridge the gap.
+      if (branch.property.type == 'list' && other_property.parent !== branch.trellis) {
+        join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property)
+        var alias = 'composite_' + join_trellis.alias + '_' + branch.property.other_trellis.name
+        var join_trellis2 = new Join_Trellis_Wrapper(branch.property.other_trellis, alias)
+        result.push(new Reference_Join(join_property, previous, join_trellis2))
 
-//          var join_trellis2 = new Join_Trellis_Wrapper(branch.property.parent,'composite_' + join_trellis.alias + '_' + branch.property.parent.name)
-//          result.push(new Composite_Join(join_trellis, join_trellis2))
-//          join_trellis = join_trellis2
-        }
+        result.push(new Composite_Join(join_trellis2, join_trellis))
+        return join_trellis
+      }
+      else {
+        join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property)
+        result.push(new Reference_Join(join_property, previous, join_trellis))
+        return join_trellis
       }
 
-      result.push(new Reference_Join(join_property, previous, join_trellis))
-
-      return join_trellis
     }
 
     static tree_to_joins(tree:Join_Tree[], previous:Join_Trellis):IJoin[] {

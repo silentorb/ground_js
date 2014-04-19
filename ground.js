@@ -2710,7 +2710,7 @@ var Ground;
         };
 
         Join.convert = function (branch, previous, result) {
-            var join_property, cross;
+            var join_property, cross, join_trellis;
             if (branch.property.get_relationship() == 3 /* many_to_many */) {
                 cross = new Cross_Trellis(branch.property);
                 result.push(new Reference_Join(cross.properties[0], previous, cross));
@@ -2721,20 +2721,21 @@ var Ground;
                 Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property()));
             }
 
-            var join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property);
+            var other_property = branch.property.get_other_property();
 
-            if (branch.property.type == 'list') {
-                var other_property = branch.property.get_other_property();
-                if (other_property.parent !== branch.trellis) {
-                    var join_trellis2 = new Join_Trellis_Wrapper(branch.property.parent, 'composite_' + join_trellis.alias + '_' + branch.property.parent.name);
-                    result.push(new Composite_Join(join_trellis, join_trellis2));
-                    previous = join_trellis2;
-                }
+            if (branch.property.type == 'list' && other_property.parent !== branch.trellis) {
+                join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property);
+                var alias = 'composite_' + join_trellis.alias + '_' + branch.property.other_trellis.name;
+                var join_trellis2 = new Join_Trellis_Wrapper(branch.property.other_trellis, alias);
+                result.push(new Reference_Join(join_property, previous, join_trellis2));
+
+                result.push(new Composite_Join(join_trellis2, join_trellis));
+                return join_trellis;
+            } else {
+                join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property);
+                result.push(new Reference_Join(join_property, previous, join_trellis));
+                return join_trellis;
             }
-
-            result.push(new Reference_Join(join_property, previous, join_trellis));
-
-            return join_trellis;
         };
 
         Join.tree_to_joins = function (tree, previous) {
