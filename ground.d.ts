@@ -403,13 +403,9 @@ declare module Ground {
     interface IJoin {
         render(): string;
     }
-    interface ITable_Reference {
-        get_table_name(): string;
-        query_reference(): string;
-        query_identity(): string;
-    }
     interface Join_Trellis {
         get_table_name(): string;
+        get_primary_keys(): Join_Property[];
         get_alias(): string;
         query_identity(): string;
     }
@@ -419,6 +415,7 @@ declare module Ground {
         constructor(trellis: Ground.Trellis, alias?: string);
         static create_using_property(trellis: Ground.Trellis, property: Ground.Property): Join_Trellis_Wrapper;
         public get_alias(): string;
+        public get_primary_keys(): Join_Property[];
         public get_table_name(): string;
         public query_identity(): string;
     }
@@ -426,23 +423,29 @@ declare module Ground {
         public name: string;
         public alias: string;
         public properties: Join_Property[];
+        public identities: Join_Property[];
         constructor(property: Ground.Property);
         private static generate_name(first, second);
-        private static get_field_name(table, property);
+        private static get_field_name(property);
+        public get_primary_keys(): Join_Property[];
         private static create_properties(cross, property);
+        public generate_insert(seeds: any): string;
         public get_alias(): string;
         public get_table_name(): string;
         public query_identity(): string;
     }
     class Join_Property {
-        public parent: Ground.ITrellis;
-        public other_trellis: Ground.ITrellis;
+        public parent: Join_Trellis;
+        public other_trellis: Join_Trellis;
         public field_name: string;
         public type: string;
         public other_property: Join_Property;
-        constructor(parent: Ground.ITrellis, other_trellis: Ground.ITrellis, field_name: string, type: string, other_property?: Join_Property);
-        static create_from_property(property: Ground.Property, other_trellis?: Ground.ITrellis, other_property?: Join_Property): Join_Property;
+        public name: string;
+        public property: Ground.Property;
+        constructor(parent: Join_Trellis, other_trellis: Join_Trellis, name: string, type: string, field_name?: string, other_property?: Join_Property);
+        static create_from_property(property: Ground.Property, other_trellis?: Join_Trellis, other_property?: Join_Property): Join_Property;
         static pair(first: Join_Property, second: Join_Property): void;
+        public get_sql_value(value: any): any;
     }
     class Join_Tree {
         public property: Ground.Property;
@@ -585,5 +588,7 @@ declare module Ground {
     }
 }
 declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
   export = Ground
 }

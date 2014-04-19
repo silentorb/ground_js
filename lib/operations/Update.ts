@@ -320,9 +320,10 @@ module Ground {
                 other = this.ground.update_object(other_trellis, other, this.user)
                   .then((other)=> {
                     var seeds = {}
+                    var cross = new Cross_Trellis(property)
                     seeds[property.parent.name] = row
                     seeds[other_trellis.name] = other
-                    sql = join.generate_insert(seeds)
+                    sql = cross.generate_insert(seeds)
                     if (this.ground.log_updates)
                       console.log(sql)
 
@@ -334,7 +335,9 @@ module Ground {
                 var seeds = {}
                 seeds[property.parent.name] = row
                 seeds[other_trellis.name] = other
-                sql = join.generate_insert(seeds)
+                var cross = new Cross_Trellis(property)
+                sql = cross.generate_insert(seeds)
+//                sql = join.generate_insert(seeds)
                 if (this.ground.log_updates)
                   console.log(sql)
 

@@ -1,4 +1,4 @@
-var MetaHub = require('vineyard-metahub');var when = require('when');
+var MetaHub = require('vineyard-metahub');var MetaHub = require('vineyard-metahub');var when = require('when');
 
 var Ground;
 (function (Ground) {
@@ -1300,7 +1300,8 @@ var Ground;
                                 var seeds = {};
                                 seeds[property.parent.name] = row;
                                 seeds[other_trellis.name] = other;
-                                sql = join.generate_insert(seeds);
+                                var cross = new Ground.Cross_Trellis(property);
+                                sql = cross.generate_insert(seeds);
                                 if (_this.ground.log_updates)
                                     console.log(sql);
 
@@ -1312,7 +1313,9 @@ var Ground;
                             var seeds = {};
                             seeds[property.parent.name] = row;
                             seeds[other_trellis.name] = other;
-                            sql = join.generate_insert(seeds);
+                            var cross = new Ground.Cross_Trellis(property);
+                            sql = cross.generate_insert(seeds);
+
                             if (_this.ground.log_updates)
                                 console.log(sql);
 
@@ -2394,7 +2397,6 @@ var Ground;
                             return null;
                     }
                     return other_primary_property.get_sql_value(value, null, true);
-
                 case 'int':
                     if (!value)
                         return 0;
@@ -2568,11 +2570,14 @@ var Ground;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
+    
+
     var Join_Trellis_Wrapper = (function () {
         function Join_Trellis_Wrapper(trellis, alias) {
             if (typeof alias === "undefined") { alias = null; }
             this.trellis = trellis;
-            this.alias = alias || trellis.get_table_name();
+            var trellis_table_name = trellis ? trellis.get_table_name() : null;
+            this.alias = alias || trellis_table_name;
         }
         Join_Trellis_Wrapper.create_using_property = function (trellis, property) {
             var alias = Join.generate_table_name(trellis, property);
@@ -2581,6 +2586,10 @@ var Ground;
 
         Join_Trellis_Wrapper.prototype.get_alias = function () {
             return this.alias;
+        };
+
+        Join_Trellis_Wrapper.prototype.get_primary_keys = function () {
+            return [Join_Property.create_from_property(this.trellis.get_primary_property())];
         };
 
         Join_Trellis_Wrapper.prototype.get_table_name = function () {
@@ -2601,6 +2610,7 @@ var Ground;
 
             this.alias = 'cross_' + this.name + '_' + property.name;
             this.properties = Cross_Trellis.create_properties(this, property);
+            this.identities = [this.properties[1], this.properties[2]];
         }
         Cross_Trellis.generate_name = function (first, second) {
             var names = [first.get_plural(), second.get_plural()];
@@ -2608,7 +2618,7 @@ var Ground;
             return temp.join('_');
         };
 
-        Cross_Trellis.get_field_name = function (table, property) {
+        Cross_Trellis.get_field_name = function (property) {
             var field = property.get_field_override();
             if (field && field.other_field)
                 return field.other_field;
@@ -2616,26 +2626,42 @@ var Ground;
             return property.parent.name;
         };
 
-        Cross_Trellis.create_properties = function (cross, property) {
-            var other_property = property.get_other_property(), second_name = property.parent.name, third_name = other_property.parent.name;
+        Cross_Trellis.prototype.get_primary_keys = function () {
+            return this.identities;
+        };
 
-            var field = property.get_field_override();
-            if (field.other_table && property.parent.ground.tables[field.other_table]) {
-                var table = property.parent.ground.tables[field.other_table];
-                second_name = Cross_Trellis.get_field_name(table, property);
-                third_name = Cross_Trellis.get_field_name(table, other_property);
-            }
+        Cross_Trellis.create_properties = function (cross, property) {
+            var other_property = property.get_other_property();
 
             var result = [
                 Join_Property.create_from_property(property, cross),
-                new Join_Property(cross, property.parent, second_name, "reference"),
-                new Join_Property(cross, other_property.parent, third_name, "reference"),
+                new Join_Property(cross, new Join_Trellis_Wrapper(property.parent), Cross_Trellis.get_field_name(property), "reference"),
+                new Join_Property(cross, new Join_Trellis_Wrapper(property.other_trellis), Cross_Trellis.get_field_name(other_property), "reference"),
                 Join_Property.create_from_property(other_property, cross)
             ];
 
             Join_Property.pair(result[0], result[1]);
             Join_Property.pair(result[2], result[3]);
             return result;
+        };
+
+        Cross_Trellis.prototype.generate_insert = function (seeds) {
+            var values = [], keys = [];
+
+            for (var i in this.identities) {
+                var identity = this.identities[i], seed = seeds[identity.name];
+                var key = identity.other_trellis.get_primary_keys()[0].name;
+                var value;
+                keys.push(identity.name);
+                if (typeof seed === 'object')
+                    value = seed[key];
+                else
+                    value = seed;
+
+                values.push(identity.get_sql_value(value));
+            }
+
+            return 'REPLACE INTO ' + this.get_table_name() + ' (`' + keys.join('`, `') + '`) VALUES (' + values.join(', ') + ');\n';
         };
 
         Cross_Trellis.prototype.get_alias = function () {
@@ -2654,23 +2680,35 @@ var Ground;
     Ground.Cross_Trellis = Cross_Trellis;
 
     var Join_Property = (function () {
-        function Join_Property(parent, other_trellis, field_name, type, other_property) {
+        function Join_Property(parent, other_trellis, name, type, field_name, other_property) {
+            if (typeof field_name === "undefined") { field_name = null; }
             if (typeof other_property === "undefined") { other_property = null; }
             this.parent = parent;
+            this.name = name;
             this.other_trellis = other_trellis;
-            this.field_name = field_name;
+            this.field_name = field_name || name;
             this.type = type;
             this.other_property = other_property;
         }
         Join_Property.create_from_property = function (property, other_trellis, other_property) {
             if (typeof other_trellis === "undefined") { other_trellis = null; }
             if (typeof other_property === "undefined") { other_property = null; }
-            return new Join_Property(property.parent, other_trellis || property.other_trellis, property.get_field_name(), property.type, other_property);
+            var result = new Join_Property(new Join_Trellis_Wrapper(property.parent), other_trellis || new Join_Trellis_Wrapper(property.other_trellis), property.name, property.type, property.get_field_name(), other_property);
+
+            result.property = property;
+            return result;
         };
 
         Join_Property.pair = function (first, second) {
             first.other_property = second;
             second.other_property = first;
+        };
+
+        Join_Property.prototype.get_sql_value = function (value) {
+            if (this.property)
+                return this.property.get_sql_value(value);
+
+            return this.other_property.property.get_sql_value(value);
         };
         return Join_Property;
     })();

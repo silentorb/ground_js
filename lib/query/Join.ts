@@ -6,14 +6,15 @@ module Ground {
     render():string
   }
 
-  export interface ITable_Reference {
-    get_table_name():string
-    query_reference():string
-    query_identity():string
-  }
+//  export interface ITable_Reference {
+//    get_table_name():string
+//    query_reference():string
+//    query_identity():string
+//  }
 
   export interface Join_Trellis {
     get_table_name():string
+    get_primary_keys():Join_Property[]
     get_alias():string
     query_identity():string
   }
@@ -24,7 +25,8 @@ module Ground {
 
     constructor(trellis:Trellis, alias:string = null) {
       this.trellis = trellis
-      this.alias = alias || trellis.get_table_name()
+      var trellis_table_name = trellis ? trellis.get_table_name() : null
+      this.alias = alias || trellis_table_name
     }
 
     static create_using_property(trellis:Trellis, property:Property):Join_Trellis_Wrapper {
@@ -34,6 +36,10 @@ module Ground {
 
     get_alias():string {
       return this.alias
+    }
+
+    get_primary_keys():Join_Property[] {
+      return [ Join_Property.create_from_property(this.trellis.get_primary_property()) ]
     }
 
     get_table_name():string {
@@ -49,6 +55,7 @@ module Ground {
     name:string
     alias:string
     properties:Join_Property[]
+    identities:Join_Property[]
 
     constructor(property:Property) {
       var field = property.get_field_override()
@@ -59,6 +66,7 @@ module Ground {
       // Add the property name in case there are cross joins in both directions
       this.alias = 'cross_' + this.name + '_' + property.name
       this.properties = Cross_Trellis.create_properties(this, property)
+      this.identities = [ this.properties[1], this.properties[2] ]
     }
 
     private static generate_name(first:Trellis, second:Trellis):string {
@@ -67,7 +75,7 @@ module Ground {
       return temp.join('_')
     }
 
-    private static get_field_name(table:Table, property:Property):string {
+    private static get_field_name(property:Property):string {
       var field = property.get_field_override()
       if (field && field.other_field)
         return field.other_field
@@ -75,28 +83,49 @@ module Ground {
       return property.parent.name
     }
 
-    private static create_properties(cross:Cross_Trellis, property:Property):Join_Property[] {
-      var other_property:Property = property.get_other_property(),
-        second_name:string = property.parent.name,
-        third_name:string = other_property.parent.name
+    get_primary_keys():Join_Property[] {
+      return this.identities
+    }
 
-      var field = property.get_field_override()
-      if (field.other_table && property.parent.ground.tables[field.other_table]) {
-        var table = property.parent.ground.tables[field.other_table]
-        second_name = Cross_Trellis.get_field_name(table, property)
-        third_name = Cross_Trellis.get_field_name(table, other_property)
-      }
+    private static create_properties(cross:Cross_Trellis, property:Property):Join_Property[] {
+      var other_property:Property = property.get_other_property()
 
       var result = [
         Join_Property.create_from_property(property, cross),
-        new Join_Property(cross, property.parent, second_name, "reference"),
-        new Join_Property(cross, other_property.parent, third_name, "reference"),
+        new Join_Property(cross, new Join_Trellis_Wrapper(property.parent),
+          Cross_Trellis.get_field_name(property), "reference"),
+        new Join_Property(cross, new Join_Trellis_Wrapper(property.other_trellis),
+          Cross_Trellis.get_field_name(other_property), "reference"),
         Join_Property.create_from_property(other_property, cross)
       ]
 
       Join_Property.pair(result[0], result[1])
       Join_Property.pair(result[2], result[3])
       return result
+    }
+
+    generate_insert(seeds):string {
+      var values = [], keys = []
+//      console.log('seeds', seeds)
+//      console.log('properties', this.identities)
+      for (var i in this.identities) {
+        var identity:Join_Property = this.identities[i], seed = seeds[identity.name]
+        var key = identity.other_trellis.get_primary_keys()[0].name
+        var value
+        keys.push(identity.name)
+        if (typeof seed === 'object')
+          value = seed[key]
+        else
+          value = seed
+
+        values.push(identity.get_sql_value(value))
+      }
+
+      return 'REPLACE INTO ' + this.get_table_name() + ' (`'
+        + keys.join('`, `')
+        + '`) VALUES ('
+        + values.join(', ')
+        + ');\n'
     }
 
     get_alias():string {
@@ -114,33 +143,49 @@ module Ground {
   }
 
   export class Join_Property {
-    parent:ITrellis
-    other_trellis:ITrellis
+    parent:Join_Trellis
+    other_trellis:Join_Trellis
     field_name:string
     type:string
     other_property:Join_Property
+    name:string
+    property:Property
 
-    constructor(parent:ITrellis, other_trellis:ITrellis, field_name:string, type:string, other_property:Join_Property = null) {
+    constructor(parent:Join_Trellis, other_trellis:Join_Trellis, name:string, type:string,
+                field_name:string = null, other_property:Join_Property = null) {
       this.parent = parent
+      this.name = name
       this.other_trellis = other_trellis
-      this.field_name = field_name
+      this.field_name = field_name || name
       this.type = type
       this.other_property = other_property
     }
 
-    static create_from_property(property:Property, other_trellis:ITrellis = null, other_property:Join_Property = null):Join_Property {
-      return new Join_Property(
-        property.parent,
-        other_trellis || property.other_trellis,
-        property.get_field_name(),
+    static create_from_property(property:Property, other_trellis:Join_Trellis = null,
+                                other_property:Join_Property = null):Join_Property {
+      var result = new Join_Property(
+        new Join_Trellis_Wrapper(property.parent),
+        other_trellis || new Join_Trellis_Wrapper(property.other_trellis),
+        property.name,
         property.type,
+        property.get_field_name(),
         other_property
       )
+
+      result.property = property
+      return result
     }
 
     static pair(first:Join_Property, second:Join_Property) {
       first.other_property = second
       second.other_property = first
+    }
+
+    get_sql_value(value) {
+      if (this.property)
+        return this.property.get_sql_value(value)
+
+      return this.other_property.property.get_sql_value(value)
     }
   }
 
