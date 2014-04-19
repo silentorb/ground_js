@@ -426,6 +426,7 @@ declare module Ground {
         public alias: string;
         public properties: Join_Property[];
         constructor(property: Ground.Property);
+        private static generate_name(first, second);
         private static create_properties(cross, property);
         public get_alias(): string;
         public get_table_name(): string;

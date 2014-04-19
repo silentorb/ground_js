@@ -2596,13 +2596,18 @@ var Ground;
 
     var Cross_Trellis = (function () {
         function Cross_Trellis(property) {
-            var names = [property.parent.get_plural(), property.other_trellis.get_plural()];
-            var temp = names.sort();
-            this.name = temp.join('_');
+            var field = property.get_field_override();
+            this.name = field ? field.other_table : Cross_Trellis.generate_name(property.parent, property.other_trellis);
 
             this.alias = 'cross_' + this.name + '_' + property.name;
             this.properties = Cross_Trellis.create_properties(this, property);
         }
+        Cross_Trellis.generate_name = function (first, second) {
+            var names = [first.get_plural(), second.get_plural()];
+            var temp = names.sort();
+            return temp.join('_');
+        };
+
         Cross_Trellis.create_properties = function (cross, property) {
             var other_property = property.get_other_property();
             var result = [

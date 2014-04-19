@@ -51,13 +51,20 @@ module Ground {
     properties:Join_Property[]
 
     constructor(property:Property) {
-      var names = [property.parent.get_plural(), property.other_trellis.get_plural()]
-      var temp = names.sort()
-      this.name = temp.join('_')
+      var field = property.get_field_override()
+      this.name = field
+        ? field.other_table
+        : Cross_Trellis.generate_name(property.parent, property.other_trellis)
 
       // Add the property name in case there are cross joins in both directions
       this.alias = 'cross_' + this.name + '_' + property.name
       this.properties = Cross_Trellis.create_properties(this, property)
+    }
+
+    private static generate_name(first:Trellis, second:Trellis):string {
+      var names = [first.get_plural(), second.get_plural()]
+      var temp = names.sort()
+      return temp.join('_')
     }
 
     private static create_properties(cross:Cross_Trellis, property:Property):Join_Property[] {
