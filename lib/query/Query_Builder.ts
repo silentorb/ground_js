@@ -143,8 +143,10 @@ module Ground {
       if (value === undefined || value === null)
         throw new Error(property.fullname() + ' could not get a valid identity from the provided seed.')
 
+      var other_property = property.get_other_property(true)
       return {
-        property: property.get_other_property(true),
+        path: other_property.name,
+        property: other_property,
         value: value,
         operator: '='
       }

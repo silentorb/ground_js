@@ -2775,6 +2775,9 @@ var Ground;
         };
 
         Join.get_end_query = function (property_chain) {
+            if (property_chain.length == 1)
+                return property_chain[0].parent.get_table_name() + '.' + property_chain[0].get_field_name();
+
             var last_property = property_chain[property_chain.length - 1];
             var last_reference = Join.get_last_reference(property_chain);
             var table_name = Join.generate_table_name(last_property.parent, last_reference);
@@ -2923,8 +2926,10 @@ var Ground;
             if (value === undefined || value === null)
                 throw new Error(property.fullname() + ' could not get a valid identity from the provided seed.');
 
+            var other_property = property.get_other_property(true);
             return {
-                property: property.get_other_property(true),
+                path: other_property.name,
+                property: other_property,
                 value: value,
                 operator: '='
             };
@@ -3166,6 +3171,10 @@ var Ground;
 
             var parts = Ground.path_to_array(filter.path);
             var property_chain = Ground.Join.path_to_property_chain(source.trellis, parts);
+            var last = property_chain[property_chain.length - 1];
+            if (last.other_trellis)
+                property_chain.push(last.other_trellis.get_primary_property());
+
             var property = property_chain[property_chain.length - 1];
 
             var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++;
@@ -3316,11 +3325,8 @@ var Ground;
                 return when.resolve();
 
             var query = Query_Runner.create_sub_query(other_property.parent, property, source);
-            if (relationship === 3 /* many_to_many */) {
-                query.filters.push(Ground.Query_Builder.create_join_filter(property, seed));
-            } else if (relationship === 2 /* one_to_many */)
-                query.add_filter(other_property.name, id);
 
+            query.add_filter(other_property.name, id);
             return query.run();
         };
 

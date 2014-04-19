@@ -47,15 +47,14 @@ module Ground {
         return when.resolve()
 
       var query = Query_Runner.create_sub_query(other_property.parent, property, source);
-      if (relationship === Relationships.many_to_many) {
-//        var seeds = {}
-//        seeds[source.trellis.name] = seed
-        query.filters.push(Query_Builder.create_join_filter(property, seed))
-//        query.add_join(Query_Runner.generate_property_join(property, seeds))
-      }
-      else if (relationship === Relationships.one_to_many)
-        query.add_filter(other_property.name, id)
+//      if (relationship === Relationships.many_to_many) {
+////        query.filters.push(Query_Builder.create_join_filter(property, seed))
+//        query.add_filter(property.name, seed)
+//      }
+//      else if (relationship === Relationships.one_to_many)
+//        query.add_filter(other_property.name, id)
 
+      query.add_filter(other_property.name, id)
       return query.run();
     }
 

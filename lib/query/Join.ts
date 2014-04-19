@@ -245,6 +245,9 @@ module Ground {
     }
 
     static get_end_query(property_chain:Property[]):string {
+      if (property_chain.length == 1)
+        return property_chain[0].parent.get_table_name() + '.' + property_chain[0].get_field_name()
+
       var last_property = property_chain[property_chain.length - 1]
       var last_reference = Join.get_last_reference(property_chain)
       var table_name = Join.generate_table_name(last_property.parent, last_reference)

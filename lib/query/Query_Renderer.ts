@@ -133,7 +133,6 @@ module Ground {
       }
     }
 
-
     private static build_filter(source:Query_Builder, filter, ground:Core):Internal_Query_Source {
       var result:Internal_Query_Source = {
         filters: [],
@@ -146,6 +145,10 @@ module Ground {
 
       var parts = Ground.path_to_array(filter.path)
       var property_chain = Join.path_to_property_chain(source.trellis, parts)
+      var last = property_chain[property_chain.length - 1]
+      if (last.other_trellis)
+        property_chain.push(last.other_trellis.get_primary_property())
+
       var property = property_chain[property_chain.length - 1]
 
       var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++;
