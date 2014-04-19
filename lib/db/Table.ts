@@ -6,6 +6,7 @@ module Ground {
     name:string
     share?:string
     other_table?:string
+    other_field?:string
   }
 
   export class Table {

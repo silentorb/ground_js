@@ -281,6 +281,7 @@ declare module Ground {
         name: string;
         share?: string;
         other_table?: string;
+        other_field?: string;
     }
     class Table {
         public name: string;
@@ -427,6 +428,7 @@ declare module Ground {
         public properties: Join_Property[];
         constructor(property: Ground.Property);
         private static generate_name(first, second);
+        private static get_field_name(table, property);
         private static create_properties(cross, property);
         public get_alias(): string;
         public get_table_name(): string;

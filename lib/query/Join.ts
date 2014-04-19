@@ -67,12 +67,30 @@ module Ground {
       return temp.join('_')
     }
 
+    private static get_field_name(table:Table, property:Property):string {
+      var field = property.get_field_override()
+      if (field && field.other_field)
+        return field.other_field
+
+      return property.parent.name
+    }
+
     private static create_properties(cross:Cross_Trellis, property:Property):Join_Property[] {
-      var other_property = property.get_other_property()
+      var other_property:Property = property.get_other_property(),
+        second_name:string = property.parent.name,
+        third_name:string = other_property.parent.name
+
+      var field = property.get_field_override()
+      if (field.other_table && property.parent.ground.tables[field.other_table]) {
+        var table = property.parent.ground.tables[field.other_table]
+        second_name = Cross_Trellis.get_field_name(table, property)
+        third_name = Cross_Trellis.get_field_name(table, other_property)
+      }
+
       var result = [
         Join_Property.create_from_property(property, cross),
-        new Join_Property(cross, property.parent, property.parent.name, "reference"),
-        new Join_Property(cross, other_property.parent, other_property.parent.name, "reference"),
+        new Join_Property(cross, property.parent, second_name, "reference"),
+        new Join_Property(cross, other_property.parent, third_name, "reference"),
         Join_Property.create_from_property(other_property, cross)
       ]
 
