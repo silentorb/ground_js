@@ -104,22 +104,20 @@ module Ground {
       return result
     }
 
-    generate_insert(seeds):string {
+    generate_insert(property:Property, owner, other):string {
       var values = [], keys = []
-//      console.log('seeds', seeds)
-//      console.log('properties', this.identities)
-      for (var i in this.identities) {
-        var identity:Join_Property = this.identities[i], seed = seeds[identity.name]
-        var key = identity.other_trellis.get_primary_keys()[0].name
-        var value
-        keys.push(identity.name)
-        if (typeof seed === 'object')
-          value = seed[key]
-        else
-          value = seed
-
-        values.push(identity.get_sql_value(value))
+      var first = this.identities.filter((x)=>x.other_property.name == property.name)[0]
+      if (!first) {
+        throw new Error('Could not insert into cross table ' + this.get_table_name()
+          + '.  Could not find identity for property ' + property.fullname() + '.')
       }
+      var second = this.identities[1 - this.identities.indexOf(first)]
+      var identities:Join_Property[] = [ first, second ]
+      keys = identities.map((x)=> x.field_name)
+      values = [
+        first.get_sql_value(owner),
+        second.get_sql_value(other)
+      ]
 
       return 'REPLACE INTO ' + this.get_table_name() + ' (`'
         + keys.join('`, `')
@@ -151,8 +149,7 @@ module Ground {
     name:string
     property:Property
 
-    constructor(parent:Join_Trellis, other_trellis:Join_Trellis, name:string, type:string,
-                field_name:string = null, other_property:Join_Property = null) {
+    constructor(parent:Join_Trellis, other_trellis:Join_Trellis, name:string, type:string, field_name:string = null, other_property:Join_Property = null) {
       this.parent = parent
       this.name = name
       this.other_trellis = other_trellis
@@ -161,8 +158,7 @@ module Ground {
       this.other_property = other_property
     }
 
-    static create_from_property(property:Property, other_trellis:Join_Trellis = null,
-                                other_property:Join_Property = null):Join_Property {
+    static create_from_property(property:Property, other_trellis:Join_Trellis = null, other_property:Join_Property = null):Join_Property {
       var result = new Join_Property(
         new Join_Trellis_Wrapper(property.parent),
         other_trellis || new Join_Trellis_Wrapper(property.other_trellis),

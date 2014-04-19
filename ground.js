@@ -1297,11 +1297,8 @@ var Ground;
                     } else {
                         if (other_id === null) {
                             other = _this.ground.update_object(other_trellis, other, _this.user).then(function (other) {
-                                var seeds = {};
                                 var cross = new Ground.Cross_Trellis(property);
-                                seeds[property.parent.name] = row;
-                                seeds[other_trellis.name] = other;
-                                sql = cross.generate_insert(seeds);
+                                sql = cross.generate_insert(property, row, other);
                                 if (_this.ground.log_updates)
                                     console.log(sql);
 
@@ -1310,11 +1307,9 @@ var Ground;
                                 });
                             });
                         } else {
-                            var seeds = {};
-                            seeds[property.parent.name] = row;
-                            seeds[other_trellis.name] = other;
                             var cross = new Ground.Cross_Trellis(property);
-                            sql = cross.generate_insert(seeds);
+                            var cross = new Ground.Cross_Trellis(property);
+                            sql = cross.generate_insert(property, row, other);
 
                             if (_this.ground.log_updates)
                                 console.log(sql);
@@ -2646,21 +2641,23 @@ var Ground;
             return result;
         };
 
-        Cross_Trellis.prototype.generate_insert = function (seeds) {
+        Cross_Trellis.prototype.generate_insert = function (property, owner, other) {
             var values = [], keys = [];
-
-            for (var i in this.identities) {
-                var identity = this.identities[i], seed = seeds[identity.name];
-                var key = identity.other_trellis.get_primary_keys()[0].name;
-                var value;
-                keys.push(identity.name);
-                if (typeof seed === 'object')
-                    value = seed[key];
-                else
-                    value = seed;
-
-                values.push(identity.get_sql_value(value));
+            var first = this.identities.filter(function (x) {
+                return x.other_property.name == property.name;
+            })[0];
+            if (!first) {
+                throw new Error('Could not insert into cross table ' + this.get_table_name() + '.  Could not find identity for property ' + property.fullname() + '.');
             }
+            var second = this.identities[1 - this.identities.indexOf(first)];
+            var identities = [first, second];
+            keys = identities.map(function (x) {
+                return x.field_name;
+            });
+            values = [
+                first.get_sql_value(owner),
+                second.get_sql_value(other)
+            ];
 
             return 'REPLACE INTO ' + this.get_table_name() + ' (`' + keys.join('`, `') + '`) VALUES (' + values.join(', ') + ');\n';
         };

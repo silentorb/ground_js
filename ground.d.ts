@@ -429,7 +429,7 @@ declare module Ground {
         private static get_field_name(property);
         public get_primary_keys(): Join_Property[];
         private static create_properties(cross, property);
-        public generate_insert(seeds: any): string;
+        public generate_insert(property: Ground.Property, owner: any, other: any): string;
         public get_alias(): string;
         public get_table_name(): string;
         public query_identity(): string;
