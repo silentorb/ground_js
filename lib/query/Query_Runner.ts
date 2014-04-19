@@ -182,13 +182,15 @@ module Ground {
           var filter = source.filters[i]
           var operator_action = Query_Builder.operators[filter.operator]
           if (operator_action && typeof operator_action.prepare === 'function') {
-            var property = source.trellis.sanitize_property(filter.property);
-            promises.push(()=> operator_action.prepare(filter, property)
-                .then((result) => {
-                  if (result === false)
-                    is_empty = true
-                })
-            )
+            if (filter.property) {
+              var property = source.trellis.sanitize_property(filter.property);
+              promises.push(()=> operator_action.prepare(filter, property)
+                  .then((result) => {
+                    if (result === false)
+                      is_empty = true
+                  })
+              )
+            }
           }
         }
       }

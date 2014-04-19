@@ -40,13 +40,6 @@ module Ground {
     map?
   }
 
-  export interface Internal_Query_Source {
-    fields?
-    filters?:any[]
-    joins?:string[]
-    arguments?
-  }
-
   export class Query {
     ground:Core;
     joins:string[] = []

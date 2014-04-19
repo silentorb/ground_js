@@ -308,7 +308,7 @@ module Ground {
             if (typeof other === 'object' && other._remove) {
               if (other_id !== null) {
                 sql = join.generate_delete_row([row, other])
-                if (this.log_updates)
+                if (this.ground.log_updates)
                   console.log(sql)
 
                 return this.ground.invoke(join.table_name + '.delete', property, row, other, join)
@@ -323,7 +323,7 @@ module Ground {
                     seeds[property.parent.name] = row
                     seeds[other_trellis.name] = other
                     sql = join.generate_insert(seeds)
-                    if (this.log_updates)
+                    if (this.ground.log_updates)
                       console.log(sql)
 
                     return this.db.query(sql)
@@ -335,7 +335,7 @@ module Ground {
                 seeds[property.parent.name] = row
                 seeds[other_trellis.name] = other
                 sql = join.generate_insert(seeds)
-                if (this.log_updates)
+                if (this.ground.log_updates)
                   console.log(sql)
 
                 return this.db.query(sql)

@@ -78,6 +78,15 @@ module Ground {
       return result;
     }
 
+    get_property(name:string):Property {
+      var properties = this.get_all_properties()
+      var property = properties[name]
+      if (!property)
+        throw new Error('Trellis ' + this.name + ' does not contain a property named ' + name + '.')
+
+      return property
+    }
+
     get_core_properties() {
       var result = {}
       for (var i in this.properties) {
@@ -154,6 +163,10 @@ module Ground {
       }
 
       return [ this.properties[this.primary_key] ]
+    }
+
+    get_primary_property():Property {
+      return this.properties[this.primary_key]
     }
 
     get_reference_property(other_trellis:Trellis):Property {
@@ -248,8 +261,12 @@ module Ground {
       }
     }
 
+    query():string {
+      return this.get_table_query() + '.' + this.properties[this.primary_key].get_field_name()
+    }
+
     query_primary_key():string {
-      return this.get_table_query() + '.' + this.properties[this.primary_key].get_field_name();
+      return this.query()
     }
 
     sanitize_property(property) {

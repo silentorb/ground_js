@@ -2,7 +2,7 @@
 /// <reference path="../references.ts"/>
 /// <reference path="../db/Database.ts"/>
 /// <reference path="../schema/Trellis.ts"/>
-/// <reference path="../operations/Query.ts"/>
+/// <reference path="../query/Query.ts"/>
 /// <reference path="../operations/Update.ts"/>
 /// <reference path="../operations/Delete.ts"/>
 /// <reference path="../../defs/node.d.ts"/>
@@ -53,7 +53,7 @@ module Ground {
     if (!path)
       throw new Error('Empty query path.')
 
-    return path.split('/')
+    return path.split(/[\/\.]/)
   }
 
   export class Property_Type {

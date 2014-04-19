@@ -9,12 +9,15 @@
 
 /// <reference path="metahub/Expression.ts"/>
 
-/// <reference path="operations/Query.ts"/>
 /// <reference path="operations/Update.ts"/>
 /// <reference path="operations/Delete.ts"/>
 
-/// <reference path="operations/Query_Builder.ts"/>
-/// <reference path="operations/Query_Renderer.ts"/>
-/// <reference path="operations/Query_Runner.ts"/>
+// Deprecated
+/// <reference path="query/Query.ts"/>
+
+/// <reference path="query/Join.ts"/>
+/// <reference path="query/Query_Builder.ts"/>
+/// <reference path="query/Query_Renderer.ts"/>
+/// <reference path="query/Query_Runner.ts"/>
 
 require('source-map-support').install();

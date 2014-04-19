@@ -161,6 +161,15 @@ var Ground;
             return result;
         };
 
+        Trellis.prototype.get_property = function (name) {
+            var properties = this.get_all_properties();
+            var property = properties[name];
+            if (!property)
+                throw new Error('Trellis ' + this.name + ' does not contain a property named ' + name + '.');
+
+            return property;
+        };
+
         Trellis.prototype.get_core_properties = function () {
             var result = {};
             for (var i in this.properties) {
@@ -226,6 +235,10 @@ var Ground;
             }
 
             return [this.properties[this.primary_key]];
+        };
+
+        Trellis.prototype.get_primary_property = function () {
+            return this.properties[this.primary_key];
         };
 
         Trellis.prototype.get_reference_property = function (other_trellis) {
@@ -317,8 +330,12 @@ var Ground;
             }
         };
 
-        Trellis.prototype.query_primary_key = function () {
+        Trellis.prototype.query = function () {
             return this.get_table_query() + '.' + this.properties[this.primary_key].get_field_name();
+        };
+
+        Trellis.prototype.query_primary_key = function () {
+            return this.query();
         };
 
         Trellis.prototype.sanitize_property = function (property) {
@@ -1270,7 +1287,7 @@ var Ground;
                     if (typeof other === 'object' && other._remove) {
                         if (other_id !== null) {
                             sql = join.generate_delete_row([row, other]);
-                            if (_this.log_queries)
+                            if (_this.ground.log_updates)
                                 console.log(sql);
 
                             return _this.ground.invoke(join.table_name + '.delete', property, row, other, join).then(function () {
@@ -1281,10 +1298,10 @@ var Ground;
                         if (other_id === null) {
                             other = _this.ground.update_object(other_trellis, other, _this.user).then(function (other) {
                                 var seeds = {};
-                                seeds[_this.trellis.name] = row;
+                                seeds[property.parent.name] = row;
                                 seeds[other_trellis.name] = other;
                                 sql = join.generate_insert(seeds);
-                                if (_this.log_queries)
+                                if (_this.ground.log_updates)
                                     console.log(sql);
 
                                 return _this.db.query(sql).then(function () {
@@ -1293,10 +1310,10 @@ var Ground;
                             });
                         } else {
                             var seeds = {};
-                            seeds[_this.trellis.name] = row;
+                            seeds[property.parent.name] = row;
                             seeds[other_trellis.name] = other;
                             sql = join.generate_insert(seeds);
-                            if (_this.log_queries)
+                            if (_this.ground.log_updates)
                                 console.log(sql);
 
                             return _this.db.query(sql).then(function () {
@@ -1508,7 +1525,7 @@ var Ground;
         if (!path)
             throw new Error('Empty query path.');
 
-        return path.split('/');
+        return path.split(/[\/\.]/);
     }
     Ground.path_to_array = path_to_array;
 
@@ -2551,6 +2568,263 @@ var Ground;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
+    var Join_Trellis_Wrapper = (function () {
+        function Join_Trellis_Wrapper(trellis, alias) {
+            if (typeof alias === "undefined") { alias = null; }
+            this.trellis = trellis;
+            this.alias = alias || trellis.get_table_name();
+        }
+        Join_Trellis_Wrapper.create_using_property = function (trellis, property) {
+            var alias = Join.generate_table_name(trellis, property);
+            return new Join_Trellis_Wrapper(trellis, alias);
+        };
+
+        Join_Trellis_Wrapper.prototype.get_alias = function () {
+            return this.alias;
+        };
+
+        Join_Trellis_Wrapper.prototype.get_table_name = function () {
+            return this.trellis.get_table_name();
+        };
+
+        Join_Trellis_Wrapper.prototype.query_identity = function () {
+            return this.get_alias() + '.' + this.trellis.get_primary_property().get_field_name();
+        };
+        return Join_Trellis_Wrapper;
+    })();
+    Ground.Join_Trellis_Wrapper = Join_Trellis_Wrapper;
+
+    var Cross_Trellis = (function () {
+        function Cross_Trellis(property) {
+            var names = [property.parent.get_plural(), property.other_trellis.get_plural()];
+            var temp = names.sort();
+            this.name = temp.join('_');
+
+            this.alias = 'cross_' + this.name + '_' + property.name;
+            this.properties = Cross_Trellis.create_properties(this, property);
+        }
+        Cross_Trellis.create_properties = function (cross, property) {
+            var other_property = property.get_other_property();
+            var result = [
+                Join_Property.create_from_property(property, cross),
+                new Join_Property(cross, property.parent, property.parent.name, "reference"),
+                new Join_Property(cross, other_property.parent, other_property.parent.name, "reference"),
+                Join_Property.create_from_property(other_property, cross)
+            ];
+
+            Join_Property.pair(result[0], result[1]);
+            Join_Property.pair(result[2], result[3]);
+            return result;
+        };
+
+        Cross_Trellis.prototype.get_alias = function () {
+            return this.alias;
+        };
+
+        Cross_Trellis.prototype.get_table_name = function () {
+            return this.name;
+        };
+
+        Cross_Trellis.prototype.query_identity = function () {
+            throw new Error('Cross_Trellis.query_identity() should never be called.' + '  Cross_Reference only has references, not identities');
+        };
+        return Cross_Trellis;
+    })();
+    Ground.Cross_Trellis = Cross_Trellis;
+
+    var Join_Property = (function () {
+        function Join_Property(parent, other_trellis, field_name, type, other_property) {
+            if (typeof other_property === "undefined") { other_property = null; }
+            this.parent = parent;
+            this.other_trellis = other_trellis;
+            this.field_name = field_name;
+            this.type = type;
+            this.other_property = other_property;
+        }
+        Join_Property.create_from_property = function (property, other_trellis, other_property) {
+            if (typeof other_trellis === "undefined") { other_trellis = null; }
+            if (typeof other_property === "undefined") { other_property = null; }
+            return new Join_Property(property.parent, other_trellis || property.other_trellis, property.get_field_name(), property.type, other_property);
+        };
+
+        Join_Property.pair = function (first, second) {
+            first.other_property = second;
+            second.other_property = first;
+        };
+        return Join_Property;
+    })();
+    Ground.Join_Property = Join_Property;
+
+    var Join_Tree = (function () {
+        function Join_Tree(property, trellis) {
+            this.children = [];
+            this.property = property;
+            this.trellis = trellis;
+        }
+        Join_Tree.get = function (tree, property, next) {
+            for (var i = 0; i < tree.length; ++i) {
+                var branch = tree[i];
+                if (branch.property.name == property.name && branch.trellis.name === next.name)
+                    return branch;
+            }
+            return null;
+        };
+        return Join_Tree;
+    })();
+    Ground.Join_Tree = Join_Tree;
+
+    var Join = (function () {
+        function Join() {
+        }
+        Join.generate_table_name = function (trellis, property) {
+            return 'link_' + trellis.name + '_' + property.get_field_name();
+        };
+
+        Join.get_last_reference = function (property_chain) {
+            var property = property_chain[property_chain.length - 1];
+
+            if (!property.other_property)
+                return property_chain[property_chain.length - 2];
+        };
+
+        Join.paths_to_tree = function (base, paths) {
+            var result = [], target, path;
+
+            for (var i = 0; i < paths.length; ++i) {
+                var trellis = base;
+                path = paths[i];
+                target = result;
+                for (var x = 0; x < path.length - 1; ++x) {
+                    var property = path[x];
+                    var next = path[x + 1].parent;
+                    var branch = Join_Tree.get(target, property, next);
+                    if (!branch) {
+                        branch = new Join_Tree(property, next);
+                        target.push(branch);
+                    }
+                    target = branch.children;
+                }
+            }
+
+            return result;
+        };
+
+        Join.convert = function (branch, previous, result) {
+            var join_property, cross;
+            if (branch.property.get_relationship() == 3 /* many_to_many */) {
+                cross = new Cross_Trellis(branch.property);
+                result.push(new Reference_Join(cross.properties[0], previous, cross));
+                previous = cross;
+                join_property = cross.properties[2];
+            } else {
+                join_property = Join_Property.create_from_property(branch.property);
+                Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property()));
+            }
+
+            var join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property);
+
+            if (branch.property.type == 'list') {
+                var other_property = branch.property.get_other_property();
+                if (other_property.parent !== branch.trellis) {
+                    var join_trellis2 = new Join_Trellis_Wrapper(branch.property.parent, 'composite_' + join_trellis.alias + '_' + branch.property.parent.name);
+                    result.push(new Composite_Join(join_trellis, join_trellis2));
+                    previous = join_trellis2;
+                }
+            }
+
+            result.push(new Reference_Join(join_property, previous, join_trellis));
+
+            return join_trellis;
+        };
+
+        Join.tree_to_joins = function (tree, previous) {
+            var result = [];
+
+            for (var i = 0; i < tree.length; ++i) {
+                var branch = tree[i], cross = null;
+                var join_trellis = Join.convert(branch, previous, result);
+                result = result.concat(Join.tree_to_joins(branch.children, join_trellis));
+            }
+
+            return result;
+        };
+
+        Join.render_paths = function (trellis, paths) {
+            var tree = Join.paths_to_tree(trellis, paths);
+            var joins = Join.tree_to_joins(tree, new Join_Trellis_Wrapper(trellis));
+            return joins.map(function (join) {
+                return join.render();
+            });
+        };
+
+        Join.path_to_property_chain = function (base, path) {
+            var parts = Ground.path_to_array(path);
+            var trellis = base;
+            var result = [];
+
+            for (var i = 0; i < parts.length; ++i) {
+                var part = parts[i];
+                var property = trellis.get_property(part);
+
+                result.push(property);
+                trellis = property.other_trellis;
+            }
+
+            return result;
+        };
+
+        Join.get_end_query = function (property_chain) {
+            var last_property = property_chain[property_chain.length - 1];
+            var last_reference = Join.get_last_reference(property_chain);
+            var table_name = Join.generate_table_name(last_property.parent, last_reference);
+            return table_name + '.' + last_property.get_field_name();
+        };
+        return Join;
+    })();
+    Ground.Join = Join;
+
+    var Reference_Join = (function () {
+        function Reference_Join(property, first, second) {
+            this.property = property;
+            this.first = first;
+            this.second = second;
+        }
+        Reference_Join.prototype.render = function () {
+            return 'LEFT JOIN ' + this.second.get_table_name() + ' ' + this.second.get_alias() + ' ON ' + this.get_condition();
+        };
+
+        Reference_Join.prototype.get_condition = function () {
+            if (this.property.type === 'reference')
+                return this.get_query_reference(this.first, this.property) + ' = ' + this.second.query_identity();
+            else
+                return this.first.query_identity() + ' = ' + this.get_query_reference(this.second, this.property.other_property);
+        };
+
+        Reference_Join.prototype.get_query_reference = function (trellis, property) {
+            return trellis.get_alias() + '.' + property.field_name;
+        };
+        return Reference_Join;
+    })();
+    Ground.Reference_Join = Reference_Join;
+
+    var Composite_Join = (function () {
+        function Composite_Join(first, second) {
+            this.first = first;
+            this.second = second;
+        }
+        Composite_Join.prototype.render = function () {
+            return 'LEFT JOIN ' + this.second.get_table_name() + ' ' + this.second.get_alias() + ' ON ' + this.get_condition();
+        };
+
+        Composite_Join.prototype.get_condition = function () {
+            return this.first.query_identity() + ' = ' + this.second.query_identity();
+        };
+        return Composite_Join;
+    })();
+    Ground.Composite_Join = Composite_Join;
+})(Ground || (Ground = {}));
+var Ground;
+(function (Ground) {
     
 
     var Query_Builder = (function () {
@@ -2569,25 +2843,27 @@ var Ground;
             Query_Builder.operators[symbol] = action;
         };
 
-        Query_Builder.prototype.add_filter = function (property_name, value, operator) {
+        Query_Builder.prototype.add_filter = function (path, value, operator) {
             if (typeof value === "undefined") { value = null; }
             if (typeof operator === "undefined") { operator = '='; }
-            var properties = this.trellis.get_all_properties();
-            var property = properties[property_name];
-            if (!property)
-                throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.');
-
             if (Query_Builder.operators[operator] === undefined)
                 throw new Error("Invalid operator: '" + operator + "'.");
 
             if (value === null || value === undefined)
-                throw new Error('Cannot add property filter where value is null; property = ' + this.trellis.name + '.' + property_name + '.');
+                throw new Error('Cannot add property filter where value is null; property = ' + this.trellis.name + '.' + path + '.');
 
-            this.filters.push({
-                property: property,
+            var filter = {
+                path: path,
                 value: value,
                 operator: operator
-            });
+            };
+
+            if (path.indexOf('.') === -1) {
+                var properties = this.trellis.get_all_properties();
+                filter.property = properties[path];
+            }
+
+            this.filters.push(filter);
         };
 
         Query_Builder.prototype.add_key_filter = function (value) {
@@ -2737,7 +3013,7 @@ var Ground;
         Query_Builder.prototype.get_primary_key_value = function () {
             var _this = this;
             var filters = this.filters.filter(function (filter) {
-                return filter.property.name == _this.trellis.primary_key;
+                return filter.path == _this.trellis.primary_key;
             });
             if (filters.length > 0)
                 return filters[0].value;
@@ -2817,18 +3093,23 @@ var Ground;
         Query_Renderer.prototype.generate_count = function (parts) {
             var sql = 'SELECT COUNT(*) AS total_number' + parts.from + parts.joins + parts.filters;
 
+            var args = parts.args;
+            for (var pattern in args) {
+                var value = args[pattern];
+                sql = sql.replace(new RegExp(pattern, 'g'), value);
+            }
+
             return sql;
         };
 
         Query_Renderer.prototype.generate_parts = function (source) {
             var properties = Query_Renderer.get_properties(source);
             var data = Query_Renderer.get_fields_and_joins(source, properties);
-            var data2 = Query_Renderer.process_property_filters(source, this.ground);
+            var data2 = Query_Renderer.build_filters(source, this.ground);
             var fields = data.fields;
-            var joins = data.joins.concat(data2.joins);
+            var joins = data.joins.concat(Ground.Join.render_paths(source.trellis, data2.property_joins));
             var args = data2.arguments;
             var filters = data2.filters || [];
-
             if (fields.length == 0)
                 throw new Error('No authorized fields found for trellis ' + source.trellis.name + '.');
 
@@ -2874,75 +3155,69 @@ var Ground;
             };
         };
 
-        Query_Renderer.process_property_filter = function (source, filter, ground) {
+        Query_Renderer.build_filter = function (source, filter, ground) {
             var result = {
                 filters: [],
                 arguments: {},
-                joins: []
+                property_joins: []
             };
-            var property = source.trellis.sanitize_property(filter.property);
-            var value = filter.value;
+            var value = filter.value, operator = filter.operator || '=', reference;
 
-            var placeholder = ':' + property.name + '_filter' + Query_Renderer.counter++;
+            var parts = Ground.path_to_array(filter.path);
+            var property_chain = Ground.Join.path_to_property_chain(source.trellis, parts);
+            var property = property_chain[property_chain.length - 1];
+
+            var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++;
             if (Query_Renderer.counter > 10000)
                 Query_Renderer.counter = 1;
 
-            if (value === 'null' && property.type != 'string') {
-                result.filters.push(property.query() + ' IS NULL');
-                return result;
-            }
-
-            if (value !== null)
-                value = ground.convert_value(value, property.type);
-
-            if (value === null || value === undefined) {
-                throw new Error('Query property filter ' + placeholder + ' is null.');
-            }
-
-            if (property.get_relationship() == 3 /* many_to_many */) {
-                var join_seed = {}, s = {};
-                s[property.other_trellis.primary_key] = placeholder;
-                join_seed[property.other_trellis.name] = s;
-
-                result.joins.push(Query_Renderer.generate_property_join(property, join_seed));
+            var operator_action = Ground.Query_Builder.operators[filter.operator];
+            if (operator_action && typeof operator_action.render === 'function') {
+                var data = {
+                    value: value,
+                    placeholder: placeholder
+                };
+                operator_action.render(result, filter, property, data);
+                value = data.value;
+                placeholder = data.placeholder;
             } else {
-                var operator_action = Ground.Query_Builder.operators[filter.operator];
-                if (operator_action && typeof operator_action.render === 'function') {
-                    var data = {
-                        value: value,
-                        placeholder: placeholder
-                    };
-                    operator_action.render(result, filter, property, data);
-                    value = data.value;
-                    placeholder = data.placeholder;
+                if (value === 'null' && property.type != 'string') {
+                    operator = 'IS';
+                    value = 'NULL';
                 } else {
-                    result.filters.push(property.query() + ' ' + filter.operator + ' ' + placeholder);
+                    if (value !== null)
+                        value = ground.convert_value(value, property.type);
+                    value = property.get_sql_value(value);
                 }
             }
 
-            if (value !== null) {
-                value = property.get_sql_value(value);
-                result.arguments[placeholder] = value;
+            if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
+                result.property_joins.push(property_chain);
+                reference = Ground.Join.get_end_query(property_chain);
+            } else {
+                reference = property.query();
             }
 
+            result.arguments[placeholder] = value;
+            result.filters.push(reference + ' ' + operator + ' ' + placeholder);
             return result;
         };
 
-        Query_Renderer.process_property_filters = function (source, ground) {
+        Query_Renderer.build_filters = function (source, ground) {
             var result = {
                 filters: [],
                 arguments: {},
-                joins: []
+                property_joins: []
             };
             for (var i in source.filters) {
                 var filter = source.filters[i];
-                var additions = Query_Renderer.process_property_filter(source, filter, ground);
+                var additions = Query_Renderer.build_filter(source, filter, ground);
 
                 if (additions.filters.length)
                     result.filters = result.filters.concat(additions.filters);
 
-                if (additions.joins.length)
-                    result.joins = result.filters.concat(additions.joins);
+                if (additions.property_joins.length)
+                    result.property_joins = result.property_joins.concat(additions.property_joins);
 
                 if (Object.keys(additions.arguments).length)
                     MetaHub.extend(result.arguments, additions.arguments);
@@ -2996,23 +3271,6 @@ var Ground;
 
                 return ' LIMIT ' + offset + ', ' + limit;
             }
-        };
-
-        Query_Renderer.add_join = function (joins, join) {
-            for (var i in joins) {
-                var j = joins[i];
-                if (j.property === join.property && j.first === join.first && j.second === join.second)
-                    return;
-            }
-
-            joins.push(join);
-        };
-
-        Query_Renderer.get_join_table = function (join) {
-            if (join.property)
-                return "Join_" + join.first.name + "_" + join.property.name;
-
-            return "Composite_Join_" + join.first.name + "_" + join.second.name;
         };
         Query_Renderer.counter = 1;
         return Query_Renderer;
@@ -3203,13 +3461,15 @@ var Ground;
                     var filter = source.filters[i];
                     var operator_action = Ground.Query_Builder.operators[filter.operator];
                     if (operator_action && typeof operator_action.prepare === 'function') {
-                        var property = source.trellis.sanitize_property(filter.property);
-                        promises.push(function () {
-                            return operator_action.prepare(filter, property).then(function (result) {
-                                if (result === false)
-                                    is_empty = true;
+                        if (filter.property) {
+                            var property = source.trellis.sanitize_property(filter.property);
+                            promises.push(function () {
+                                return operator_action.prepare(filter, property).then(function (result) {
+                                    if (result === false)
+                                        is_empty = true;
+                                });
                             });
-                        });
+                        }
                     }
                 }
             }

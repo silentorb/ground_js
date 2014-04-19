@@ -8,7 +8,8 @@ module Ground {
   }
 
   export interface Query_Filter {
-    property:Property
+    path?:string
+    property?:Property
     value
     operator:string
   }
@@ -62,23 +63,29 @@ module Ground {
       Query_Builder.operators[symbol] = action
     }
 
-    add_filter(property_name:string, value = null, operator:string = '=') {
-      var properties = this.trellis.get_all_properties()
-      var property = properties[property_name]
-      if (!property)
-        throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.')
+    add_filter(path:string, value = null, operator:string = '=') {
+
+//      if (!property)
+//        throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.')
 //      console.log('q', Query_Builder.operators)
       if (Query_Builder.operators[operator] === undefined)
         throw new Error("Invalid operator: '" + operator + "'.")
 
       if (value === null || value === undefined)
-        throw new Error('Cannot add property filter where value is null; property = ' + this.trellis.name + '.' + property_name + '.')
+        throw new Error('Cannot add property filter where value is null; property = ' + this.trellis.name + '.' + path + '.')
 
-      this.filters.push({
-        property: property,
+      var filter = <Query_Filter>{
+        path: path,
         value: value,
         operator: operator
-      })
+      }
+
+      if (path.indexOf('.') === -1) {
+        var properties = this.trellis.get_all_properties()
+       filter.property = properties[path]
+      }
+
+      this.filters.push(filter)
     }
 
     add_key_filter(value) {
@@ -227,7 +234,7 @@ module Ground {
     }
 
     get_primary_key_value() {
-      var filters = this.filters.filter((filter)=>filter.property.name == this.trellis.primary_key)
+      var filters = this.filters.filter((filter)=>filter.path == this.trellis.primary_key)
       if (filters.length > 0)
         return filters[0].value
 

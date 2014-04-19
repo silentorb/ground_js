@@ -43,6 +43,7 @@ declare module Ground {
         public clone_property(property_name: string, target_trellis: Trellis): void;
         public get_all_links(filter?: (property: Ground.Property) => boolean): {};
         public get_all_properties(): {};
+        public get_property(name: string): Ground.Property;
         public get_core_properties(): {};
         public get_id(source: any): any;
         public get_identity(seed: any): {};
@@ -50,6 +51,7 @@ declare module Ground {
         public get_links(): Ground.Property[];
         public get_plural(): string;
         public get_primary_keys(): any[];
+        public get_primary_property(): Ground.Property;
         public get_reference_property(other_trellis: Trellis): Ground.Property;
         public get_root_table(): Ground.Table;
         public get_table_name(): string;
@@ -57,6 +59,7 @@ declare module Ground {
         public get_tree(): Trellis[];
         public initialize(all: any): void;
         public load_from_object(source: Ground.ITrellis_Source): void;
+        public query(): string;
         public query_primary_key(): string;
         public sanitize_property(property: any): any;
         public set_parent(parent: Trellis): void;
@@ -88,12 +91,6 @@ declare module Ground {
     interface External_Query_Source extends Property_Query_Source {
         trellis: string;
         map?: any;
-    }
-    interface Internal_Query_Source {
-        fields?: any;
-        filters?: any[];
-        joins?: string[];
-        arguments?: any;
     }
     class Query {
         public ground: Ground.Core;
@@ -135,7 +132,7 @@ declare module Ground {
         public generate_sql(properties: any): string;
         public get_fields_and_joins(properties: {
             [name: string]: Ground.Property;
-        }, include_primary_key?: boolean): Internal_Query_Source;
+        }, include_primary_key?: boolean): Ground.Internal_Query_Source;
         public get_primary_key_value(): any;
         static generate_property_join(property: Ground.Property, seeds: any): string;
         public create_sub_query(trellis: Ground.Trellis, property: Ground.Property): Query;
@@ -145,8 +142,8 @@ declare module Ground {
         public has_expansion(path: string): boolean;
         public process_row(row: any): Promise;
         public query_link_property(seed: any, property: any): Promise;
-        public process_property_filter(filter: any): Internal_Query_Source;
-        public process_property_filters(): Internal_Query_Source;
+        public process_property_filter(filter: any): Ground.Internal_Query_Source;
+        public process_property_filters(): Ground.Internal_Query_Source;
         public extend(source: External_Query_Source): void;
         public run_core(): Promise;
         public run(): Promise;
@@ -402,12 +399,90 @@ declare module Ground {
     }
 }
 declare module Ground {
+    interface IJoin {
+        render(): string;
+    }
+    interface ITable_Reference {
+        get_table_name(): string;
+        query_reference(): string;
+        query_identity(): string;
+    }
+    interface Join_Trellis {
+        get_table_name(): string;
+        get_alias(): string;
+        query_identity(): string;
+    }
+    class Join_Trellis_Wrapper implements Join_Trellis {
+        public trellis: Ground.Trellis;
+        public alias: string;
+        constructor(trellis: Ground.Trellis, alias?: string);
+        static create_using_property(trellis: Ground.Trellis, property: Ground.Property): Join_Trellis_Wrapper;
+        public get_alias(): string;
+        public get_table_name(): string;
+        public query_identity(): string;
+    }
+    class Cross_Trellis implements Join_Trellis {
+        public name: string;
+        public alias: string;
+        public properties: Join_Property[];
+        constructor(property: Ground.Property);
+        private static create_properties(cross, property);
+        public get_alias(): string;
+        public get_table_name(): string;
+        public query_identity(): string;
+    }
+    class Join_Property {
+        public parent: Ground.ITrellis;
+        public other_trellis: Ground.ITrellis;
+        public field_name: string;
+        public type: string;
+        public other_property: Join_Property;
+        constructor(parent: Ground.ITrellis, other_trellis: Ground.ITrellis, field_name: string, type: string, other_property?: Join_Property);
+        static create_from_property(property: Ground.Property, other_trellis?: Ground.ITrellis, other_property?: Join_Property): Join_Property;
+        static pair(first: Join_Property, second: Join_Property): void;
+    }
+    class Join_Tree {
+        public property: Ground.Property;
+        public trellis: Ground.Trellis;
+        public children: Join_Tree[];
+        constructor(property: Ground.Property, trellis: Ground.Trellis);
+        static get(tree: Join_Tree[], property: Ground.Property, next: Ground.Trellis): Join_Tree;
+    }
+    class Join {
+        static generate_table_name(trellis: Ground.Trellis, property: Ground.Property): string;
+        static get_last_reference(property_chain: Ground.Property[]): Ground.Property;
+        static paths_to_tree(base: Ground.Trellis, paths: any[]): Join_Tree[];
+        private static convert(branch, previous, result);
+        static tree_to_joins(tree: Join_Tree[], previous: Join_Trellis): IJoin[];
+        static render_paths(trellis: Ground.Trellis, paths: Ground.Property[][]): string[];
+        static path_to_property_chain(base: Ground.Trellis, path: any): any[];
+        static get_end_query(property_chain: Ground.Property[]): string;
+    }
+    class Reference_Join implements IJoin {
+        public property: Join_Property;
+        public first: Join_Trellis;
+        public second: Join_Trellis;
+        constructor(property: Join_Property, first: Join_Trellis, second: Join_Trellis);
+        public render(): string;
+        private get_condition();
+        private get_query_reference(trellis, property);
+    }
+    class Composite_Join implements IJoin {
+        public first: Join_Trellis;
+        public second: Join_Trellis;
+        constructor(first: Join_Trellis, second: Join_Trellis);
+        public render(): string;
+        private get_condition();
+    }
+}
+declare module Ground {
     interface IPager {
         limit?: any;
         offset?: any;
     }
     interface Query_Filter {
-        property: Ground.Property;
+        path?: string;
+        property?: Ground.Property;
         value: any;
         operator: string;
     }
@@ -440,7 +515,7 @@ declare module Ground {
         public filters: Query_Filter[];
         constructor(trellis: Ground.Trellis);
         static add_operator(symbol: string, action: any): void;
-        public add_filter(property_name: string, value?: any, operator?: string): void;
+        public add_filter(path: string, value?: any, operator?: string): void;
         public add_key_filter(value: any): void;
         public add_sort(sort: Query_Sort): void;
         public add_map(target: string, source?: any): void;
@@ -455,10 +530,12 @@ declare module Ground {
     }
 }
 declare module Ground {
-    interface Join {
-        property?: Ground.Property;
-        first: Ground.Trellis;
-        second: Ground.Trellis;
+    interface Internal_Query_Source {
+        fields?: any;
+        filters?: any[];
+        joins?: string[];
+        property_joins?: Ground.Property[][];
+        arguments?: any;
     }
     class Query_Renderer {
         public ground: Ground.Core;
@@ -478,12 +555,10 @@ declare module Ground {
             args: any;
         };
         private static get_fields_and_joins(source, properties, include_primary_key?);
-        private static process_property_filter(source, filter, ground);
-        static process_property_filters(source: Ground.Query_Builder, ground: Ground.Core): Ground.Internal_Query_Source;
+        private static build_filter(source, filter, ground);
+        static build_filters(source: Ground.Query_Builder, ground: Ground.Core): Internal_Query_Source;
         static process_sorts(sorts: Ground.Query_Sort[], trellis: Ground.Trellis): string;
         static render_pager(pager: Ground.IPager): string;
-        static add_join(joins: any, join: Join): void;
-        static get_join_table(join: Join): string;
     }
 }
 declare module Ground {
