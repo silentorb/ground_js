@@ -186,7 +186,7 @@ module Ground {
       }
       else {
         join_property = Join_Property.create_from_property(branch.property)
-        Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property()))
+        Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property(true)))
       }
 
       var other_property = branch.property.get_other_property()
@@ -207,15 +207,17 @@ module Ground {
         result.push(new Reference_Join(join_property, previous, join_trellis))
         return join_trellis
       }
-
     }
 
-    static tree_to_joins(tree:Join_Tree[], previous:Join_Trellis):IJoin[] {
-      var result:IJoin[] = []
+    static tree_to_joins(tree:Join_Tree[], previous:Join_Trellis = null):IJoin[] {
+      var result:IJoin[] = [], base:Join_Trellis
 
       for (var i = 0; i < tree.length; ++i) {
         var branch:Join_Tree = tree[i], cross:Cross_Trellis = null
-        var join_trellis = Join.convert(branch, previous, result)
+        if (!previous) {
+          base = new Join_Trellis_Wrapper(branch.property.parent)
+        }
+        var join_trellis = Join.convert(branch, previous || base, result)
         result = result.concat(Join.tree_to_joins(branch.children, join_trellis))
       }
 
@@ -224,7 +226,7 @@ module Ground {
 
     static render_paths(trellis:Trellis, paths:Property[][]):string[] {
       var tree = Join.paths_to_tree(trellis, paths)
-      var joins = Join.tree_to_joins(tree, new Join_Trellis_Wrapper(trellis))
+      var joins = Join.tree_to_joins(tree)
       return joins.map((join)=> join.render())
     }
 

@@ -2718,7 +2718,7 @@ var Ground;
                 join_property = cross.properties[2];
             } else {
                 join_property = Join_Property.create_from_property(branch.property);
-                Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property()));
+                Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property(true)));
             }
 
             var other_property = branch.property.get_other_property();
@@ -2739,11 +2739,15 @@ var Ground;
         };
 
         Join.tree_to_joins = function (tree, previous) {
-            var result = [];
+            if (typeof previous === "undefined") { previous = null; }
+            var result = [], base;
 
             for (var i = 0; i < tree.length; ++i) {
                 var branch = tree[i], cross = null;
-                var join_trellis = Join.convert(branch, previous, result);
+                if (!previous) {
+                    base = new Join_Trellis_Wrapper(branch.property.parent);
+                }
+                var join_trellis = Join.convert(branch, previous || base, result);
                 result = result.concat(Join.tree_to_joins(branch.children, join_trellis));
             }
 
@@ -2752,7 +2756,7 @@ var Ground;
 
         Join.render_paths = function (trellis, paths) {
             var tree = Join.paths_to_tree(trellis, paths);
-            var joins = Join.tree_to_joins(tree, new Join_Trellis_Wrapper(trellis));
+            var joins = Join.tree_to_joins(tree);
             return joins.map(function (join) {
                 return join.render();
             });

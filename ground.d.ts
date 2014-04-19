@@ -453,7 +453,7 @@ declare module Ground {
         static get_last_reference(property_chain: Ground.Property[]): Ground.Property;
         static paths_to_tree(base: Ground.Trellis, paths: any[]): Join_Tree[];
         private static convert(branch, previous, result);
-        static tree_to_joins(tree: Join_Tree[], previous: Join_Trellis): IJoin[];
+        static tree_to_joins(tree: Join_Tree[], previous?: Join_Trellis): IJoin[];
         static render_paths(trellis: Ground.Trellis, paths: Ground.Property[][]): string[];
         static path_to_property_chain(base: Ground.Trellis, path: any): any[];
         static get_end_query(property_chain: Ground.Property[]): string;
