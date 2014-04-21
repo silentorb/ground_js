@@ -3103,9 +3103,8 @@ var Ground;
             '=': null,
             'LIKE': {
                 "render": function (result, filter, property, data) {
-                    result.filters.push(property.query() + ' LIKE ' + data.placeholder);
                     if (data.value !== null)
-                        data.value = '%' + data.value + '%';
+                        data.value = "'%" + data.value + "%'";
                 }
             },
             '!=': null
