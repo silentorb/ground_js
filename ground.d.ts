@@ -226,6 +226,8 @@ declare module Ground {
     }
     interface ISeed {
         _deleted?: any;
+        _deleted_?: any;
+        _removed_?: any;
     }
     interface IUpdate {
         run: () => Promise;
@@ -429,7 +431,9 @@ declare module Ground {
         private static get_field_name(property);
         public get_primary_keys(): Join_Property[];
         private static create_properties(cross, property);
+        public generate_delete(property: Ground.Property, owner: any, other: any): string;
         public generate_insert(property: Ground.Property, owner: any, other: any): string;
+        public order_identities(property: Ground.Property): Join_Property[];
         public get_alias(): string;
         public get_table_name(): string;
         public query_identity(): string;
@@ -444,6 +448,7 @@ declare module Ground {
         public property: Ground.Property;
         constructor(parent: Join_Trellis, other_trellis: Join_Trellis, name: string, type: string, field_name?: string, other_property?: Join_Property);
         static create_from_property(property: Ground.Property, other_trellis?: Join_Trellis, other_property?: Join_Property): Join_Property;
+        public get_comparison(value: any): string;
         static pair(first: Join_Property, second: Join_Property): void;
         public get_sql_value(value: any): any;
     }

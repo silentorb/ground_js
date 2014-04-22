@@ -1284,13 +1284,16 @@ var Ground;
                 var sql, other_id = other_trellis.get_id(other);
 
                 return _this.update_reference_object(other, property).then(function () {
-                    if (typeof other === 'object' && other._remove) {
+                    if (typeof other === 'object' && other._removed_) {
                         if (other_id !== null) {
-                            sql = join.generate_delete_row([row, other]);
+                            var cross = new Ground.Cross_Trellis(property);
+                            cross['alias'] = null;
+
+                            sql = cross.generate_delete(property, row, other);
                             if (_this.ground.log_updates)
                                 console.log(sql);
 
-                            return _this.ground.invoke(join.table_name + '.delete', property, row, other, join).then(function () {
+                            return _this.ground.invoke(join.table_name + '.remove', property, row, other, join).then(function () {
                                 return _this.db.query(sql);
                             });
                         }
@@ -1307,7 +1310,6 @@ var Ground;
                                 });
                             });
                         } else {
-                            var cross = new Ground.Cross_Trellis(property);
                             var cross = new Ground.Cross_Trellis(property);
                             sql = cross.generate_insert(property, row, other);
 
@@ -1701,7 +1703,7 @@ var Ground;
             if (typeof as_service === "undefined") { as_service = false; }
             trellis = this.sanitize_trellis_argument(trellis);
 
-            if (seed._deleted === true || seed._deleted === 'true')
+            if (seed._deleted === true || seed._deleted === 'true' || seed._deleted_ === true || seed._deleted_ === 'true')
                 return this.delete_object(trellis, seed);
 
             var update = new Ground.Update(trellis, seed, this);
@@ -2641,8 +2643,29 @@ var Ground;
             return result;
         };
 
+        Cross_Trellis.prototype.generate_delete = function (property, owner, other) {
+            var identities = this.order_identities(property);
+            var conditions = [
+                identities[0].get_comparison(owner),
+                identities[1].get_comparison(other)
+            ];
+            return 'DELETE FROM ' + this.get_table_name() + ' WHERE ' + conditions.join(' AND ') + "\n";
+        };
+
         Cross_Trellis.prototype.generate_insert = function (property, owner, other) {
-            var values = [], keys = [];
+            var identities = this.order_identities(property);
+            var keys = identities.map(function (x) {
+                return x.field_name;
+            });
+            var values = [
+                identities[0].get_sql_value(owner),
+                identities[1].get_sql_value(other)
+            ];
+
+            return 'REPLACE INTO ' + this.get_table_name() + ' (`' + keys.join('`, `') + '`) VALUES (' + values.join(', ') + ');\n';
+        };
+
+        Cross_Trellis.prototype.order_identities = function (property) {
             var first = this.identities.filter(function (x) {
                 return x.other_property.name == property.name;
             })[0];
@@ -2650,16 +2673,7 @@ var Ground;
                 throw new Error('Could not insert into cross table ' + this.get_table_name() + '.  Could not find identity for property ' + property.fullname() + '.');
             }
             var second = this.identities[1 - this.identities.indexOf(first)];
-            var identities = [first, second];
-            keys = identities.map(function (x) {
-                return x.field_name;
-            });
-            values = [
-                first.get_sql_value(owner),
-                second.get_sql_value(other)
-            ];
-
-            return 'REPLACE INTO ' + this.get_table_name() + ' (`' + keys.join('`, `') + '`) VALUES (' + values.join(', ') + ');\n';
+            return [first, second];
         };
 
         Cross_Trellis.prototype.get_alias = function () {
@@ -2695,6 +2709,11 @@ var Ground;
 
             result.property = property;
             return result;
+        };
+
+        Join_Property.prototype.get_comparison = function (value) {
+            var table_name = this.parent.get_alias() || this.parent.get_table_name();
+            return table_name + '.' + this.field_name + ' = ' + this.get_sql_value(value);
         };
 
         Join_Property.pair = function (first, second) {

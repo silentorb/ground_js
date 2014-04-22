@@ -104,19 +104,21 @@ module Ground {
       return result
     }
 
+    generate_delete(property:Property, owner, other):string {
+      var identities = this.order_identities(property)
+      var conditions = [
+        identities[0].get_comparison(owner),
+        identities[1].get_comparison(other)
+      ]
+      return 'DELETE FROM ' + this.get_table_name() + ' WHERE ' + conditions.join(' AND ') + "\n"
+    }
+
     generate_insert(property:Property, owner, other):string {
-      var values = [], keys = []
-      var first = this.identities.filter((x)=>x.other_property.name == property.name)[0]
-      if (!first) {
-        throw new Error('Could not insert into cross table ' + this.get_table_name()
-          + '.  Could not find identity for property ' + property.fullname() + '.')
-      }
-      var second = this.identities[1 - this.identities.indexOf(first)]
-      var identities:Join_Property[] = [ first, second ]
-      keys = identities.map((x)=> x.field_name)
-      values = [
-        first.get_sql_value(owner),
-        second.get_sql_value(other)
+      var identities = this.order_identities(property)
+      var keys = identities.map((x)=> x.field_name)
+      var values = [
+        identities[0].get_sql_value(owner),
+        identities[1].get_sql_value(other)
       ]
 
       return 'REPLACE INTO ' + this.get_table_name() + ' (`'
@@ -124,6 +126,16 @@ module Ground {
         + '`) VALUES ('
         + values.join(', ')
         + ');\n'
+    }
+
+    order_identities(property:Property):Join_Property[] {
+      var first = this.identities.filter((x)=>x.other_property.name == property.name)[0]
+      if (!first) {
+        throw new Error('Could not insert into cross table ' + this.get_table_name()
+          + '.  Could not find identity for property ' + property.fullname() + '.')
+      }
+      var second = this.identities[1 - this.identities.indexOf(first)]
+      return [ first, second ]
     }
 
     get_alias():string {
@@ -170,6 +182,11 @@ module Ground {
 
       result.property = property
       return result
+    }
+
+    get_comparison(value):string {
+      var table_name = this.parent.get_alias() || this.parent.get_table_name()
+      return table_name + '.' + this.field_name + ' = ' + this.get_sql_value(value)
     }
 
     static pair(first:Join_Property, second:Join_Property) {

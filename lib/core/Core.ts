@@ -30,7 +30,9 @@ module Ground {
   }
 
   export interface ISeed {
-    _deleted?;
+    _deleted?
+    _deleted_?
+    _removed_?
   }
 
   export interface IUpdate {
@@ -239,7 +241,8 @@ module Ground {
       // If _deleted is an object then it is a list of links
       // to delete which will be handled by Update.
       // If _delete is simply true then the seed itself is marked for deletion.
-      if (seed._deleted === true || seed._deleted === 'true')
+      if (seed._deleted === true || seed._deleted === 'true'
+        || seed._deleted_ === true || seed._deleted_ === 'true')
         return this.delete_object(trellis, seed);
 
       var update = new Update(trellis, seed, this);

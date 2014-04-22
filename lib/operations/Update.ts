@@ -305,13 +305,17 @@ module Ground {
         return this.update_reference_object(other, property)
           .then(() => {
             // Clients can use the _remove flag to detach items from lists without deleting them
-            if (typeof other === 'object' && other._remove) {
+            if (typeof other === 'object' && other._removed_) {
               if (other_id !== null) {
-                sql = join.generate_delete_row([row, other])
+                var cross = new Cross_Trellis(property)
+                cross['alias'] = null
+
+//                sql = join.generate_delete_row([row, other])
+                sql = cross.generate_delete(property, row, other)
                 if (this.ground.log_updates)
                   console.log(sql)
 
-                return this.ground.invoke(join.table_name + '.delete', property, row, other, join)
+                return this.ground.invoke(join.table_name + '.remove', property, row, other, join)
                   .then(() => this.db.query(sql))
               }
             }
@@ -335,7 +339,6 @@ module Ground {
 //                var seeds = {}
 //                seeds[property.parent.name] = row
 //                seeds[other_trellis.name] = other
-                var cross = new Cross_Trellis(property)
                 var cross = new Cross_Trellis(property)
                 sql = cross.generate_insert(property,row,other)
 //                sql = join.generate_insert(seeds)
