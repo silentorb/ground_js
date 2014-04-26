@@ -88,7 +88,7 @@ module Ground {
     }
 
     private static create_properties(cross:Cross_Trellis, property:Property):Join_Property[] {
-      var other_property:Property = property.get_other_property()
+      var other_property:Property = property.get_other_property(true)
 
       var result = [
         Join_Property.create_from_property(property, cross),
@@ -272,7 +272,7 @@ module Ground {
         Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property(true)))
       }
 
-      var other_property = branch.property.get_other_property()
+      var other_property = branch.property.get_other_property(true)
 
       // joined trellises usually require two trellis properties to be useful, and sometimes those properties
       // are not in the same table, so composite join must be added to bridge the gap.

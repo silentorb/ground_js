@@ -337,7 +337,9 @@ module Ground {
       attributes.type = 'list'
       attributes.is_virtual = true
       attributes.trellis = this.parent.name
-      return new Property(this.other_trellis.name, attributes, this.other_trellis)
+      var result = new Property(this.other_trellis.name, attributes, this.other_trellis)
+      result.other_trellis = this.parent
+      return result
     }
 
     get_property_type():Property_Type {

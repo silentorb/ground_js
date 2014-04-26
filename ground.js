@@ -2476,7 +2476,9 @@ var Ground;
             attributes.type = 'list';
             attributes.is_virtual = true;
             attributes.trellis = this.parent.name;
-            return new Property(this.other_trellis.name, attributes, this.other_trellis);
+            var result = new Property(this.other_trellis.name, attributes, this.other_trellis);
+            result.other_trellis = this.parent;
+            return result;
         };
 
         Property.prototype.get_property_type = function () {
@@ -2629,7 +2631,7 @@ var Ground;
         };
 
         Cross_Trellis.create_properties = function (cross, property) {
-            var other_property = property.get_other_property();
+            var other_property = property.get_other_property(true);
 
             var result = [
                 Join_Property.create_from_property(property, cross),
@@ -2797,7 +2799,7 @@ var Ground;
                 Join_Property.pair(join_property, Join_Property.create_from_property(branch.property.get_other_property(true)));
             }
 
-            var other_property = branch.property.get_other_property();
+            var other_property = branch.property.get_other_property(true);
 
             if (branch.property.type == 'list' && other_property.parent !== branch.trellis) {
                 join_trellis = Join_Trellis_Wrapper.create_using_property(branch.trellis, branch.property);
