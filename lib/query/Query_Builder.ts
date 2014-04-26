@@ -226,7 +226,7 @@ module Ground {
           var expansion = source.expansions[i]
           var tokens = expansion.split('/')
           var subquery = this
-          console.log('expansion', tokens)
+//          console.log('expansion', tokens)
           for (var j = 0; j < tokens.length; ++j) {
             subquery = subquery.add_subquery(tokens[j], {})
           }

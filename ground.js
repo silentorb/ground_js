@@ -2727,7 +2727,7 @@ var Ground;
             if (this.property)
                 return this.property.get_sql_value(value);
 
-            return this.other_property.property.get_sql_value(value);
+            return this.other_property.property.get_other_property(true).get_sql_value(value);
         };
         return Join_Property;
     })();
@@ -3090,7 +3090,7 @@ var Ground;
                     var expansion = source.expansions[i];
                     var tokens = expansion.split('/');
                     var subquery = this;
-                    console.log('expansion', tokens);
+
                     for (var j = 0; j < tokens.length; ++j) {
                         subquery = subquery.add_subquery(tokens[j], {});
                     }

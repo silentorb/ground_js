@@ -198,7 +198,7 @@ module Ground {
       if (this.property)
         return this.property.get_sql_value(value)
 
-      return this.other_property.property.get_sql_value(value)
+      return this.other_property.property.get_other_property(true).get_sql_value(value)
     }
   }
 
