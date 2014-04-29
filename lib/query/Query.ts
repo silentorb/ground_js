@@ -38,6 +38,8 @@ module Ground {
   export interface External_Query_Source extends Property_Query_Source {
     trellis:string;
     map?
+    type?:string
+    queries?:External_Query_Source[]
   }
 
   export class Query {

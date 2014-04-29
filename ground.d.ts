@@ -91,6 +91,8 @@ declare module Ground {
     interface External_Query_Source extends Property_Query_Source {
         trellis: string;
         map?: any;
+        type?: string;
+        queries?: External_Query_Source[];
     }
     class Query {
         public ground: Ground.Core;
@@ -531,6 +533,7 @@ declare module Ground {
         public add_key_filter(value: any): void;
         public add_sort(sort: Query_Sort): void;
         public add_map(target: string, source?: any): void;
+        public add_query(source: any): Query_Builder;
         public add_subquery(property_name: string, source?: any): Query_Builder;
         public add_transform_clause(clause: string): void;
         public create_runner(): Ground.Query_Runner;
@@ -549,23 +552,26 @@ declare module Ground {
         property_joins?: Ground.Property[][];
         arguments?: any;
     }
+    interface Query_Parts {
+        fields: string;
+        from: string;
+        joins: string;
+        filters: string;
+        sorts: string;
+        pager: string;
+        args: any;
+    }
     class Query_Renderer {
         public ground: Ground.Core;
         static counter: number;
         constructor(ground: Ground.Core);
+        static apply_arguments(sql: string, args: any): string;
         static get_properties(source: Ground.Query_Builder): {};
         static generate_property_join(property: Ground.Property, seeds: any): string;
-        public generate_sql(parts: any, source: Ground.Query_Builder): string;
-        public generate_count(parts: any): string;
-        public generate_parts(source: Ground.Query_Builder): {
-            fields: any;
-            from: string;
-            joins: string;
-            filters: string;
-            sorts: string;
-            pager: string;
-            args: any;
-        };
+        public generate_sql(parts: Query_Parts, source: Ground.Query_Builder): string;
+        public generate_count(parts: Query_Parts): string;
+        public generate_union(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
+        public generate_parts(source: Ground.Query_Builder): Query_Parts;
         private static get_fields_and_joins(source, properties, include_primary_key?);
         private static build_filter(source, filter, ground);
         static build_filters(source: Ground.Query_Builder, ground: Ground.Core): Internal_Query_Source;
@@ -574,6 +580,14 @@ declare module Ground {
     }
 }
 declare module Ground {
+    interface IQuery_Preparation {
+        queries?: string[];
+        is_empty: boolean;
+    }
+    interface IQuery_Render_Result {
+        sql: string;
+        parts: any;
+    }
     class Query_Runner {
         public source: Ground.Query_Builder;
         public run_stack: any;
@@ -588,65 +602,13 @@ declare module Ground {
         private static get_reference_object(row, property, source);
         public process_row(row: any, source: Ground.Query_Builder): Promise;
         public query_link_property(seed: any, property: any, source: Ground.Query_Builder): Promise;
+        public prepare(): Promise;
+        public render(): Promise;
         public run_core(): Promise;
         public run(): Promise;
         public run_single(): Promise;
     }
 }
 declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
-  export = Ground
-}declare module "vineyard-ground" {
   export = Ground
 }

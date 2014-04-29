@@ -10,22 +10,25 @@ module Ground {
     arguments?
   }
 
+  export interface Query_Parts {
+    fields:string
+    from:string
+    joins:string
+    filters:string
+    sorts:string
+    pager:string
+    args
+  }
+
   export class Query_Renderer {
     ground:Core
-//    fields:string[] = []
-//    joins:string[] = []
-//    arguments = {}
-//    filters:string[] = []
-//    post_clauses:any[] = []
-
     static counter = 1
 
     constructor(ground:Core) {
       this.ground = ground
     }
 
-    static apply_arguments(sql, args):string {
-      var args = parts.args
+    static apply_arguments(sql:string, args):string {
       for (var pattern in args) {
         var value = args[pattern]
         sql = sql.replace(new RegExp(pattern, 'g'), value)
@@ -50,7 +53,7 @@ module Ground {
       return join.generate_join(seeds);
     }
 
-    generate_sql(parts, source:Query_Builder) {
+    generate_sql(parts:Query_Parts, source:Query_Builder) {
       var sql = 'SELECT '
         + parts.fields
         + parts.from
@@ -65,18 +68,12 @@ module Ground {
       }
 
       sql = Query_Renderer.apply_arguments(sql, parts.args)
-//      var args = parts.args
-//      for (var pattern in args) {
-//        var value = args[pattern]
-//        sql = sql.replace(new RegExp(pattern, 'g'), value)
-//      }
-
-      sql += parts.pager
+        + parts.pager
 
       return sql;
     }
 
-    generate_count(parts) {
+    generate_count(parts:Query_Parts) {
       var sql = 'SELECT COUNT(*) AS total_number'
         + parts.from
         + parts.joins
@@ -87,9 +84,11 @@ module Ground {
       return sql;
     }
 
-    generate_union(parts, queries) {
-      var sql = 'UNION\n'
-        + queries.join('\n')
+    generate_union(parts:Query_Parts, queries:string[], source:Query_Builder) {
+      var alias = source.trellis.get_table_name()
+      var sql = 'SELECT * FROM ('
+        + queries.join('\nUNION\n')
+        + '\n) ' + alias + '\n'
         + parts.filters
         + parts.sorts
 
@@ -98,7 +97,7 @@ module Ground {
       return sql;
     }
 
-    generate_parts(source:Query_Builder) {
+    generate_parts(source:Query_Builder):Query_Parts {
       var properties = Query_Renderer.get_properties(source)
       var data = Query_Renderer.get_fields_and_joins(source, properties)
       var data2 = Query_Renderer.build_filters(source, this.ground)
@@ -138,7 +137,7 @@ module Ground {
         }
       }
 
-      if (source.map) {
+      if (source.map && Object.keys(source.map).length > 0) {
         if (!source.map[source.trellis.primary_key])
           render_field(source.trellis.primary_key)
 
@@ -174,12 +173,13 @@ module Ground {
         for (name in properties) {
           render_field(name)
         }
-        for (name in trellises) {
-          var trellis = trellises[name];
-          var join = source.trellis.get_ancestor_join(trellis);
-          if (join)
-            joins.push(join);
-        }
+      }
+
+      for (name in trellises) {
+        var trellis = trellises[name];
+        var join = source.trellis.get_ancestor_join(trellis);
+        if (join)
+          joins.push(join);
       }
 
       return {

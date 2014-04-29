@@ -40,7 +40,6 @@ module Ground {
     transforms:Query_Transform[] = []
     subqueries = {}
     map = {}
-    type:string = 'query'
     queries:Query_Builder[] = undefined // used for Unions
     public static operators = {
       '=': null,
@@ -111,7 +110,8 @@ module Ground {
 
     add_query(source):Query_Builder {
       var trellis = this.ground.sanitize_trellis_argument(source.trellis)
-      query = new Query_Builder(trellis)
+      var query = new Query_Builder(trellis)
+      this.queries = this.queries || []
       this.queries.push(query)
       query.extend(source)
 
@@ -167,6 +167,9 @@ module Ground {
       if (!source) // I think it's okay to allow null to be passed to this method
         return
 
+      if (typeof source.type === 'string')
+        this.type = source.type
+
       var i
       this.source = source
 
@@ -188,8 +191,8 @@ module Ground {
       }
 
       if (source.type === 'union') {
-        for (var i = 0; i < source.queries.length; ++i) {
-          this.add_query(i, source.queries[i])
+        for (i = 0; i < source.queries.length; ++i) {
+          this.add_query(source.queries[i])
         }
       }
       else {

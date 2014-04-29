@@ -1,4 +1,4 @@
-var MetaHub = require('vineyard-metahub');var MetaHub = require('vineyard-metahub');var MetaHub = require('vineyard-metahub');var MetaHub = require('vineyard-metahub');var MetaHub = require('vineyard-metahub');var MetaHub = require('vineyard-metahub');var when = require('when');
+var MetaHub = require('vineyard-metahub');var when = require('when');
 
 var Ground;
 (function (Ground) {
@@ -2925,7 +2925,6 @@ var Ground;
             this.transforms = [];
             this.subqueries = {};
             this.map = {};
-            this.type = 'query';
             this.queries = undefined;
             this.filters = [];
             this.trellis = trellis;
@@ -2980,7 +2979,8 @@ var Ground;
 
         Query_Builder.prototype.add_query = function (source) {
             var trellis = this.ground.sanitize_trellis_argument(source.trellis);
-            query = new Query_Builder(trellis);
+            var query = new Query_Builder(trellis);
+            this.queries = this.queries || [];
             this.queries.push(query);
             query.extend(source);
 
@@ -3036,6 +3036,9 @@ var Ground;
             if (!source)
                 return;
 
+            if (typeof source.type === 'string')
+                this.type = source.type;
+
             var i;
             this.source = source;
 
@@ -3057,8 +3060,8 @@ var Ground;
             }
 
             if (source.type === 'union') {
-                for (var i = 0; i < source.queries.length; ++i) {
-                    this.add_query(i, source.queries[i]);
+                for (i = 0; i < source.queries.length; ++i) {
+                    this.add_query(source.queries[i]);
                 }
             } else {
                 if (source.properties) {
@@ -3161,7 +3164,6 @@ var Ground;
             this.ground = ground;
         }
         Query_Renderer.apply_arguments = function (sql, args) {
-            var args = parts.args;
             for (var pattern in args) {
                 var value = args[pattern];
                 sql = sql.replace(new RegExp(pattern, 'g'), value);
@@ -3196,9 +3198,7 @@ var Ground;
                 sql = 'SELECT * FROM (' + sql + ' ) ' + temp_table + ' ' + transform.clause;
             }
 
-            sql = Query_Renderer.apply_arguments(sql, parts.args);
-
-            sql += parts.pager;
+            sql = Query_Renderer.apply_arguments(sql, parts.args) + parts.pager;
 
             return sql;
         };
@@ -3211,8 +3211,9 @@ var Ground;
             return sql;
         };
 
-        Query_Renderer.prototype.generate_union = function (parts, queries) {
-            var sql = 'UNION\n' + queries.join('\n') + parts.filters + parts.joins;
+        Query_Renderer.prototype.generate_union = function (parts, queries, source) {
+            var alias = source.trellis.get_table_name();
+            var sql = 'SELECT * FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
 
             sql = Query_Renderer.apply_arguments(sql, parts.args);
 
@@ -3259,7 +3260,7 @@ var Ground;
                 }
             };
 
-            if (source.map) {
+            if (source.map && Object.keys(source.map).length > 0) {
                 if (!source.map[source.trellis.primary_key])
                     render_field(source.trellis.primary_key);
 
@@ -3292,12 +3293,13 @@ var Ground;
                 for (name in properties) {
                     render_field(name);
                 }
-                for (name in trellises) {
-                    var trellis = trellises[name];
-                    var join = source.trellis.get_ancestor_join(trellis);
-                    if (join)
-                        joins.push(join);
-                }
+            }
+
+            for (name in trellises) {
+                var trellis = trellises[name];
+                var join = source.trellis.get_ancestor_join(trellis);
+                if (join)
+                    joins.push(join);
             }
 
             return {
@@ -3591,7 +3593,7 @@ var Ground;
             throw new Error('Could not find relationship: ' + relationship + '.');
         };
 
-        Query_Runner.prototype.run_core = function () {
+        Query_Runner.prototype.prepare = function () {
             var _this = this;
             var source = this.source;
             if (this.row_cache)
@@ -3627,24 +3629,63 @@ var Ground;
                 }
             }
 
+            var queries = [];
+
+            if (source.type == 'union') {
+                promises = promises.concat(source.queries.map(function (query) {
+                    return function () {
+                        var runner = new Query_Runner(query);
+                        return runner.render().then(function (result) {
+                            queries.push(result.sql);
+                            return when.resolve();
+                        });
+                    };
+                }));
+            }
+
             var sequence = require('when/sequence');
             return sequence(promises).then(function () {
-                if (is_empty)
-                    return when.resolve([]);
+                return {
+                    queries: queries,
+                    is_empty: is_empty
+                };
+            });
+        };
 
+        Query_Runner.prototype.render = function () {
+            var _this = this;
+            return this.prepare().then(function (preparation) {
+                if (preparation.is_empty)
+                    return when.resolve(null);
+
+                var source = _this.source;
                 var parts = _this.renderer.generate_parts(source);
-                var sql = _this.renderer.generate_sql(parts, source);
+                var sql = source.type == 'union' ? _this.renderer.generate_union(parts, preparation.queries, source) : _this.renderer.generate_sql(parts, source);
+
                 sql = sql.replace(/\r/g, "\n");
                 if (_this.ground.log_queries)
                     console.log('\nquery', sql + '\n');
 
-                return _this.ground.db.query(sql).then(function (rows) {
+                return {
+                    sql: sql,
+                    parts: parts
+                };
+            });
+        };
+
+        Query_Runner.prototype.run_core = function () {
+            var _this = this;
+            return this.render().then(function (render_result) {
+                if (!render_result.sql)
+                    return when.resolve([]);
+
+                return _this.ground.db.query(render_result.sql).then(function (rows) {
                     var result = {
                         objects: rows
                     };
                     _this.row_cache = result;
-                    if (source.pager) {
-                        var sql = _this.renderer.generate_count(parts);
+                    if (_this.source.pager) {
+                        var sql = _this.renderer.generate_count(render_result.parts);
                         if (_this.ground.log_queries)
                             console.log('\nquery', sql + '\n');
                         return _this.ground.db.query_single(sql).then(function (count) {
@@ -3660,7 +3701,6 @@ var Ground;
 
         Query_Runner.prototype.run = function () {
             var _this = this;
-            var source = this.source;
             if (this.ground.log_queries) {
                 var temp = new Error();
                 this.run_stack = temp['stack'];
@@ -3668,7 +3708,7 @@ var Ground;
 
             return this.run_core().then(function (result) {
                 return when.all(result.objects.map(function (row) {
-                    return _this.process_row(row, source);
+                    return _this.process_row(row, _this.source);
                 })).then(function (rows) {
                     result.objects = rows;
                     return result;

@@ -2,6 +2,16 @@
 
 module Ground {
 
+  export interface IQuery_Preparation {
+    queries?:string[]
+    is_empty:boolean
+  }
+
+  export interface IQuery_Render_Result {
+    sql:string
+    parts
+  }
+
   export class Query_Runner {
     source:Query_Builder
     run_stack
@@ -166,7 +176,7 @@ module Ground {
       throw new Error('Could not find relationship: ' + relationship + '.')
     }
 
-    run_core():Promise {
+    prepare():Promise {
       var source = this.source
       if (this.row_cache)
         return when.resolve(this.row_cache)
@@ -195,35 +205,67 @@ module Ground {
         }
       }
 
-      if (source.type == 'union') {
-        promises = promises.concat(source.queries.map((query)=> {
+      var queries:string[] = []
 
+      if (source.type == 'union') {
+        promises = promises.concat(source.queries.map((query)=> ()=> {
+          var runner = new Query_Runner(query)
+          return runner.render()
+            .then((result)=> {
+              queries.push(result.sql)
+              return when.resolve()
+            })
         }))
       }
 
       var sequence = require('when/sequence')
       return sequence(promises)
-        .then((queries)=> {
-          if (is_empty)
-            return when.resolve([])
+        .then(()=> {
+          return {
+            queries: queries,
+            is_empty: is_empty
+          }
+        })
+    }
 
+    render():Promise {
+      return this.prepare()
+        .then((preparation)=> {
+          if (preparation.is_empty)
+            return when.resolve(null)
+
+          var source = this.source
           var parts = this.renderer.generate_parts(source)
-          var sql = ? source.type == 'union'
-            ? this.renderer.generate_union(parts, queries)
+          var sql = source.type == 'union'
+            ? this.renderer.generate_union(parts, preparation.queries, source)
             : this.renderer.generate_sql(parts, source)
 
-            sql = sql.replace(/\r/g, "\n")
+          sql = sql.replace(/\r/g, "\n")
           if (this.ground.log_queries)
             console.log('\nquery', sql + '\n')
 
-          return this.ground.db.query(sql)
+          return {
+            sql: sql,
+            parts: parts
+          }
+        })
+    }
+
+    run_core():Promise {
+      return this.render()
+        .then((render_result)=> {
+          if (!render_result.sql)
+            return when.resolve([])
+
+
+          return this.ground.db.query(render_result.sql)
             .then((rows)=> {
               var result = {
                 objects: rows
               }
               this.row_cache = result
-              if (source.pager) {
-                var sql = this.renderer.generate_count(parts)
+              if (this.source.pager) {
+                var sql = this.renderer.generate_count(render_result.parts)
                 if (this.ground.log_queries)
                   console.log('\nquery', sql + '\n')
                 return this.ground.db.query_single(sql)
@@ -240,14 +282,13 @@ module Ground {
     }
 
     run():Promise {
-      var source = this.source
       if (this.ground.log_queries) {
         var temp = new Error()
         this.run_stack = temp['stack']
       }
 
       return this.run_core()
-        .then((result) => when.all(result.objects.map((row) => this.process_row(row, source)))
+        .then((result) => when.all(result.objects.map((row) => this.process_row(row, this.source)))
           .then((rows)=> {
             result.objects = rows
             return result
