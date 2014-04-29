@@ -257,7 +257,6 @@ module Ground {
           if (!render_result.sql)
             return when.resolve([])
 
-
           return this.ground.db.query(render_result.sql)
             .then((rows)=> {
               var result = {
@@ -281,6 +280,18 @@ module Ground {
         })
     }
 
+    get_source(row) {
+      if (this.source.type !== 'union' || !row.type)
+        return this.source
+
+      var matches = this.source.queries.filter((x)=> x.trellis.name == row.type)
+
+      if (matches.length == 0)
+        return this.source
+
+      return matches[0]
+    }
+
     run():Promise {
       if (this.ground.log_queries) {
         var temp = new Error()
@@ -288,7 +299,7 @@ module Ground {
       }
 
       return this.run_core()
-        .then((result) => when.all(result.objects.map((row) => this.process_row(row, this.source)))
+        .then((result) => when.all(result.objects.map((row) => this.process_row(row, this.get_source(row))))
           .then((rows)=> {
             result.objects = rows
             return result

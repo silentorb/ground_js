@@ -605,6 +605,7 @@ declare module Ground {
         public prepare(): Promise;
         public render(): Promise;
         public run_core(): Promise;
+        public get_source(row: any): Ground.Query_Builder;
         public run(): Promise;
         public run_single(): Promise;
     }

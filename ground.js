@@ -3275,9 +3275,14 @@ var Ground;
                         if (!expression.value.toString().match(/^[\w_]*$/))
                             throw new Error('Invalid mapping value: ' + value + '.');
 
-                        var value = source.ground.convert_value(expression.value, typeof expression.value);
-                        if (typeof value === 'string')
-                            value = "'" + value + "'";
+                        var value = expression.value;
+                        if (typeof value === 'object') {
+                            value = "'object'";
+                        } else {
+                            value = source.ground.convert_value(expression.value, typeof expression.value);
+                            if (typeof value === 'string')
+                                value = "'" + value + "'";
+                        }
 
                         var sql = value + " AS " + name;
                         fields.push(sql);
@@ -3699,6 +3704,20 @@ var Ground;
             });
         };
 
+        Query_Runner.prototype.get_source = function (row) {
+            if (this.source.type !== 'union' || !row.type)
+                return this.source;
+
+            var matches = this.source.queries.filter(function (x) {
+                return x.trellis.name == row.type;
+            });
+
+            if (matches.length == 0)
+                return this.source;
+
+            return matches[0];
+        };
+
         Query_Runner.prototype.run = function () {
             var _this = this;
             if (this.ground.log_queries) {
@@ -3708,7 +3727,7 @@ var Ground;
 
             return this.run_core().then(function (result) {
                 return when.all(result.objects.map(function (row) {
-                    return _this.process_row(row, _this.source);
+                    return _this.process_row(row, _this.get_source(row));
                 })).then(function (rows) {
                     result.objects = rows;
                     return result;
