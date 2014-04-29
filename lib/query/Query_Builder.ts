@@ -40,6 +40,8 @@ module Ground {
     transforms:Query_Transform[] = []
     subqueries = {}
     map = {}
+    type:string = 'query'
+    queries:Query_Builder[] = undefined // used for Unions
     public static operators = {
       '=': null,
       'LIKE': {
@@ -81,7 +83,7 @@ module Ground {
 
       if (path.indexOf('.') === -1) {
         var properties = this.trellis.get_all_properties()
-       filter.property = properties[path]
+        filter.property = properties[path]
       }
 
       this.filters.push(filter)
@@ -104,6 +106,16 @@ module Ground {
 
     add_map(target:string, source = null) {
       this.map[target] = source
+    }
+
+
+    add_query(source):Query_Builder {
+      var trellis = this.ground.sanitize_trellis_argument(source.trellis)
+      query = new Query_Builder(trellis)
+      this.queries.push(query)
+      query.extend(source)
+
+      return query
     }
 
     add_subquery(property_name:string, source = null):Query_Builder {
@@ -175,37 +187,44 @@ module Ground {
         this.pager = source.pager
       }
 
-      if (source.properties) {
-        var properties = this.trellis.get_all_properties()
-        this.properties = {}
-        for (var i in source.properties) {
-          var property = source.properties[i]
-          if (typeof property == 'string') {
-            if (!properties[property])
-              throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.')
+      if (source.type === 'union') {
+        for (var i = 0; i < source.queries.length; ++i) {
+          this.add_query(i, source.queries[i])
+        }
+      }
+      else {
+        if (source.properties) {
+          var properties = this.trellis.get_all_properties()
+          this.properties = {}
+          for (var i in source.properties) {
+            var property = source.properties[i]
+            if (typeof property == 'string') {
+              if (!properties[property])
+                throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.')
 
-            this.properties[property] = {
+              this.properties[property] = {
+              }
+            }
+            else {
+              var name = property.name || i
+              if (!properties[name])
+                throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.')
+
+              if (property)
+                this.properties[name] = property
             }
           }
-          else {
-            var name = property.name || i
-            if (!properties[name])
-              throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.')
 
-            if (property)
-              this.properties[name] = property
+          var identities = [ this.trellis.properties[this.trellis.primary_key] ]
+          if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
+            identities = identities.concat(identities[0].composite_properties)
           }
-        }
 
-        var identities = [ this.trellis.properties[this.trellis.primary_key] ]
-        if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
-          identities = identities.concat(identities[0].composite_properties)
-        }
-
-        for (var k in identities) {
-          var identity = identities[k]
-          if (!this.properties[identity.name])
-            this.properties[identity.name] = {}
+          for (var k in identities) {
+            var identity = identities[k]
+            if (!this.properties[identity.name])
+              this.properties[identity.name] = {}
+          }
         }
       }
 
@@ -226,7 +245,6 @@ module Ground {
           var expansion = source.expansions[i]
           var tokens = expansion.split('/')
           var subquery = this
-//          console.log('expansion', tokens)
           for (var j = 0; j < tokens.length; ++j) {
             subquery = subquery.add_subquery(tokens[j], {})
           }

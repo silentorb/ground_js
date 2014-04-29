@@ -24,6 +24,16 @@ module Ground {
       this.ground = ground
     }
 
+    static apply_arguments(sql, args):string {
+      var args = parts.args
+      for (var pattern in args) {
+        var value = args[pattern]
+        sql = sql.replace(new RegExp(pattern, 'g'), value)
+      }
+
+      return sql
+    }
+
     static get_properties(source:Query_Builder) {
       if (source.properties && Object.keys(source.properties).length > 0) {
         var properties = source.trellis.get_all_properties()
@@ -54,11 +64,12 @@ module Ground {
         sql = 'SELECT * FROM (' + sql + ' ) ' + temp_table + ' ' + transform.clause
       }
 
-      var args = parts.args
-      for (var pattern in args) {
-        var value = args[pattern]
-        sql = sql.replace(new RegExp(pattern, 'g'), value)
-      }
+      sql = Query_Renderer.apply_arguments(sql, parts.args)
+//      var args = parts.args
+//      for (var pattern in args) {
+//        var value = args[pattern]
+//        sql = sql.replace(new RegExp(pattern, 'g'), value)
+//      }
 
       sql += parts.pager
 
@@ -71,11 +82,18 @@ module Ground {
         + parts.joins
         + parts.filters
 
-      var args = parts.args
-      for (var pattern in args) {
-        var value = args[pattern]
-        sql = sql.replace(new RegExp(pattern, 'g'), value)
-      }
+      sql = Query_Renderer.apply_arguments(sql, parts.args)
+
+      return sql;
+    }
+
+    generate_union(parts, queries) {
+      var sql = 'UNION\n'
+        + queries.join('\n')
+        + parts.filters
+        + parts.sorts
+
+      sql = Query_Renderer.apply_arguments(sql, parts.args)
 
       return sql;
     }
@@ -103,14 +121,14 @@ module Ground {
     }
 
     private static get_fields_and_joins(source:Query_Builder, properties, include_primary_key:boolean = true):Internal_Query_Source {
-      var name, fields:string[] = [];
-      var trellises = {};
-      for (name in properties) {
+      var name, fields:string[] = [], trellises = {}, joins = []
+
+      var render_field = (name)=> {
         var property = properties[name];
         // Virtual properties aren't saved to the database
         // Useful when you define custom serialization hooks
         if (property.type == 'list' || property.is_virtual)
-          continue;
+          return
 
         if (property.name != source.trellis.primary_key || include_primary_key) {
           var sql = property.get_field_query()
@@ -119,12 +137,49 @@ module Ground {
             trellises[property.parent.name] = property.parent
         }
       }
-      var joins = [];
-      for (name in trellises) {
-        var trellis = trellises[name];
-        var join = source.trellis.get_ancestor_join(trellis);
-        if (join)
-          joins.push(join);
+
+      if (source.map) {
+        if (!source.map[source.trellis.primary_key])
+          render_field(source.trellis.primary_key)
+
+        for (var name in source.map) {
+          if (!name.match(/^[\w_]+$/))
+            throw new Error('Invalid field name for mapping: ' + name + '.')
+
+          var expression = source.map[name]
+          if (!expression.type) {
+            render_field(name)
+          }
+          else if (expression.type == 'literal') {
+            if (!expression.value.toString().match(/^[\w_]*$/))
+              throw new Error('Invalid mapping value: ' + value + '.')
+
+            var value = source.ground.convert_value(expression.value, typeof expression.value)
+            if (typeof value === 'string')
+              value = "'" + value + "'"
+
+            var sql = value + " AS " + name
+            fields.push(sql)
+          }
+          else if (expression.type == 'reference') {
+            if (!properties[expression.path])
+              throw new Error('Invalid map path: ' + expression.path + '.')
+
+            var sql = expression.path + " AS " + name
+            fields.push(sql)
+          }
+        }
+      }
+      else {
+        for (name in properties) {
+          render_field(name)
+        }
+        for (name in trellises) {
+          var trellis = trellises[name];
+          var join = source.trellis.get_ancestor_join(trellis);
+          if (join)
+            joins.push(join);
+        }
       }
 
       return {

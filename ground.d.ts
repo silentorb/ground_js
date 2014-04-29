@@ -516,6 +516,7 @@ declare module Ground {
         public transforms: Query_Transform[];
         public subqueries: {};
         public map: {};
+        public queries: Query_Builder[];
         static operators: {
             '=': any;
             'LIKE': {
@@ -593,5 +594,59 @@ declare module Ground {
     }
 }
 declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
+  export = Ground
+}declare module "vineyard-ground" {
   export = Ground
 }

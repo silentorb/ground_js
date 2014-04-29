@@ -123,7 +123,8 @@ module Ground {
             replacement = value
             break
           }
-          row[i] = value
+          if (value !== undefined)
+            row[i] = value
         }
         MetaHub.map_to_array(links, (property, name) => {
           if (property.is_composite_sub)
@@ -194,15 +195,24 @@ module Ground {
         }
       }
 
+      if (source.type == 'union') {
+        promises = promises.concat(source.queries.map((query)=> {
+
+        }))
+      }
+
       var sequence = require('when/sequence')
       return sequence(promises)
-        .then(()=> {
+        .then((queries)=> {
           if (is_empty)
             return when.resolve([])
 
           var parts = this.renderer.generate_parts(source)
-          var sql = this.renderer.generate_sql(parts, source)
-          sql = sql.replace(/\r/g, "\n")
+          var sql = ? source.type == 'union'
+            ? this.renderer.generate_union(parts, queries)
+            : this.renderer.generate_sql(parts, source)
+
+            sql = sql.replace(/\r/g, "\n")
           if (this.ground.log_queries)
             console.log('\nquery', sql + '\n')
 

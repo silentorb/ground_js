@@ -166,11 +166,13 @@ module Ground {
         case 'list':
         case 'reference':
           return value;
+        case 'number': // Just for formatting values on the fly using typeof
         case 'int':
           return Math.round(value);
         case 'string':
         case 'text':
           return value;
+        case 'boolean': // Just for formatting values on the fly using typeof
         case 'bool':
           return Core.to_bool(value);
         case 'float':

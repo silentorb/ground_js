@@ -28,6 +28,10 @@ module Ground {
         if (expression.type == 'function') {
           return Expression_Engine.resolve_function(<Expression_Function>expression, context)
         }
+
+        if (expression.type == 'literal') {
+          return expression.value
+        }
       }
     }
 

@@ -1,8 +1,3 @@
-/**
- * Created with JetBrains PhpStorm.
- * User: Chris Johnson
- * Date: 9/18/13
- */
 
 /// <reference path="../references.ts"/>
 
@@ -193,9 +188,9 @@ module Ground {
         if (this.parent) {
           return this.parent.get_table_name();
         }
-        else {
-          throw new Error('Cannot query trellis ' + this.name + ' since it is virtual and has no parent');
-        }
+//        else {
+//          throw new Error('Cannot query trellis ' + this.name + ' since it is virtual and has no parent');
+//        }
       }
       if (this.table) {
         if (this.table.db_name)
