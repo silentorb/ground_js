@@ -97,7 +97,7 @@ module Ground {
       return sql;
     }
 
-    generate_parts(source:Query_Builder):Query_Parts {
+    generate_parts(source:Query_Builder, query_id:number = undefined):Query_Parts {
       var properties = Query_Renderer.get_properties(source)
       var data = Query_Renderer.get_fields_and_joins(source, properties)
       var data2 = Query_Renderer.build_filters(source, this.ground)
@@ -107,6 +107,10 @@ module Ground {
       var filters = data2.filters || []
       if (fields.length == 0)
         throw new Error('No authorized fields found for trellis ' + source.trellis.name + '.');
+
+      if (typeof query_id === 'number') {
+        fields.push(query_id.toString() + ' AS _query_id_')
+      }
 
       return {
         fields: fields.join(",\n"),

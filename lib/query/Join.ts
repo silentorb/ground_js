@@ -69,8 +69,8 @@ module Ground {
       this.identities = [ this.properties[1], this.properties[2] ]
     }
 
-    private static generate_name(first:Trellis, second:Trellis):string {
-      var names = [first.get_plural(), second.get_plural()]
+    static generate_name(first:Trellis, second:Trellis):string {
+      var names = [first.get_table_name(), second.get_table_name()]
       var temp = names.sort()
       return temp.join('_')
     }

@@ -24,7 +24,6 @@ declare module Ground {
     interface ITrellis {
     }
     class Trellis implements ITrellis {
-        public plural: string;
         public parent: Trellis;
         public ground: Ground.Core;
         public table: Ground.Table;
@@ -33,9 +32,7 @@ declare module Ground {
         public properties: {
             [name: string]: Ground.Property;
         };
-        public all_properties: {
-            [name: string]: Ground.Property;
-        };
+        public all_properties: {};
         public is_virtual: boolean;
         constructor(name: string, ground: Ground.Core);
         public add_property(name: string, source: any): Ground.Property;
@@ -49,7 +46,6 @@ declare module Ground {
         public get_identity(seed: any): {};
         public get_ancestor_join(other: Trellis): string;
         public get_links(): Ground.Property[];
-        public get_plural(): string;
         public get_primary_keys(): any[];
         public get_primary_property(): Ground.Property;
         public get_reference_property(other_trellis: Trellis): Ground.Property;
@@ -219,7 +215,6 @@ declare module Ground {
         trellis?: string;
     }
     interface ITrellis_Source {
-        plural: string;
         parent: string;
         name: string;
         primary_key: string;
@@ -249,6 +244,7 @@ declare module Ground {
     }
     class Core extends MetaHub.Meta_Object {
         public trellises: Ground.Trellis[];
+        public custom_tables: Ground.Table[];
         public tables: Ground.Table[];
         public views: any[];
         public property_types: Property_Type[];
@@ -259,6 +255,8 @@ declare module Ground {
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
         public get_base_property_type(type: any): any;
         public convert_value(value: any, type: any): any;
+        private create_remaining_tables();
+        private create_missing_table_links();
         public create_query(trellis_name: string, base_path?: string): Ground.Query_Builder;
         public create_update(trellis: any, seed?: ISeed, user?: Ground.IUser): IUpdate;
         public delete_object(trellis: Ground.Trellis, seed: ISeed): Promise;
@@ -287,6 +285,17 @@ declare module Ground {
         other_table?: string;
         other_field?: string;
     }
+    enum Link_Field_Type {
+        identity = 0,
+        reference = 1,
+    }
+    class Link_Field {
+        public name: string;
+        public parent: Table;
+        public other_table: Table;
+        public type: Link_Field_Type;
+        constructor(name: string, parent: Table, other_table: Table, type: Link_Field_Type);
+    }
     class Table {
         public name: string;
         public properties: {};
@@ -296,9 +305,13 @@ declare module Ground {
         public trellis: Ground.Trellis;
         public primary_keys: any[];
         public query: string;
+        public links: {};
         constructor(name: string, ground: Ground.Core);
         public connect_trellis(trellis: Ground.Trellis): void;
         static create_from_trellis(trellis: Ground.Trellis, ground?: Ground.Core): Table;
+        static get_other_table(property: Ground.Property): Table;
+        static get_other_table_name(property: Ground.Property): string;
+        public create_link(property: Ground.Property): void;
         public create_sql(ground: Ground.Core): string;
         static create_sql_from_array(table_name: string, source: any[], primary_keys?: any[], indexes?: any[]): string;
         public create_sql_from_trellis(trellis: Ground.Trellis): string;
@@ -429,7 +442,7 @@ declare module Ground {
         public properties: Join_Property[];
         public identities: Join_Property[];
         constructor(property: Ground.Property);
-        private static generate_name(first, second);
+        static generate_name(first: Ground.Trellis, second: Ground.Trellis): string;
         private static get_field_name(property);
         public get_primary_keys(): Join_Property[];
         private static create_properties(cross, property);
@@ -571,7 +584,7 @@ declare module Ground {
         public generate_sql(parts: Query_Parts, source: Ground.Query_Builder): string;
         public generate_count(parts: Query_Parts): string;
         public generate_union(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
-        public generate_parts(source: Ground.Query_Builder): Query_Parts;
+        public generate_parts(source: Ground.Query_Builder, query_id?: number): Query_Parts;
         private static get_fields_and_joins(source, properties, include_primary_key?);
         private static build_filter(source, filter, ground);
         static build_filters(source: Ground.Query_Builder, ground: Ground.Core): Internal_Query_Source;
@@ -603,7 +616,7 @@ declare module Ground {
         public process_row(row: any, source: Ground.Query_Builder): Promise;
         public query_link_property(seed: any, property: any, source: Ground.Query_Builder): Promise;
         public prepare(): Promise;
-        public render(): Promise;
+        public render(query_id?: number): Promise;
         public run_core(): Promise;
         public get_source(row: any): Ground.Query_Builder;
         public run(): Promise;

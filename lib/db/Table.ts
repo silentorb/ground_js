@@ -9,6 +9,25 @@ module Ground {
     other_field?:string
   }
 
+  export enum Link_Field_Type {
+    identity,
+    reference
+  }
+
+  export class Link_Field {
+    name:string
+    parent:Table
+    other_table:Table
+    type:Link_Field_Type
+
+    constructor(name:string, parent:Table, other_table:Table, type:Link_Field_Type) {
+      this.name = name
+      this.parent = parent
+      this.other_table = other_table
+      this.type = type
+    }
+  }
+
   export class Table {
     name:string
     properties = {}
@@ -18,6 +37,7 @@ module Ground {
     trellis:Trellis
     primary_keys:any[]
     query:string
+    links = {}
 
     constructor(name:string, ground:Core) {
       this.name = name;
@@ -38,6 +58,40 @@ module Ground {
       var table = new Table(trellis.get_table_name(), ground);
       table.connect_trellis(trellis);
       return table;
+    }
+
+    static get_other_table(property:Property):Table {
+      var ground = property.parent.ground
+      var name = Table.get_other_table_name(property)
+      return ground.tables[name]
+    }
+
+    static get_other_table_name(property:Property):string {
+      var field = property.get_field_override()
+      if (field && field.other_table)
+        return field.other_table
+
+      if (property.get_relationship() === Relationships.many_to_many)
+        return Cross_Trellis.generate_name(property.parent, property.other_trellis)
+
+      return property.other_trellis.name
+    }
+
+    create_link(property:Property) {
+
+      var other_table = Table.get_other_table(property)
+      var type = property.type == 'reference'
+        ? Link_Field_Type.reference
+        : Link_Field_Type.identity
+
+      var link = new Link_Field(
+        property.name,
+        this,
+        other_table,
+        type
+      )
+
+      this.links[link.name] = link
     }
 
     create_sql(ground:Core) {
@@ -72,8 +126,8 @@ module Ground {
 
         var auto_increment =
           primary_keys.indexOf(name) > -1
-          && type.search(/INT/) > -1
-          && primary_keys[0] == name
+            && type.search(/INT/) > -1
+            && primary_keys[0] == name
 
         var field_sql = '`' + name + '` ' + type;
         if (auto_increment)
@@ -236,7 +290,7 @@ module Ground {
         this.trellis = this.ground.trellises[name];
         this.trellis.table = this;
         if (!source.name)
-          this.name = this.trellis.get_plural();
+          this.name = this.trellis.name + 's';
       }
     }
   }

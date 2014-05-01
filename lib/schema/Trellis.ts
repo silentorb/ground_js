@@ -8,7 +8,6 @@ module Ground {
   }
 
   export class Trellis implements ITrellis {
-    plural:string = null;
     parent:Trellis = null;
     ground:Core;
     table:Table = null;
@@ -18,8 +17,7 @@ module Ground {
     properties:{ [name: string]: Property
     } = {};
     // Every property including inherited properties
-    all_properties:{ [name: string]: Property;
-    } = {};
+    all_properties = {};
     is_virtual:boolean = false;
 
     constructor(name:string, ground:Core) {
@@ -91,9 +89,6 @@ module Ground {
       }
 
       return result;
-//      return Enumerable.From(this.properties).Where(
-//        (p) => p.type != 'list'
-//      );
     }
 
     get_id(source) {
@@ -143,10 +138,6 @@ module Ground {
       return result;
     }
 
-    get_plural():string {
-      return this.plural || this.name + 's';
-    }
-
     get_primary_keys() {
       if (this.table && this.table.primary_keys) {
         var result = []
@@ -183,7 +174,6 @@ module Ground {
     }
 
     get_table_name():string {
-//      console.log('get_table_name', this.name, this.is_virtual, this.plural, this.table)
       if (this.is_virtual) {
         if (this.parent) {
           return this.parent.get_table_name();
@@ -198,8 +188,6 @@ module Ground {
         else
           return this.table.name;
       }
-      if (this.plural)
-        return this.plural;
 
       return this.name + 's';
     }

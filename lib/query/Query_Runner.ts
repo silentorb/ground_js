@@ -208,9 +208,10 @@ module Ground {
       var queries:string[] = []
 
       if (source.type == 'union') {
+        var query_index = 0
         promises = promises.concat(source.queries.map((query)=> ()=> {
           var runner = new Query_Runner(query)
-          return runner.render()
+          return runner.render(query_index++)
             .then((result)=> {
               queries.push(result.sql)
               return when.resolve()
@@ -228,14 +229,14 @@ module Ground {
         })
     }
 
-    render():Promise {
+    render(query_id:number = undefined):Promise {
       return this.prepare()
         .then((preparation)=> {
           if (preparation.is_empty)
             return when.resolve(null)
 
           var source = this.source
-          var parts = this.renderer.generate_parts(source)
+          var parts = this.renderer.generate_parts(source, query_id)
           var sql = source.type == 'union'
             ? this.renderer.generate_union(parts, preparation.queries, source)
             : this.renderer.generate_sql(parts, source)
@@ -280,16 +281,11 @@ module Ground {
         })
     }
 
-    get_source(row) {
-      if (this.source.type !== 'union' || !row.type)
+    get_source(row):Query_Builder {
+      if (this.source.type !== 'union' || !row._query_id_)
         return this.source
 
-      var matches = this.source.queries.filter((x)=> x.trellis.name == row.type)
-
-      if (matches.length == 0)
-        return this.source
-
-      return matches[0]
+      return this.source.queries[row._query_id_]
     }
 
     run():Promise {

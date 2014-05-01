@@ -657,7 +657,7 @@ module Ground {
       var cross_property:Property = null, first_trellis
 
       var trellis:Trellis = first_trellis = ground.sanitize_trellis_argument(parts[0])
-      sql += 'FROM `' + trellis.get_plural() + '`\n'
+      sql += 'FROM `' + trellis.get_table_name() + '`\n'
 
       for (var i = 1; i < parts.length; ++i) {
         var properties = trellis.get_all_properties()

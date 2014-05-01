@@ -103,7 +103,6 @@ var Ground;
 (function (Ground) {
     var Trellis = (function () {
         function Trellis(name, ground) {
-            this.plural = null;
             this.parent = null;
             this.table = null;
             this.name = null;
@@ -220,10 +219,6 @@ var Ground;
             return result;
         };
 
-        Trellis.prototype.get_plural = function () {
-            return this.plural || this.name + 's';
-        };
-
         Trellis.prototype.get_primary_keys = function () {
             if (this.table && this.table.primary_keys) {
                 var result = [];
@@ -271,8 +266,6 @@ var Ground;
                 else
                     return this.table.name;
             }
-            if (this.plural)
-                return this.plural;
 
             return this.name + 's';
         };
@@ -969,7 +962,7 @@ var Ground;
             var cross_property = null, first_trellis;
 
             var trellis = first_trellis = ground.sanitize_trellis_argument(parts[0]);
-            sql += 'FROM `' + trellis.get_plural() + '`\n';
+            sql += 'FROM `' + trellis.get_table_name() + '`\n';
 
             for (var i = 1; i < parts.length; ++i) {
                 var properties = trellis.get_all_properties();
@@ -1566,6 +1559,7 @@ var Ground;
         function Core(config, db_name) {
             _super.call(this);
             this.trellises = [];
+            this.custom_tables = [];
             this.tables = [];
             this.views = [];
             this.property_types = [];
@@ -1643,6 +1637,29 @@ var Ground;
             }
 
             throw new Error('Not sure how to convert sql type of ' + type + '.');
+        };
+
+        Core.prototype.create_remaining_tables = function () {
+            for (var i in this.trellises) {
+                var trellis = this.trellises[i];
+                if (this.tables[trellis.name])
+                    continue;
+
+                var table = Ground.Table.create_from_trellis(trellis, this);
+                this.tables[i] = table;
+            }
+        };
+
+        Core.prototype.create_missing_table_links = function () {
+            for (var i in this.trellises) {
+                var trellis = this.trellises[i];
+                var table = this.tables[trellis.name];
+                var links = trellis.get_all_links();
+                for (var p in links) {
+                    if (!table.links[p])
+                        table.create_link(links[p]);
+                }
+            }
         };
 
         Core.prototype.create_query = function (trellis_name, base_path) {
@@ -1741,6 +1758,7 @@ var Ground;
                 var table = new Ground.Table(name, this);
                 table.load_from_schema(tables[name]);
                 this.tables[name] = table;
+                this.custom_tables[name] = table;
             }
         };
 
@@ -1767,6 +1785,9 @@ var Ground;
 
             if (subset)
                 this.initialize_trellises(subset, this.trellises);
+
+            this.create_remaining_tables();
+            this.create_missing_table_links();
         };
 
         Core.remove_fields = function (object, trellis, filter) {
@@ -1813,9 +1834,27 @@ var Ground;
 module.exports = Ground;
 var Ground;
 (function (Ground) {
+    (function (Link_Field_Type) {
+        Link_Field_Type[Link_Field_Type["identity"] = 0] = "identity";
+        Link_Field_Type[Link_Field_Type["reference"] = 1] = "reference";
+    })(Ground.Link_Field_Type || (Ground.Link_Field_Type = {}));
+    var Link_Field_Type = Ground.Link_Field_Type;
+
+    var Link_Field = (function () {
+        function Link_Field(name, parent, other_table, type) {
+            this.name = name;
+            this.parent = parent;
+            this.other_table = other_table;
+            this.type = type;
+        }
+        return Link_Field;
+    })();
+    Ground.Link_Field = Link_Field;
+
     var Table = (function () {
         function Table(name, ground) {
             this.properties = {};
+            this.links = {};
             this.name = name;
             this.ground = ground;
         }
@@ -1834,6 +1873,32 @@ var Ground;
             var table = new Table(trellis.get_table_name(), ground);
             table.connect_trellis(trellis);
             return table;
+        };
+
+        Table.get_other_table = function (property) {
+            var ground = property.parent.ground;
+            var name = Table.get_other_table_name(property);
+            return ground.tables[name];
+        };
+
+        Table.get_other_table_name = function (property) {
+            var field = property.get_field_override();
+            if (field && field.other_table)
+                return field.other_table;
+
+            if (property.get_relationship() === 3 /* many_to_many */)
+                return Ground.Cross_Trellis.generate_name(property.parent, property.other_trellis);
+
+            return property.other_trellis.name;
+        };
+
+        Table.prototype.create_link = function (property) {
+            var other_table = Table.get_other_table(property);
+            var type = property.type == 'reference' ? 1 /* reference */ : 0 /* identity */;
+
+            var link = new Link_Field(property.name, this, other_table, type);
+
+            this.links[link.name] = link;
         };
 
         Table.prototype.create_sql = function (ground) {
@@ -2023,7 +2088,7 @@ var Ground;
                 this.trellis = this.ground.trellises[name];
                 this.trellis.table = this;
                 if (!source.name)
-                    this.name = this.trellis.get_plural();
+                    this.name = this.trellis.name + 's';
             }
         };
         return Table;
@@ -2048,7 +2113,7 @@ var Ground;
             }
 
             this.table_name = table_name || trellises.map(function (t) {
-                return t.get_plural();
+                return t.get_table_name();
             }).sort().join('_');
 
             this.identities = trellises.map(function (x) {
@@ -2123,7 +2188,7 @@ var Ground;
 
         Link_Trellis.prototype.generate_table_name = function () {
             var temp = MetaHub.map_to_array(this.identities, function (p) {
-                return p.parent.get_plural();
+                return p.parent.get_table_name();
             });
             temp = temp.sort();
             this.table_name = temp.join('_');
@@ -2617,7 +2682,7 @@ var Ground;
             this.identities = [this.properties[1], this.properties[2]];
         }
         Cross_Trellis.generate_name = function (first, second) {
-            var names = [first.get_plural(), second.get_plural()];
+            var names = [first.get_table_name(), second.get_table_name()];
             var temp = names.sort();
             return temp.join('_');
         };
@@ -3220,7 +3285,8 @@ var Ground;
             return sql;
         };
 
-        Query_Renderer.prototype.generate_parts = function (source) {
+        Query_Renderer.prototype.generate_parts = function (source, query_id) {
+            if (typeof query_id === "undefined") { query_id = undefined; }
             var properties = Query_Renderer.get_properties(source);
             var data = Query_Renderer.get_fields_and_joins(source, properties);
             var data2 = Query_Renderer.build_filters(source, this.ground);
@@ -3230,6 +3296,10 @@ var Ground;
             var filters = data2.filters || [];
             if (fields.length == 0)
                 throw new Error('No authorized fields found for trellis ' + source.trellis.name + '.');
+
+            if (typeof query_id === 'number') {
+                fields.push(query_id.toString() + ' AS _query_id_');
+            }
 
             return {
                 fields: fields.join(",\n"),
@@ -3637,10 +3707,11 @@ var Ground;
             var queries = [];
 
             if (source.type == 'union') {
+                var query_index = 0;
                 promises = promises.concat(source.queries.map(function (query) {
                     return function () {
                         var runner = new Query_Runner(query);
-                        return runner.render().then(function (result) {
+                        return runner.render(query_index++).then(function (result) {
                             queries.push(result.sql);
                             return when.resolve();
                         });
@@ -3657,14 +3728,15 @@ var Ground;
             });
         };
 
-        Query_Runner.prototype.render = function () {
+        Query_Runner.prototype.render = function (query_id) {
+            if (typeof query_id === "undefined") { query_id = undefined; }
             var _this = this;
             return this.prepare().then(function (preparation) {
                 if (preparation.is_empty)
                     return when.resolve(null);
 
                 var source = _this.source;
-                var parts = _this.renderer.generate_parts(source);
+                var parts = _this.renderer.generate_parts(source, query_id);
                 var sql = source.type == 'union' ? _this.renderer.generate_union(parts, preparation.queries, source) : _this.renderer.generate_sql(parts, source);
 
                 sql = sql.replace(/\r/g, "\n");
@@ -3705,17 +3777,10 @@ var Ground;
         };
 
         Query_Runner.prototype.get_source = function (row) {
-            if (this.source.type !== 'union' || !row.type)
+            if (this.source.type !== 'union' || !row._query_id_)
                 return this.source;
 
-            var matches = this.source.queries.filter(function (x) {
-                return x.trellis.name == row.type;
-            });
-
-            if (matches.length == 0)
-                return this.source;
-
-            return matches[0];
+            return this.source.queries[row._query_id_];
         };
 
         Query_Runner.prototype.run = function () {

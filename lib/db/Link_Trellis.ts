@@ -1,7 +1,3 @@
-/**
- * User: Chris Johnson
- * Date: 10/1/13
- */
 
 /// <reference path="../references.ts"/>
 
@@ -37,7 +33,7 @@ module Ground {
         this.trellis_dictionary[trellis.name] = trellis
       }
 
-      this.table_name = table_name || trellises.map((t)=> t.get_plural())
+      this.table_name = table_name || trellises.map((t)=> t.get_table_name())
         .sort().join('_')
 
       this.identities = trellises.map((x)=> this.create_identity(x))
@@ -135,7 +131,7 @@ module Ground {
 
     private generate_table_name() {
       var temp = MetaHub.map_to_array(this.identities,
-        (p)=>  p.parent.get_plural())
+        (p)=>  p.parent.get_table_name())
       temp = temp.sort()
       this.table_name = temp.join('_')
     }

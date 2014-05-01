@@ -1,4 +1,3 @@
-
 /// <reference path="../references.ts"/>
 /// <reference path="../db/Database.ts"/>
 /// <reference path="../schema/Trellis.ts"/>
@@ -21,7 +20,6 @@ module Ground {
   }
 
   export interface ITrellis_Source {
-    plural:string;
     parent:string;
     name:string;
     primary_key:string;
@@ -101,6 +99,7 @@ module Ground {
 
   export class Core extends MetaHub.Meta_Object {
     trellises:Trellis[] = []
+    custom_tables:Table[] = []
     tables:Table[] = []
     views:any[] = []
     property_types:Property_Type[] = []
@@ -185,9 +184,28 @@ module Ground {
 //      return null;
     }
 
-//    create_query(trellis:Trellis, base_path = '') {
-//      return new Query(trellis, base_path);
-//    }
+    private create_remaining_tables() {
+      for (var i in this.trellises) {
+        var trellis = this.trellises[i]
+        if (this.tables[trellis.name])
+          continue
+
+        var table = Table.create_from_trellis(trellis, this)
+        this.tables[i] = table
+      }
+    }
+
+    private create_missing_table_links() {
+      for (var i in this.trellises) {
+        var trellis = this.trellises[i]
+        var table = this.tables[trellis.name]
+        var links = trellis.get_all_links()
+        for (var p in links) {
+          if (!table.links[p])
+            table.create_link(links[p])
+        }
+      }
+    }
 
     create_query(trellis_name:string, base_path = ''):Query_Builder {
       var trellis = this.sanitize_trellis_argument(trellis_name);
@@ -282,6 +300,7 @@ module Ground {
         var table = new Table(name, this);
         table.load_from_schema(tables[name]);
         this.tables[name] = table;
+        this.custom_tables[name] = table;
       }
     }
 
@@ -308,6 +327,9 @@ module Ground {
 
       if (subset)
         this.initialize_trellises(subset, this.trellises);
+
+      this.create_remaining_tables()
+      this.create_missing_table_links()
     }
 
     static remove_fields(object, trellis:Trellis, filter) {
