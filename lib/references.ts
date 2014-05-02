@@ -3,6 +3,7 @@
 /// <reference path="core/Core.ts"/>
 /// <reference path="db/Table.ts"/>
 /// <reference path="db/Link_Trellis.ts"/>
+/// <reference path="db/SQL.ts"/>
 
 /// <reference path="schema/Property.ts"/>
 /// <reference path="schema/Trellis.ts"/>

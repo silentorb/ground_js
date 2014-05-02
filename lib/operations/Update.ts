@@ -310,43 +310,38 @@ module Ground {
                 var cross = new Cross_Trellis(property)
                 cross['alias'] = null
 
-//                sql = join.generate_delete_row([row, other])
                 sql = cross.generate_delete(property, row, other)
                 if (this.ground.log_updates)
                   console.log(sql)
 
-                return this.ground.invoke(join.table_name + '.remove', property, row, other, join)
+                return this.ground.invoke(join.table_name + '.remove', row, property, other, join)
                   .then(() => this.db.query(sql))
+                  .then(() => this.ground.invoke(join.table_name + '.removed', row, property, other, join))
               }
             }
             else {
               if (other_id === null) {
                 other = this.ground.update_object(other_trellis, other, this.user)
                   .then((other)=> {
-//                    var seeds = {}
-//                    seeds[property.parent.name] = row
-//                    seeds[other_trellis.name] = other
                     var cross = new Cross_Trellis(property)
                     sql = cross.generate_insert(property,row,other)
                     if (this.ground.log_updates)
                       console.log(sql)
 
-                    return this.db.query(sql)
-                      .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
+                    return this.ground.invoke(join.table_name + '.create', row, property, other, join)
+                      .then(() => this.db.query(sql))
+                      .then(() => this.ground.invoke(join.table_name + '.created', row, property, other, join))
                   })
               }
               else {
-//                var seeds = {}
-//                seeds[property.parent.name] = row
-//                seeds[other_trellis.name] = other
                 var cross = new Cross_Trellis(property)
                 sql = cross.generate_insert(property,row,other)
-//                sql = join.generate_insert(seeds)
                 if (this.ground.log_updates)
                   console.log(sql)
 
-                return this.db.query(sql)
-                  .then(() => this.ground.invoke(join.table_name + '.create', property, row, other, join))
+                return this.ground.invoke(join.table_name + '.create', row, property, other, join)
+                  .then(() => this.db.query(sql))
+                  .then(() => this.ground.invoke(join.table_name + '.created', row, property, other, join))
               }
             }
           })

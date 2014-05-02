@@ -152,6 +152,57 @@ module Ground {
     }
   }
 
+  export class Cross_Trellis2 {
+    alias:string
+    table:Table
+
+    constructor(property:Property, alias:string = null) {
+      this.table = Table.get_other_table(property)
+      this.alias = alias
+    }
+
+//    generate_delete(property:Property, owner, other):string {
+//      var identities = this.order_identities(property)
+//      var conditions = [
+//        identities[0].get_comparison(owner),
+//        identities[1].get_comparison(other)
+//      ]
+//      return 'DELETE FROM ' + this.get_table_name() + ' WHERE ' + conditions.join(' AND ') + "\n"
+//    }
+
+    generate_insert(property:Property, owner, other):string {
+      var identities = this.order_identities(property)
+      var keys = identities.map((x)=> x.name)
+      var values = [
+        SQL.get_link_sql_value(identities[0], owner),
+        SQL.get_link_sql_value(identities[1], other)
+      ]
+
+      return 'REPLACE INTO ' + this.table.name + ' (`'
+        + keys.join('`, `')
+        + '`) VALUES ('
+        + values.join(', ')
+        + ');\n'
+    }
+
+    order_identities(property:Property):Link_Field[] {
+      var table = this.table
+      var first = MetaHub.filter(table.links, (x)=>x.name == property.name)[0]
+      if (!first) {
+        throw new Error('Could not operate using cross table ' + this.table.name
+          + '.  Could not find identity for property ' + property.fullname() + '.')
+      }
+      MetaHub.filter(table.links, (x)=>x.name == property.name)[0]
+      var second = MetaHub.filter(table.links, (x)=>x.name == property.name)[0]
+      return [ first, second ]
+    }
+
+//    query_identity():string {
+//      throw new Error('Cross_Trellis.query_identity() should never be called.' +
+//        '  Cross_Reference only has references, not identities')
+//    }
+  }
+
   export class Join_Property {
     parent:Join_Trellis
     other_trellis:Join_Trellis

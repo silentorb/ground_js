@@ -294,6 +294,9 @@ declare module Ground {
         public parent: Table;
         public other_table: Table;
         public type: Link_Field_Type;
+        public other_link: Link_Field;
+        public field: IField;
+        public property: Ground.Property;
         constructor(name: string, parent: Table, other_table: Table, type: Link_Field_Type);
     }
     class Table {
@@ -354,6 +357,11 @@ declare module Ground {
         public get_conditions(seeds: any): string[];
         public get_identity_by_trellis(trellis: Ground.Trellis): Identity;
         public get_table_declaration(): string;
+    }
+}
+declare module Ground {
+    module SQL {
+        function get_link_sql_value(link: Ground.Link_Field, value: any): any;
     }
 }
 declare module Ground {
@@ -452,6 +460,13 @@ declare module Ground {
         public get_alias(): string;
         public get_table_name(): string;
         public query_identity(): string;
+    }
+    class Cross_Trellis2 {
+        public alias: string;
+        public table: Ground.Table;
+        constructor(property: Ground.Property, alias?: string);
+        public generate_insert(property: Ground.Property, owner: any, other: any): string;
+        public order_identities(property: Ground.Property): Ground.Link_Field[];
     }
     class Join_Property {
         public parent: Join_Trellis;

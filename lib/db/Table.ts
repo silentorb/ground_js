@@ -19,6 +19,9 @@ module Ground {
     parent:Table
     other_table:Table
     type:Link_Field_Type
+    other_link:Link_Field
+    field:IField
+    property:Property
 
     constructor(name:string, parent:Table, other_table:Table, type:Link_Field_Type) {
       this.name = name
@@ -91,19 +94,56 @@ module Ground {
         type
       )
 
+      link.property = property
+
+      if (this.properties[link.name])
+        link.field = this.properties[link.name]
+
+      var other_link
+      if (!other_table.trellis) {
+        // other_table must be a cross-table
+        var other_field_name = link.field && link.field.other_field
+          ? link.field.other_field
+          : property.parent.name // By default cross-table links are the name of the trellis they point to
+
+        other_link = new Link_Field(
+          property.name,
+          other_table,
+          this,
+          Link_Field_Type.reference // Cross-table links are always references
+        )
+
+        other_table.links[other_link.name]= other_link
+      }
+      else {
+        var other_field_name = link.field && link.field.other_field
+          ? link.field.other_field
+          : property.get_other_property(true).name
+
+        // I'm assuming that if the other link is currently null,
+        // it will be initialized later and at that time
+        // the cross references will be assigned.
+        other_link = other_table.links[other_field_name] || null
+      }
+
+      if (other_link) {
+        link.other_link = other_link
+        other_link.other_link = link
+      }
+
       this.links[link.name] = link
     }
 
     create_sql(ground:Core) {
       var fields = [];
       for (var name in this.properties) {
-        var property = this.properties[name];
+        var property = this.properties[name]
 
         var field = {
           name: property.name || name,
           type: ground.get_base_property_type(property.type).field_type,
           default: undefined
-        };
+        }
 
         if (property.default !== undefined)
           field.default = property.default;

@@ -1284,8 +1284,10 @@ var Ground;
                             if (_this.ground.log_updates)
                                 console.log(sql);
 
-                            return _this.ground.invoke(join.table_name + '.remove', property, row, other, join).then(function () {
+                            return _this.ground.invoke(join.table_name + '.remove', row, property, other, join).then(function () {
                                 return _this.db.query(sql);
+                            }).then(function () {
+                                return _this.ground.invoke(join.table_name + '.removed', row, property, other, join);
                             });
                         }
                     } else {
@@ -1296,19 +1298,22 @@ var Ground;
                                 if (_this.ground.log_updates)
                                     console.log(sql);
 
-                                return _this.db.query(sql).then(function () {
-                                    return _this.ground.invoke(join.table_name + '.create', property, row, other, join);
+                                return _this.ground.invoke(join.table_name + '.create', row, property, other, join).then(function () {
+                                    return _this.db.query(sql);
+                                }).then(function () {
+                                    return _this.ground.invoke(join.table_name + '.created', row, property, other, join);
                                 });
                             });
                         } else {
                             var cross = new Ground.Cross_Trellis(property);
                             sql = cross.generate_insert(property, row, other);
-
                             if (_this.ground.log_updates)
                                 console.log(sql);
 
-                            return _this.db.query(sql).then(function () {
-                                return _this.ground.invoke(join.table_name + '.create', property, row, other, join);
+                            return _this.ground.invoke(join.table_name + '.create', row, property, other, join).then(function () {
+                                return _this.db.query(sql);
+                            }).then(function () {
+                                return _this.ground.invoke(join.table_name + '.created', row, property, other, join);
                             });
                         }
                     }
@@ -1898,6 +1903,29 @@ var Ground;
 
             var link = new Link_Field(property.name, this, other_table, type);
 
+            link.property = property;
+
+            if (this.properties[link.name])
+                link.field = this.properties[link.name];
+
+            var other_link;
+            if (!other_table.trellis) {
+                var other_field_name = link.field && link.field.other_field ? link.field.other_field : property.parent.name;
+
+                other_link = new Link_Field(property.name, other_table, this, 1 /* reference */);
+
+                other_table.links[other_link.name] = other_link;
+            } else {
+                var other_field_name = link.field && link.field.other_field ? link.field.other_field : property.get_other_property(true).name;
+
+                other_link = other_table.links[other_field_name] || null;
+            }
+
+            if (other_link) {
+                link.other_link = other_link;
+                other_link.other_link = link;
+            }
+
             this.links[link.name] = link;
         };
 
@@ -2271,6 +2299,19 @@ var Ground;
         return Link_Trellis;
     })();
     Ground.Link_Trellis = Link_Trellis;
+})(Ground || (Ground = {}));
+var Ground;
+(function (Ground) {
+    (function (SQL) {
+        function get_link_sql_value(link, value) {
+            if (this.property)
+                return this.property.get_sql_value(value);
+
+            return this.other_property.property.get_other_property(true).get_sql_value(value);
+        }
+        SQL.get_link_sql_value = get_link_sql_value;
+    })(Ground.SQL || (Ground.SQL = {}));
+    var SQL = Ground.SQL;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
@@ -2761,6 +2802,45 @@ var Ground;
         return Cross_Trellis;
     })();
     Ground.Cross_Trellis = Cross_Trellis;
+
+    var Cross_Trellis2 = (function () {
+        function Cross_Trellis2(property, alias) {
+            if (typeof alias === "undefined") { alias = null; }
+            this.table = Ground.Table.get_other_table(property);
+            this.alias = alias;
+        }
+        Cross_Trellis2.prototype.generate_insert = function (property, owner, other) {
+            var identities = this.order_identities(property);
+            var keys = identities.map(function (x) {
+                return x.name;
+            });
+            var values = [
+                Ground.SQL.get_link_sql_value(identities[0], owner),
+                Ground.SQL.get_link_sql_value(identities[1], other)
+            ];
+
+            return 'REPLACE INTO ' + this.table.name + ' (`' + keys.join('`, `') + '`) VALUES (' + values.join(', ') + ');\n';
+        };
+
+        Cross_Trellis2.prototype.order_identities = function (property) {
+            var table = this.table;
+            var first = MetaHub.filter(table.links, function (x) {
+                return x.name == property.name;
+            })[0];
+            if (!first) {
+                throw new Error('Could not operate using cross table ' + this.table.name + '.  Could not find identity for property ' + property.fullname() + '.');
+            }
+            MetaHub.filter(table.links, function (x) {
+                return x.name == property.name;
+            })[0];
+            var second = MetaHub.filter(table.links, function (x) {
+                return x.name == property.name;
+            })[0];
+            return [first, second];
+        };
+        return Cross_Trellis2;
+    })();
+    Ground.Cross_Trellis2 = Cross_Trellis2;
 
     var Join_Property = (function () {
         function Join_Property(parent, other_trellis, name, type, field_name, other_property) {
