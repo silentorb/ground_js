@@ -3360,6 +3360,15 @@ var Ground;
             var alias = source.trellis.get_table_name();
             var sql = 'SELECT * FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
 
+            sql = Query_Renderer.apply_arguments(sql, parts.args) + parts.pager;
+
+            return sql;
+        };
+
+        Query_Renderer.prototype.generate_union_count = function (parts, queries, source) {
+            var alias = source.trellis.get_table_name();
+            var sql = 'SELECT COUNT(*) AS total_number FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
+
             sql = Query_Renderer.apply_arguments(sql, parts.args);
 
             return sql;
@@ -3825,7 +3834,8 @@ var Ground;
 
                 return {
                     sql: sql,
-                    parts: parts
+                    parts: parts,
+                    preparation: preparation
                 };
             });
         };
@@ -3842,7 +3852,8 @@ var Ground;
                     };
                     _this.row_cache = result;
                     if (_this.source.pager) {
-                        var sql = _this.renderer.generate_count(render_result.parts);
+                        var sql = _this.source.type != 'union' ? _this.renderer.generate_count(render_result.parts) : _this.renderer.generate_union_count(render_result.parts, render_result.preparation.queries, _this.source);
+
                         if (_this.ground.log_queries)
                             console.log('\nquery', sql + '\n');
                         return _this.ground.db.query_single(sql).then(function (count) {

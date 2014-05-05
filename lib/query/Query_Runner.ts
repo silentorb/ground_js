@@ -247,7 +247,8 @@ module Ground {
 
           return {
             sql: sql,
-            parts: parts
+            parts: parts,
+            preparation: preparation
           }
         })
     }
@@ -265,7 +266,11 @@ module Ground {
               }
               this.row_cache = result
               if (this.source.pager) {
-                var sql = this.renderer.generate_count(render_result.parts)
+                var sql = this.source.type != 'union'
+                  ? this.renderer.generate_count(render_result.parts)
+                  : this.renderer.generate_union_count(render_result.parts,
+                  render_result.preparation.queries, this.source)
+
                 if (this.ground.log_queries)
                   console.log('\nquery', sql + '\n')
                 return this.ground.db.query_single(sql)

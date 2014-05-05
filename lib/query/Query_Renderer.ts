@@ -93,6 +93,20 @@ module Ground {
         + parts.sorts
 
       sql = Query_Renderer.apply_arguments(sql, parts.args)
+        + parts.pager
+
+      return sql;
+    }
+
+    generate_union_count(parts:Query_Parts, queries:string[], source:Query_Builder) {
+      var alias = source.trellis.get_table_name()
+      var sql = 'SELECT COUNT(*) AS total_number FROM ('
+        + queries.join('\nUNION\n')
+        + '\n) ' + alias + '\n'
+        + parts.filters
+        + parts.sorts
+
+      sql = Query_Renderer.apply_arguments(sql, parts.args)
 
       return sql;
     }

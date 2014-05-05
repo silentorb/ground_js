@@ -599,6 +599,7 @@ declare module Ground {
         public generate_sql(parts: Query_Parts, source: Ground.Query_Builder): string;
         public generate_count(parts: Query_Parts): string;
         public generate_union(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
+        public generate_union_count(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
         public generate_parts(source: Ground.Query_Builder, query_id?: number): Query_Parts;
         private static get_fields_and_joins(source, properties, include_primary_key?);
         private static build_filter(source, filter, ground);
