@@ -49,7 +49,13 @@ module Ground {
             data.value = "'%" + data.value + "%'"
         }
       },
-      '!=': null
+      '!=': null,
+      '<': null,
+      '>': null,
+      '<=': null,
+      '>=': null,
+      '=>': null,
+      '=<': null
     }
 
     filters:Query_Filter[] = []

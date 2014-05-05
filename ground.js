@@ -3296,7 +3296,13 @@ var Ground;
                         data.value = "'%" + data.value + "%'";
                 }
             },
-            '!=': null
+            '!=': null,
+            '<': null,
+            '>': null,
+            '<=': null,
+            '>=': null,
+            '=>': null,
+            '=<': null
         };
         return Query_Builder;
     })();

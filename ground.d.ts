@@ -553,6 +553,12 @@ declare module Ground {
                 "render": (result: any, filter: any, property: any, data: any) => void;
             };
             '!=': any;
+            '<': any;
+            '>': any;
+            '<=': any;
+            '>=': any;
+            '=>': any;
+            '=<': any;
         };
         public filters: Query_Filter[];
         constructor(trellis: Ground.Trellis);
