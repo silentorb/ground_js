@@ -168,10 +168,13 @@ module Ground {
             render_field(name)
           }
           else if (expression.type == 'literal') {
-            if (!expression.value.toString().match(/^[\w_]*$/))
+            var value = expression.value
+            if (value === null) {
+              value = 'NULL'
+            }
+            else if (!expression.value.toString().match(/^[\w_]*$/))
               throw new Error('Invalid mapping value: ' + value + '.')
 
-            var value = expression.value
             if (typeof value === 'object') {
               value = "'object'"
             }
