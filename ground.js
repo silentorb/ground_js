@@ -3876,7 +3876,7 @@ var Ground;
         };
 
         Query_Runner.prototype.get_source = function (row) {
-            if (this.source.type !== 'union' || !row._query_id_)
+            if (this.source.type !== 'union')
                 return this.source;
 
             return this.source.queries[row._query_id_];

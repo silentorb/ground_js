@@ -287,7 +287,7 @@ module Ground {
     }
 
     get_source(row):Query_Builder {
-      if (this.source.type !== 'union' || !row._query_id_)
+      if (this.source.type !== 'union')
         return this.source
 
       return this.source.queries[row._query_id_]
