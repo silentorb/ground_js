@@ -86,7 +86,7 @@ module Ground {
 
     generate_union(parts:Query_Parts, queries:string[], source:Query_Builder) {
       var alias = source.trellis.get_table_name()
-      var sql = 'SELECT * FROM ('
+      var sql = 'SELECT DISTINCT * FROM ('
         + queries.join('\nUNION\n')
         + '\n) ' + alias + '\n'
         + parts.filters
@@ -100,7 +100,7 @@ module Ground {
 
     generate_union_count(parts:Query_Parts, queries:string[], source:Query_Builder) {
       var alias = source.trellis.get_table_name()
-      var sql = 'SELECT COUNT(*) AS total_number FROM ('
+      var sql = 'SELECT COUNT(DISTINCT ' + source.trellis.query() + ') AS total_number FROM ('
         + queries.join('\nUNION\n')
         + '\n) ' + alias + '\n'
         + parts.filters
@@ -345,25 +345,5 @@ module Ground {
         return ' LIMIT ' + offset + ', ' + limit;
       }
     }
-
-//    static get_join_table(join:Join):string {
-//      if (join.property)
-//        return "Join_" + join.first.name + "_" + join.property.name
-//
-//      return "Composite_Join_" + join.first.name + "_" + join.second.name
-//    }
-
-//    static render_join(join:Join):string {
-//      var table_name = Query_Renderer.get_join_table(join)
-//      if (join.property) {
-//        var link = Link_Trellis.create_from_property(join.property);
-//        link.alias = table_name
-//        return link.generate_join({});
-//      }
-//      else {
-//        return 'JOIN ' + join.first.get_table_name() + ' ' + table_name
-//          + ' ON ' + this.get_condition_string({}) + "\n"
-//      }
-//    }
   }
 }

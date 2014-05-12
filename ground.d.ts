@@ -2,15 +2,18 @@
 /// <reference path="../vineyard-metahub/metahub.d.ts" />
 
 declare var when: any;
+declare var mysql: any;
 declare module Ground {
     class Database {
         public settings: any;
         public database: string;
         public log_queries: boolean;
         public pool: any;
+        public active: boolean;
         constructor(settings: {}, database: string);
         public add_table_to_database(table: Ground.Table, ground: Ground.Core): Promise;
         public add_non_trellis_tables_to_database(tables: Ground.Table[], ground: Ground.Core): Promise;
+        public start(): void;
         public close(): void;
         public create_table(trellis: Ground.Trellis): Promise;
         public create_trellis_tables(trellises: Ground.Trellis[]): Promise;

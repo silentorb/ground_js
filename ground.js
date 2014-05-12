@@ -1,10 +1,12 @@
 var MetaHub = require('vineyard-metahub');var when = require('when');
+var mysql = require('mysql');
 
 var Ground;
 (function (Ground) {
     var Database = (function () {
         function Database(settings, database) {
             this.log_queries = false;
+            this.active = true;
             this.settings = settings;
             this.database = database;
             var mysql = require('mysql');
@@ -29,8 +31,21 @@ var Ground;
             return when.all(promises);
         };
 
+        Database.prototype.start = function () {
+            if (this.active)
+                return;
+
+            this.pool = mysql.createPool(this.settings[this.database]);
+            this.active = true;
+            console.log('db-close');
+        };
+
         Database.prototype.close = function () {
-            this.pool.end();
+            if (this.pool) {
+                this.pool.end();
+                this.pool = null;
+            }
+            this.active = false;
         };
 
         Database.prototype.create_table = function (trellis) {
@@ -2559,10 +2574,20 @@ var Ground;
             if (typeof create_if_none === "undefined") { create_if_none = false; }
             var property;
             if (this.other_property) {
-                return this.other_trellis.properties[this.other_property];
+                var properties = this.other_trellis.get_all_properties();
+                var other_property = properties[this.other_property];
+                if (!other_property) {
+                    throw new Error('Invalid other property in ' + this.get_field_name() + ": " + this.other_trellis.name + '.' + this.other_property + ' does not exist.');
+
+                    return other_property;
+                }
             } else {
-                if (!this.other_trellis)
+                if (!this.other_trellis) {
+                    if (create_if_none)
+                        throw new Error("Attempt to get other property for " + this.get_field_name() + " but its other_trellis is null.");
+
                     return null;
+                }
 
                 for (var name in this.other_trellis.properties) {
                     property = this.other_trellis.properties[name];
@@ -2572,8 +2597,12 @@ var Ground;
                 }
             }
 
-            if (this.other_trellis === this.parent)
+            if (this.other_trellis === this.parent) {
+                if (create_if_none)
+                    return this;
+
                 return null;
+            }
 
             if (!create_if_none)
                 return null;
@@ -3364,7 +3393,7 @@ var Ground;
 
         Query_Renderer.prototype.generate_union = function (parts, queries, source) {
             var alias = source.trellis.get_table_name();
-            var sql = 'SELECT * FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
+            var sql = 'SELECT DISTINCT * FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
 
             sql = Query_Renderer.apply_arguments(sql, parts.args) + parts.pager;
 
@@ -3373,7 +3402,7 @@ var Ground;
 
         Query_Renderer.prototype.generate_union_count = function (parts, queries, source) {
             var alias = source.trellis.get_table_name();
-            var sql = 'SELECT COUNT(*) AS total_number FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
+            var sql = 'SELECT COUNT(DISTINCT ' + source.trellis.query() + ') AS total_number FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
 
             sql = Query_Renderer.apply_arguments(sql, parts.args);
 

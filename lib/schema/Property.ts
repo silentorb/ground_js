@@ -15,7 +15,8 @@ module Ground {
     type:string = null
     insert:string = null
     other_property:string = null
-    "default":any
+  "default":
+    any
     other_trellis:Trellis = null
     other_trellis_name:string = null
     is_private:boolean = false
@@ -33,10 +34,10 @@ module Ground {
         if (this.hasOwnProperty(i))
           this[i] = source[i];
       }
-      if (source['default'] !== undefined )
+      if (source['default'] !== undefined)
         this.default = source['default']
 
-      if (source['allow_null'] !== undefined )
+      if (source['allow_null'] !== undefined)
         this.allow_null = source['allow_null']
 
       if (source.trellis) {
@@ -84,7 +85,7 @@ module Ground {
 
     get_composite() {
       if (this.composite_properties)
-      return [ this ].concat(this.composite_properties)
+        return [ this ].concat(this.composite_properties)
 
       return [ this ]
     }
@@ -310,11 +311,22 @@ module Ground {
     get_other_property(create_if_none:boolean = false):Property {
       var property;
       if (this.other_property) {
-        return this.other_trellis.properties[this.other_property];
+        var properties = this.other_trellis.get_all_properties()
+        var other_property = properties[this.other_property]
+        if (!other_property) {
+          throw new Error('Invalid other property in ' + this.get_field_name() + ": "
+            + this.other_trellis.name + '.' + this.other_property + ' does not exist.')
+
+          return other_property
+        }
       }
       else {
-        if (!this.other_trellis)
+        if (!this.other_trellis) {
+          if (create_if_none)
+            throw new Error("Attempt to get other property for " + this.get_field_name() + " but its other_trellis is null.");
+
           return null
+        }
 
         for (var name in this.other_trellis.properties) {
           property = this.other_trellis.properties[name];
@@ -324,8 +336,12 @@ module Ground {
         }
       }
 
-      if (this.other_trellis === this.parent)
+      if (this.other_trellis === this.parent) {
+        if (create_if_none)
+          return this
+
         return null
+      }
 
       if (!create_if_none)
         return null
