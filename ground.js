@@ -3528,15 +3528,26 @@ var Ground;
             if (Query_Renderer.counter > 10000)
                 Query_Renderer.counter = 1;
 
+            if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
+                result.property_joins.push(property_chain);
+                reference = Ground.Join.get_end_query(property_chain);
+            } else {
+                reference = property.query();
+            }
+
             var operator_action = Ground.Query_Builder.operators[filter.operator];
             if (operator_action && typeof operator_action.render === 'function') {
                 var data = {
                     value: value,
-                    placeholder: placeholder
+                    operator: operator,
+                    placeholder: placeholder,
+                    reference: reference
                 };
                 operator_action.render(result, filter, property, data);
                 value = data.value;
                 placeholder = data.placeholder;
+                operator = data.operator;
+                reference = data.reference;
             } else {
                 if (value === 'null' && property.type != 'string') {
                     operator = 'IS';
@@ -3546,13 +3557,6 @@ var Ground;
                         value = ground.convert_value(value, property.type);
                     value = property.get_sql_value(value);
                 }
-            }
-
-            if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
-                result.property_joins.push(property_chain);
-                reference = Ground.Join.get_end_query(property_chain);
-            } else {
-                reference = property.query();
             }
 
             result.arguments[placeholder] = value;

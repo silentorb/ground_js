@@ -237,15 +237,27 @@ module Ground {
       if (Query_Renderer.counter > 10000)
         Query_Renderer.counter = 1
 
+      if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
+        result.property_joins.push(property_chain)
+        reference = Join.get_end_query(property_chain)
+      }
+      else {
+        reference = property.query()
+      }
+
       var operator_action = Query_Builder.operators[filter.operator]
       if (operator_action && typeof operator_action.render === 'function') {
         var data = {
           value: value,
-          placeholder: placeholder
+          operator: operator,
+          placeholder: placeholder,
+          reference: reference
         }
         operator_action.render(result, filter, property, data)
         value = data.value
         placeholder = data.placeholder
+        operator = data.operator
+        reference = data.reference
       }
       else {
         if (value === 'null' && property.type != 'string') {
@@ -259,14 +271,6 @@ module Ground {
             value = ground.convert_value(value, property.type);
           value = property.get_sql_value(value)
         }
-      }
-
-      if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
-        result.property_joins.push(property_chain)
-        reference = Join.get_end_query(property_chain)
-      }
-      else {
-        reference = property.query()
       }
 
       result.arguments[placeholder] = value;
