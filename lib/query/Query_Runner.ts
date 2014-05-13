@@ -54,7 +54,8 @@ module Ground {
 
       var other_property = property.get_other_property();
       if (!other_property)
-        return when.resolve()
+        throw new Error("Could not find other property for " + property.fullname() + ".")
+//        return when.resolve()
 
       var query = Query_Runner.create_sub_query(other_property.parent, property, source);
 //      if (relationship === Relationships.many_to_many) {
@@ -169,7 +170,7 @@ module Ground {
         case Relationships.one_to_many:
         case Relationships.many_to_many:
           return Query_Runner.get_many_list(seed, property, relationship, source)
-            .then((result)=> result.objects)
+            .then((result)=> result ? result.objects : [])
           break
       }
 

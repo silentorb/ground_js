@@ -317,8 +317,8 @@ module Ground {
           throw new Error('Invalid other property in ' + this.get_field_name() + ": "
             + this.other_trellis.name + '.' + this.other_property + ' does not exist.')
 
-          return other_property
         }
+        return other_property
       }
       else {
         if (!this.other_trellis) {

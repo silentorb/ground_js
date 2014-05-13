@@ -2578,9 +2578,8 @@ var Ground;
                 var other_property = properties[this.other_property];
                 if (!other_property) {
                     throw new Error('Invalid other property in ' + this.get_field_name() + ": " + this.other_trellis.name + '.' + this.other_property + ' does not exist.');
-
-                    return other_property;
                 }
+                return other_property;
             } else {
                 if (!this.other_trellis) {
                     if (create_if_none)
@@ -3670,7 +3669,7 @@ var Ground;
 
             var other_property = property.get_other_property();
             if (!other_property)
-                return when.resolve();
+                throw new Error("Could not find other property for " + property.fullname() + ".");
 
             var query = Query_Runner.create_sub_query(other_property.parent, property, source);
 
@@ -3786,7 +3785,7 @@ var Ground;
                 case 2 /* one_to_many */:
                 case 3 /* many_to_many */:
                     return Query_Runner.get_many_list(seed, property, relationship, source).then(function (result) {
-                        return result.objects;
+                        return result ? result.objects : [];
                     });
                     break;
             }
