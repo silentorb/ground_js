@@ -15,7 +15,8 @@ module Ground {
   }
 
   export interface Query_Sort {
-    property
+    property?
+    path?
     dir?
   }
 
@@ -77,8 +78,8 @@ module Ground {
       if (Query_Builder.operators[operator] === undefined)
         throw new Error("Invalid operator: '" + operator + "'.")
 
-      if (value === null || value === undefined)
-        throw new Error('Cannot add property filter where value is null; property = ' + this.trellis.name + '.' + path + '.')
+      if (value === undefined)
+        throw new Error('Cannot add property filter where value is undefined; property = ' + this.trellis.name + '.' + path + '.')
 
       var filter = <Query_Filter>{
         path: path,
@@ -99,12 +100,12 @@ module Ground {
     }
 
     add_sort(sort:Query_Sort) {
-      for (var i = 0; i < this.sorts.length; ++i) {
-        if (this.sorts[i].property == sort.property) {
-          this.sorts.splice(i, 1)
-          break
-        }
-      }
+//      for (var i = 0; i < this.sorts.length; ++i) {
+//        if (this.sorts[i].property == sort.property) {
+//          this.sorts.splice(i, 1)
+//          break
+//        }
+//      }
 
       this.sorts.push(sort)
     }

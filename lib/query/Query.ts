@@ -446,10 +446,10 @@ module Ground {
       var value = filter.value;
 
       var placeholder = ':' + property.name + '_filter';
-      if (value === 'null' && property.type != 'string') {
-        result.filters.push(property.query() + ' IS NULL');
-        return result;
-      }
+//      if (value === 'null' && property.type != 'string') {
+//        result.filters.push(property.query() + ' IS NULL');
+//        return result;
+//      }
 
       if (value !== null)
         value = this.ground.convert_value(value, property.type);

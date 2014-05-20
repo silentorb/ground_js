@@ -531,7 +531,8 @@ declare module Ground {
         operator: string;
     }
     interface Query_Sort {
-        property: any;
+        property?: any;
+        path?: any;
         dir?: any;
     }
     interface Query_Transform {
@@ -611,9 +612,10 @@ declare module Ground {
         public generate_union_count(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
         public generate_parts(source: Ground.Query_Builder, query_id?: number): Query_Parts;
         private static get_fields_and_joins(source, properties, include_primary_key?);
+        private static add_path(path, trellis, result);
         private static build_filter(source, filter, ground);
         static build_filters(source: Ground.Query_Builder, ground: Ground.Core): Internal_Query_Source;
-        static process_sorts(sorts: Ground.Query_Sort[], trellis: Ground.Trellis): string;
+        static process_sorts(sorts: Ground.Query_Sort[], trellis: Ground.Trellis, result: Internal_Query_Source): string;
         static render_pager(pager: Ground.IPager): string;
     }
 }

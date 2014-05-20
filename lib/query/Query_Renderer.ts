@@ -115,6 +115,10 @@ module Ground {
       var properties = Query_Renderer.get_properties(source)
       var data = Query_Renderer.get_fields_and_joins(source, properties)
       var data2 = Query_Renderer.build_filters(source, this.ground)
+      var sorts = source.sorts.length > 0
+        ? Query_Renderer.process_sorts(source.sorts, source.trellis, data2)
+        : null
+
       var fields = data.fields
       var joins = data.joins.concat(Join.render_paths(source.trellis, data2.property_joins))
       var args = data2.arguments
@@ -131,7 +135,7 @@ module Ground {
         from: "\nFROM `" + source.trellis.get_table_name() + '`',
         joins: joins.length > 0 ? "\n" + joins.join("\n") : '',
         filters: filters.length > 0 ? "\nWHERE " + filters.join(" AND ") : '',
-        sorts: source.sorts.length > 0 ? ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis) : '',
+        sorts: sorts ? ' ' + sorts : '',
         pager: source.pager ? ' ' + Query_Renderer.render_pager(source.pager) : '',
         args: args
       }
@@ -215,6 +219,23 @@ module Ground {
       }
     }
 
+    private static add_path(path, trellis:Trellis, result:Internal_Query_Source):any[] {
+      var parts = Ground.path_to_array(path)
+      var property_chain = Join.path_to_property_chain(trellis, parts)
+      var last = property_chain[property_chain.length - 1]
+      if (last.other_trellis)
+        property_chain.push(last.other_trellis.get_primary_property())
+
+      var property = property_chain[property_chain.length - 1]
+
+      if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
+        result.property_joins = result.property_joins || []
+        result.property_joins.push(property_chain)
+      }
+
+      return property_chain
+    }
+
     private static build_filter(source:Query_Builder, filter, ground:Core):Internal_Query_Source {
       var result:Internal_Query_Source = {
         filters: [],
@@ -225,20 +246,14 @@ module Ground {
         operator:string = filter.operator || '=',
         reference:string
 
-      var parts = Ground.path_to_array(filter.path)
-      var property_chain = Join.path_to_property_chain(source.trellis, parts)
-      var last = property_chain[property_chain.length - 1]
-      if (last.other_trellis)
-        property_chain.push(last.other_trellis.get_primary_property())
-
-      var property = property_chain[property_chain.length - 1]
-
       var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++;
       if (Query_Renderer.counter > 10000)
         Query_Renderer.counter = 1
 
+      var property_chain = Query_Renderer.add_path(filter.path, source.trellis, result)
+      var property = property_chain[property_chain.length - 1]
+
       if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
-        result.property_joins.push(property_chain)
         reference = Join.get_end_query(property_chain)
       }
       else {
@@ -260,10 +275,14 @@ module Ground {
         reference = data.reference
       }
       else {
-        if (value === 'null' && property.type != 'string') {
+        if (value === null || (value === 'null' && property.type != 'string')) {
 //        result.filters.push(property.query() + ' IS NULL');
 //        return result;
-          operator = 'IS'
+          if (!operator || operator == '=')
+            operator = 'IS'
+          else if (operator == '!=')
+            operator = 'IS NOT'
+
           value = 'NULL'
         }
         else {
@@ -300,23 +319,23 @@ module Ground {
       return result
     }
 
-    static process_sorts(sorts:Query_Sort[], trellis:Trellis):string {
+    static process_sorts(sorts:Query_Sort[], trellis:Trellis, result:Internal_Query_Source):string {
       if (sorts.length == 0)
         return ''
 
-      if (trellis)
-        var properties = trellis.get_all_properties()
+      var properties = trellis.get_all_properties()
 
       var items = sorts.map((sort)=> {
         var sql
-        if (trellis) {
+        if (sort.path) {
+          var property_chain = Query_Renderer.add_path(sort.path, trellis, result)
+          sql = Join.get_end_query(property_chain)
+        }
+        else {
           if (!properties[sort.property])
             throw new Error(trellis.name + ' does not contain sort property: ' + sort.property)
 
           sql = properties[sort.property].query()
-        }
-        else {
-          sql = sort.property
         }
 
         if (typeof sort.dir === 'string') {
@@ -327,10 +346,12 @@ module Ground {
             sql += ' DESC'
         }
 
-        return 'ORDER BY ' + sql
+        return sql
       })
 
-      return items.join(', ')
+      return items.length > 0
+        ? 'ORDER BY ' + items.join(', ')
+        : ''
     }
 
     static render_pager(pager:IPager):string {

@@ -46,7 +46,7 @@ module Ground {
 
       this.pool = mysql.createPool(this.settings[this.database])
       this.active = true
-      console.log('db-close')
+      console.log('db-started.')
     }
 
     close() {

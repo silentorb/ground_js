@@ -37,7 +37,7 @@ var Ground;
 
             this.pool = mysql.createPool(this.settings[this.database]);
             this.active = true;
-            console.log('db-close');
+            console.log('db-started.');
         };
 
         Database.prototype.close = function () {
@@ -777,10 +777,6 @@ var Ground;
             var value = filter.value;
 
             var placeholder = ':' + property.name + '_filter';
-            if (value === 'null' && property.type != 'string') {
-                result.filters.push(property.query() + ' IS NULL');
-                return result;
-            }
 
             if (value !== null)
                 value = this.ground.convert_value(value, property.type);
@@ -3034,10 +3030,10 @@ var Ground;
         };
 
         Join.get_end_query = function (property_chain) {
-            if (property_chain.length == 1)
-                return property_chain[0].parent.get_table_name() + '.' + property_chain[0].get_field_name();
-
             var last_property = property_chain[property_chain.length - 1];
+            if (property_chain.length == 1 && last_property.get_relationship() != 3 /* many_to_many */)
+                return last_property.parent.get_table_name() + '.' + last_property.get_field_name();
+
             var last_reference = Join.get_last_reference(property_chain);
             var table_name = Join.generate_table_name(last_property.parent, last_reference);
             return table_name + '.' + last_property.get_field_name();
@@ -3113,8 +3109,8 @@ var Ground;
             if (Query_Builder.operators[operator] === undefined)
                 throw new Error("Invalid operator: '" + operator + "'.");
 
-            if (value === null || value === undefined)
-                throw new Error('Cannot add property filter where value is null; property = ' + this.trellis.name + '.' + path + '.');
+            if (value === undefined)
+                throw new Error('Cannot add property filter where value is undefined; property = ' + this.trellis.name + '.' + path + '.');
 
             var filter = {
                 path: path,
@@ -3135,13 +3131,6 @@ var Ground;
         };
 
         Query_Builder.prototype.add_sort = function (sort) {
-            for (var i = 0; i < this.sorts.length; ++i) {
-                if (this.sorts[i].property == sort.property) {
-                    this.sorts.splice(i, 1);
-                    break;
-                }
-            }
-
             this.sorts.push(sort);
         };
 
@@ -3413,6 +3402,8 @@ var Ground;
             var properties = Query_Renderer.get_properties(source);
             var data = Query_Renderer.get_fields_and_joins(source, properties);
             var data2 = Query_Renderer.build_filters(source, this.ground);
+            var sorts = source.sorts.length > 0 ? Query_Renderer.process_sorts(source.sorts, source.trellis, data2) : null;
+
             var fields = data.fields;
             var joins = data.joins.concat(Ground.Join.render_paths(source.trellis, data2.property_joins));
             var args = data2.arguments;
@@ -3429,7 +3420,7 @@ var Ground;
                 from: "\nFROM `" + source.trellis.get_table_name() + '`',
                 joins: joins.length > 0 ? "\n" + joins.join("\n") : '',
                 filters: filters.length > 0 ? "\nWHERE " + filters.join(" AND ") : '',
-                sorts: source.sorts.length > 0 ? ' ' + Query_Renderer.process_sorts(source.sorts, source.trellis) : '',
+                sorts: sorts ? ' ' + sorts : '',
                 pager: source.pager ? ' ' + Query_Renderer.render_pager(source.pager) : '',
                 args: args
             };
@@ -3508,6 +3499,23 @@ var Ground;
             };
         };
 
+        Query_Renderer.add_path = function (path, trellis, result) {
+            var parts = Ground.path_to_array(path);
+            var property_chain = Ground.Join.path_to_property_chain(trellis, parts);
+            var last = property_chain[property_chain.length - 1];
+            if (last.other_trellis)
+                property_chain.push(last.other_trellis.get_primary_property());
+
+            var property = property_chain[property_chain.length - 1];
+
+            if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
+                result.property_joins = result.property_joins || [];
+                result.property_joins.push(property_chain);
+            }
+
+            return property_chain;
+        };
+
         Query_Renderer.build_filter = function (source, filter, ground) {
             var result = {
                 filters: [],
@@ -3516,20 +3524,14 @@ var Ground;
             };
             var value = filter.value, operator = filter.operator || '=', reference;
 
-            var parts = Ground.path_to_array(filter.path);
-            var property_chain = Ground.Join.path_to_property_chain(source.trellis, parts);
-            var last = property_chain[property_chain.length - 1];
-            if (last.other_trellis)
-                property_chain.push(last.other_trellis.get_primary_property());
-
-            var property = property_chain[property_chain.length - 1];
-
             var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++;
             if (Query_Renderer.counter > 10000)
                 Query_Renderer.counter = 1;
 
+            var property_chain = Query_Renderer.add_path(filter.path, source.trellis, result);
+            var property = property_chain[property_chain.length - 1];
+
             if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
-                result.property_joins.push(property_chain);
                 reference = Ground.Join.get_end_query(property_chain);
             } else {
                 reference = property.query();
@@ -3549,8 +3551,12 @@ var Ground;
                 operator = data.operator;
                 reference = data.reference;
             } else {
-                if (value === 'null' && property.type != 'string') {
-                    operator = 'IS';
+                if (value === null || (value === 'null' && property.type != 'string')) {
+                    if (!operator || operator == '=')
+                        operator = 'IS';
+                    else if (operator == '!=')
+                        operator = 'IS NOT';
+
                     value = 'NULL';
                 } else {
                     if (value !== null)
@@ -3586,22 +3592,22 @@ var Ground;
             return result;
         };
 
-        Query_Renderer.process_sorts = function (sorts, trellis) {
+        Query_Renderer.process_sorts = function (sorts, trellis, result) {
             if (sorts.length == 0)
                 return '';
 
-            if (trellis)
-                var properties = trellis.get_all_properties();
+            var properties = trellis.get_all_properties();
 
             var items = sorts.map(function (sort) {
                 var sql;
-                if (trellis) {
+                if (sort.path) {
+                    var property_chain = Query_Renderer.add_path(sort.path, trellis, result);
+                    sql = Ground.Join.get_end_query(property_chain);
+                } else {
                     if (!properties[sort.property])
                         throw new Error(trellis.name + ' does not contain sort property: ' + sort.property);
 
                     sql = properties[sort.property].query();
-                } else {
-                    sql = sort.property;
                 }
 
                 if (typeof sort.dir === 'string') {
@@ -3612,10 +3618,10 @@ var Ground;
                         sql += ' DESC';
                 }
 
-                return 'ORDER BY ' + sql;
+                return sql;
             });
 
-            return items.join(', ');
+            return items.length > 0 ? 'ORDER BY ' + items.join(', ') : '';
         };
 
         Query_Renderer.render_pager = function (pager) {
