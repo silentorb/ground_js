@@ -236,8 +236,12 @@ module Ground {
     }
 
     get_comparison(value):string {
+      return this.query() + ' = ' + this.get_sql_value(value)
+    }
+
+    query():string {
       var table_name = this.parent.get_alias() || this.parent.get_table_name()
-      return table_name + '.' + this.field_name + ' = ' + this.get_sql_value(value)
+      return table_name + '.' + this.field_name
     }
 
     static pair(first:Join_Property, second:Join_Property) {

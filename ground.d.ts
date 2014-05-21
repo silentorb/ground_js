@@ -434,6 +434,15 @@ declare module Ground {
         constructor(ground: Ground.Core, parent: any, property_name: string, count_name: string);
         public count(seed: any): Promise;
     }
+    class Join_Count extends MetaHub.Meta_Object {
+        public ground: Ground.Core;
+        public parent: Ground.Trellis;
+        public link: Ground.Cross_Trellis;
+        public count_name: string;
+        public property: Ground.Property;
+        constructor(ground: Ground.Core, property: Ground.Property, count_name: string);
+        public count(seed: any, property: Ground.Property): Promise;
+    }
 }
 declare module Ground {
     interface Statement {
@@ -511,6 +520,7 @@ declare module Ground {
         constructor(parent: Join_Trellis, other_trellis: Join_Trellis, name: string, type: string, field_name?: string, other_property?: Join_Property);
         static create_from_property(property: Ground.Property, other_trellis?: Join_Trellis, other_property?: Join_Property): Join_Property;
         public get_comparison(value: any): string;
+        public query(): string;
         static pair(first: Join_Property, second: Join_Property): void;
         public get_sql_value(value: any): any;
     }

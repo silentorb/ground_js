@@ -2274,7 +2274,7 @@ var Ground;
             if (!seed) {
                 console.log('empty key');
             }
-            if (typeof seed === 'string')
+            if (typeof seed === 'string' || typeof seed === 'number')
                 return this.table_name + '.' + key.name + ' = ' + seed;
 
             if (seed[key.property.name] !== undefined) {
@@ -2783,32 +2783,42 @@ var Ground;
             this.ground = ground;
             this.parent = property.parent;
             this.count_name = count_name;
-            this.link = Ground.Link_Trellis.create_from_property(property);
-            this.link.identities.pop();
+            this.link = new Ground.Cross_Trellis(property);
+            this.link.alias = this.link.name;
+            this.property = property;
 
-            var table_name = this.link.table_name;
-            this.listen(ground, table_name + '.created', function (seed) {
-                return _this.count(seed);
+            var table_name = this.link.get_table_name();
+            this.listen(ground, table_name + '.created', function (seed, property) {
+                return _this.count(seed, property);
             });
-            this.listen(ground, table_name + '.removed', function (seed) {
-                return _this.count(seed);
+            this.listen(ground, table_name + '.removed', function (seed, property) {
+                return _this.count(seed, property);
             });
         }
-        Join_Count.prototype.count = function (seed) {
+        Join_Count.prototype.count = function (seed, property) {
             var _this = this;
-            var trellis = this.link.trellises[0];
-            var seeds = {};
-            var identity = seed[trellis.primary_key];
-            var key = seeds[trellis.name] = trellis.properties[trellis.primary_key].get_sql_value(identity);
+            var key_name;
+            if (property == this.property) {
+                key_name = this.property.parent.primary_key;
+            } else {
+                key_name = property.name;
+            }
 
-            var sql = "UPDATE " + this.parent.get_table_name() + "\nSET " + this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + this.link.get_table_declaration() + "\nWHERE " + this.link.get_condition_string(seeds) + ")" + "\nWHERE " + trellis.query_primary_key() + " = " + key;
+            return property.parent.assure_properties(seed, [key_name]).then(function (seed) {
+                var trellis = _this.property.parent;
+                var key = trellis.get_primary_property().get_sql_value(seed[key_name]);
+                var identities = _this.link.order_identities(_this.property);
 
-            return this.ground.db.query(sql).then(function () {
-                return _this.invoke('changed', seed);
+                var sql = "UPDATE " + _this.parent.get_table_name() + "\nSET " + _this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + _this.link.get_table_name() + "\nWHERE " + identities[0].query() + ' = ' + trellis.query_primary_key() + ")" + "\nWHERE " + trellis.query_primary_key() + " = " + key;
+
+                return _this.ground.db.query(sql).then(function () {
+                    return _this.invoke('changed', seed);
+                });
             });
         };
         return Join_Count;
     })(MetaHub.Meta_Object);
+    Ground.Join_Count = Join_Count;
 
     var Multi_Count = (function (_super) {
         __extends(Multi_Count, _super);
@@ -2862,7 +2872,12 @@ var Ground;
                 var func = source.expression;
                 if (func.name == 'count') {
                     var reference = func.arguments[0];
-                    new Ground.Record_Count(ground, source.trellis, reference.path, source.property);
+                    var trellis = ground.sanitize_trellis_argument(source.trellis);
+                    var property = trellis.get_property(reference.path);
+                    if (property.get_relationship() !== 3 /* many_to_many */)
+                        new Ground.Record_Count(ground, source.trellis, reference.path, source.property);
+                    else
+                        new Ground.Join_Count(ground, property, source.property);
                 }
             }
         };
@@ -3055,8 +3070,12 @@ var Ground;
         };
 
         Join_Property.prototype.get_comparison = function (value) {
+            return this.query() + ' = ' + this.get_sql_value(value);
+        };
+
+        Join_Property.prototype.query = function () {
             var table_name = this.parent.get_alias() || this.parent.get_table_name();
-            return table_name + '.' + this.field_name + ' = ' + this.get_sql_value(value);
+            return table_name + '.' + this.field_name;
         };
 
         Join_Property.pair = function (first, second) {

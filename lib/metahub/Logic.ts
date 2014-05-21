@@ -40,7 +40,12 @@ module Ground {
         var func = <Function_Expression>source.expression
         if (func.name == 'count') {
           var reference = <Reference_Expression>func.arguments[0]
-          new Record_Count(ground, source.trellis, reference.path, source.property)
+          var trellis = ground.sanitize_trellis_argument(source.trellis)
+          var property = trellis.get_property(reference.path)
+          if (property.get_relationship() !== Relationships.many_to_many)
+            new Record_Count(ground, source.trellis, reference.path, source.property)
+          else
+            new Join_Count(ground, property, source.property)
         }
       }
     }

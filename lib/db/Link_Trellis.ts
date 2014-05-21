@@ -140,7 +140,7 @@ module Ground {
       if (!seed) {
         console.log('empty key')
       }
-      if (typeof seed === 'string')
+      if (typeof seed === 'string' || typeof seed === 'number')
         return this.table_name + '.' + key.name + ' = ' + seed
 
       if (seed[key.property.name] !== undefined) {

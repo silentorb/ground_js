@@ -37,42 +37,56 @@ module Ground {
     }
   }
 
-  class Join_Count extends MetaHub.Meta_Object {
+  export class Join_Count extends MetaHub.Meta_Object {
     ground:Core
     parent:Trellis
-    link:Link_Trellis
+    link:Cross_Trellis
     count_name:string
+    property:Property
 
     constructor(ground:Core, property:Property, count_name:string) {
       super()
       this.ground = ground
       this.parent = property.parent
       this.count_name = count_name
-      this.link = Link_Trellis.create_from_property(property)
-      this.link.identities.pop()
+      this.link = new Cross_Trellis(property)
+      this.link.alias = this.link.name
+      this.property = property
 
-      var table_name = this.link.table_name
-      this.listen(ground, table_name + '.created', (seed) => this.count(seed))
-      this.listen(ground, table_name + '.removed', (seed) => this.count(seed))
+      var table_name = this.link.get_table_name()
+      this.listen(ground, table_name + '.created', (seed, property) => this.count(seed, property))
+      this.listen(ground, table_name + '.removed', (seed, property) => this.count(seed, property))
     }
 
-    count(seed):Promise {
+    count(seed, property:Property):Promise {
 //    console.log('!!! join')
-      var trellis = this.link.trellises[0]
-      var seeds = {}
-      var identity = seed[trellis.primary_key]
-      var key = seeds[trellis.name] = trellis.properties[trellis.primary_key].get_sql_value(identity)
+      var key_name
+      if (property == this.property) {
+        key_name = this.property.parent.primary_key
+      }
+      else {
+        key_name = property.name
+      }
 
-      var sql =
-        "UPDATE " + this.parent.get_table_name()
-          + "\nSET " + this.count_name + " ="
-          + "\n(SELECT COUNT(*)"
-          + "\nFROM " + this.link.get_table_declaration()
-          + "\nWHERE " + this.link.get_condition_string(seeds) + ")"
-          + "\nWHERE " + trellis.query_primary_key() + " = " + key
+      return property.parent.assure_properties(seed, [key_name])
+        .then((seed)=> {
 
-      return this.ground.db.query(sql)
-        .then(() => this.invoke('changed', seed))
+          var trellis = this.property.parent
+          var key = trellis.get_primary_property().get_sql_value(seed[key_name])
+          var identities = this.link.order_identities(this.property)
+
+          var sql =
+            "UPDATE " + this.parent.get_table_name()
+              + "\nSET " + this.count_name + " ="
+              + "\n(SELECT COUNT(*)"
+              + "\nFROM " + this.link.get_table_name()
+              + "\nWHERE " + identities[0].query() + ' = ' + trellis.query_primary_key() + ")"
+              + "\nWHERE " + trellis.query_primary_key() + " = " + key
+
+//          console.log('update', sql)
+          return this.ground.db.query(sql)
+            .then(() => this.invoke('changed', seed))
+        })
     }
   }
 
