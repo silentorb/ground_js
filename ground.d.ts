@@ -62,6 +62,8 @@ declare module Ground {
         public query_primary_key(): string;
         public sanitize_property(property: any): any;
         public set_parent(parent: Trellis): void;
+        private seed_has_properties(seed, properties);
+        public assure_properties(seed: any, required_properties: string[]): Promise;
     }
 }
 declare module Ground {
@@ -418,13 +420,40 @@ declare module Ground {
     interface Expression {
         type?: string;
     }
-    interface Expression_Function extends Expression {
-        name: string;
-        args: any[];
-    }
     class Expression_Engine {
         static resolve(expression: any, context: any): any;
-        static resolve_function(expression: Expression_Function, context: any): void;
+        static resolve_function(expression: Ground.Function_Expression, context: any): void;
+    }
+}
+declare module Ground {
+    class Record_Count extends MetaHub.Meta_Object {
+        public ground: Ground.Core;
+        public parent: Ground.Trellis;
+        public child: Ground.Trellis;
+        public count_name: string;
+        constructor(ground: Ground.Core, parent: any, property_name: string, count_name: string);
+        public count(seed: any): Promise;
+    }
+}
+declare module Ground {
+    interface Statement {
+        type: string;
+    }
+    interface Constraint_Statement extends Statement {
+        trellis: string;
+        property: string;
+        expression: Ground.Expression;
+    }
+    interface Function_Expression extends Ground.Expression {
+        name: string;
+        arguments: Ground.Expression[];
+    }
+    interface Reference_Expression extends Ground.Expression {
+        path: string;
+    }
+    class Logic {
+        static load(ground: Ground.Core, statements: Statement[]): void;
+        static load_constraint(ground: Ground.Core, source: Constraint_Statement): void;
     }
 }
 declare module Ground {
@@ -576,7 +605,7 @@ declare module Ground {
         public add_transform_clause(clause: string): void;
         public create_runner(): Ground.Query_Runner;
         static create_join_filter(property: Ground.Property, seed: any): Query_Filter;
-        public extend(source: Ground.External_Query_Source): void;
+        public extend(source: any): void;
         public get_primary_key_value(): any;
         public run(): Promise;
         public run_single(): Promise;

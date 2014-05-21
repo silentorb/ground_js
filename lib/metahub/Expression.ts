@@ -12,10 +12,10 @@ module Ground {
     type?:string
   }
 
-  export interface Expression_Function extends Expression {
-    name:string
-    args:any[]
-  }
+//  export interface Expression_Function extends Expression {
+//    name:string
+//    args:any[]
+//  }
 
   export class Expression_Engine {
     static resolve(expression, context):any {
@@ -26,7 +26,7 @@ module Ground {
       }
       else if (expression && typeof expression === 'object') {
         if (expression.type == 'function') {
-          return Expression_Engine.resolve_function(<Expression_Function>expression, context)
+          return Expression_Engine.resolve_function(<Function_Expression>expression, context)
         }
 
         if (expression.type == 'literal') {
@@ -35,7 +35,7 @@ module Ground {
       }
     }
 
-    static resolve_function(expression:Expression_Function, context) {
+    static resolve_function(expression:Function_Expression, context) {
       if (expression.name == 'sum') {
 
       }

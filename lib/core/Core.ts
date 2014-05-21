@@ -39,9 +39,10 @@ module Ground {
   }
 
   interface ISchema_Source {
-    trellises?:any[];
-    tables?:any[];
-    views?:any[];
+    trellises?:any[]
+    tables?:any[]
+    views?:any[]
+    logic?:Statement[]
   }
 
   export function path_to_array(path) {
@@ -219,7 +220,10 @@ module Ground {
       // If _deleted is an object then it is a list of links
       // to delete which will be handled by Update.
       // If _delete is simply true then the seed itself is marked for deletion.
-      if (seed._deleted === true || seed._deleted === 'true')
+      if (seed._deleted === true
+        || seed._deleted === 'true'
+        || seed._deleted_ === true
+        || seed._deleted_ === 'true')
         return new Delete(this, trellis, seed)
 
       var update = new Update(trellis, seed, this)
@@ -327,6 +331,10 @@ module Ground {
 
       if (subset)
         this.initialize_trellises(subset, this.trellises);
+
+      if (MetaHub.is_array(data.logic) && data.logic.length > 0) {
+        Logic.load(this, data.logic)
+      }
 
       this.create_remaining_tables()
       this.create_missing_table_links()

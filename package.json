@@ -1,6 +1,6 @@
 {
   "name": "vineyard-ground",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "description": "Ground Libraries for Node.js",
   "main": "ground.js",
   "repository": {

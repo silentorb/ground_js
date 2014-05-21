@@ -1,4 +1,3 @@
-
 /// <reference path="../references.ts"/>
 
 module Ground {
@@ -288,6 +287,29 @@ module Ground {
         parent.clone_property(keys[i], this);
       }
       this.primary_key = parent.primary_key;
+    }
+
+    private seed_has_properties(seed, properties:string[]):boolean {
+      for (var i in properties) {
+        var name = properties[i]
+        if (seed[name] === undefined)
+          return false
+      }
+
+      return true
+    }
+
+    assure_properties(seed, required_properties:string[]):Promise {
+      if (this.seed_has_properties(seed, required_properties)) {
+        return when.resolve(seed)
+      }
+
+      var query = this.ground.create_query(this.name)
+      query.add_key_filter(seed[this.primary_key])
+      query.extend({
+        properties:required_properties
+      })
+      return query.run_single()
     }
   }
 }

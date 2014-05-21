@@ -170,7 +170,7 @@ module Ground {
       }
     }
 
-    extend(source:External_Query_Source) {
+    extend(source) {
       if (!source) // I think it's okay to allow null to be passed to this method
         return
 

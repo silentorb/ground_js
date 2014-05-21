@@ -9,6 +9,8 @@
 /// <reference path="schema/Trellis.ts"/>
 
 /// <reference path="metahub/Expression.ts"/>
+/// <reference path="metahub/Count.ts"/>
+/// <reference path="metahub/Logic.ts"/>
 
 /// <reference path="operations/Update.ts"/>
 /// <reference path="operations/Delete.ts"/>

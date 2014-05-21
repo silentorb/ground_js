@@ -379,6 +379,29 @@ var Ground;
             }
             this.primary_key = parent.primary_key;
         };
+
+        Trellis.prototype.seed_has_properties = function (seed, properties) {
+            for (var i in properties) {
+                var name = properties[i];
+                if (seed[name] === undefined)
+                    return false;
+            }
+
+            return true;
+        };
+
+        Trellis.prototype.assure_properties = function (seed, required_properties) {
+            if (this.seed_has_properties(seed, required_properties)) {
+                return when.resolve(seed);
+            }
+
+            var query = this.ground.create_query(this.name);
+            query.add_key_filter(seed[this.primary_key]);
+            query.extend({
+                properties: required_properties
+            });
+            return query.run_single();
+        };
         return Trellis;
     })();
     Ground.Trellis = Trellis;
@@ -1489,26 +1512,35 @@ var Ground;
             var _this = this;
             if (depth > this.max_depth)
                 throw new Error("Max depth of " + this.max_depth + " exceeded.  Possible infinite loop.");
-
+            console.log('deleting');
             var id = seed[trellis.primary_key];
             if (id === null || id === undefined)
                 throw new Error("Object was tagged to be deleted but has no identity.");
 
             id = trellis.properties[trellis.primary_key].get_sql_value(id);
-
-            var tree = trellis.get_tree().filter(function (t) {
-                return !t.is_virtual;
-            });
-            var invoke_promises = tree.map(function (trellis) {
-                return _this.ground.invoke(trellis.name + '.delete', seed);
+            var property_names = MetaHub.map_to_array(trellis.get_all_properties(), function (x) {
+                return x.name;
             });
 
-            return when.all(invoke_promises).then(function () {
-                return tree.map(function (trellis) {
-                    return _this.delete_record(trellis, id);
+            return trellis.assure_properties(seed, property_names).then(function (seed) {
+                var tree = trellis.get_tree().filter(function (t) {
+                    return !t.is_virtual;
                 });
-            }).then(function () {
-                return _this.delete_children(trellis, id, depth);
+                var invoke_promises = tree.map(function (trellis) {
+                    return _this.ground.invoke(trellis.name + '.delete', seed);
+                });
+
+                return when.all(invoke_promises).then(function () {
+                    return when.all(tree.map(function (trellis) {
+                        return _this.delete_record(trellis, id);
+                    }));
+                }).then(function () {
+                    return when.all(tree.map(function (trellis) {
+                        return _this.ground.invoke(trellis.name + '.deleted', seed);
+                    }));
+                }).then(function () {
+                    return _this.delete_children(trellis, id, depth);
+                });
             });
         };
         return Delete;
@@ -1690,7 +1722,7 @@ var Ground;
             if (typeof user === "undefined") { user = null; }
             trellis = this.sanitize_trellis_argument(trellis);
 
-            if (seed._deleted === true || seed._deleted === 'true')
+            if (seed._deleted === true || seed._deleted === 'true' || seed._deleted_ === true || seed._deleted_ === 'true')
                 return new Ground.Delete(this, trellis, seed);
 
             var update = new Ground.Update(trellis, seed, this);
@@ -1801,6 +1833,10 @@ var Ground;
 
             if (subset)
                 this.initialize_trellises(subset, this.trellises);
+
+            if (MetaHub.is_array(data.logic) && data.logic.length > 0) {
+                Ground.Logic.load(this, data.logic);
+            }
 
             this.create_remaining_tables();
             this.create_missing_table_links();
@@ -2701,6 +2737,138 @@ var Ground;
         return Expression_Engine;
     })();
     Ground.Expression_Engine = Expression_Engine;
+})(Ground || (Ground = {}));
+var Ground;
+(function (Ground) {
+    var Record_Count = (function (_super) {
+        __extends(Record_Count, _super);
+        function Record_Count(ground, parent, property_name, count_name) {
+            var _this = this;
+            _super.call(this);
+            this.ground = ground;
+            this.parent = ground.sanitize_trellis_argument(parent);
+            var property = this.parent.get_property(property_name);
+            this.child = property.other_trellis;
+            this.count_name = count_name;
+
+            this.listen(ground, this.child.name + '.created', function (seed, update) {
+                return _this.count(seed);
+            });
+            this.listen(ground, this.child.name + '.deleted', function (seed, update) {
+                return _this.count(seed);
+            });
+        }
+        Record_Count.prototype.count = function (seed) {
+            var _this = this;
+            var back_reference = this.child.get_reference_property(this.parent);
+            return this.child.assure_properties(seed, [back_reference.name]).then(function (seed) {
+                var parent_key = back_reference.get_sql_value(seed[back_reference.name]);
+
+                var sql = "UPDATE " + _this.parent.get_table_name() + " SET " + _this.count_name + " =\n" + "(SELECT COUNT(*)" + "FROM " + _this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")\n" + "WHERE " + _this.parent.query_primary_key() + " = " + parent_key;
+
+                return _this.ground.db.query(sql, [parent_key]).then(function () {
+                    return _this.invoke('changed', seed[back_reference.name]);
+                });
+            });
+        };
+        return Record_Count;
+    })(MetaHub.Meta_Object);
+    Ground.Record_Count = Record_Count;
+
+    var Join_Count = (function (_super) {
+        __extends(Join_Count, _super);
+        function Join_Count(ground, property, count_name) {
+            var _this = this;
+            _super.call(this);
+            this.ground = ground;
+            this.parent = property.parent;
+            this.count_name = count_name;
+            this.link = Ground.Link_Trellis.create_from_property(property);
+            this.link.identities.pop();
+
+            var table_name = this.link.table_name;
+            this.listen(ground, table_name + '.created', function (seed) {
+                return _this.count(seed);
+            });
+            this.listen(ground, table_name + '.removed', function (seed) {
+                return _this.count(seed);
+            });
+        }
+        Join_Count.prototype.count = function (seed) {
+            var _this = this;
+            var trellis = this.link.trellises[0];
+            var seeds = {};
+            var identity = seed[trellis.primary_key];
+            var key = seeds[trellis.name] = trellis.properties[trellis.primary_key].get_sql_value(identity);
+
+            var sql = "UPDATE " + this.parent.get_table_name() + "\nSET " + this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + this.link.get_table_declaration() + "\nWHERE " + this.link.get_condition_string(seeds) + ")" + "\nWHERE " + trellis.query_primary_key() + " = " + key;
+
+            return this.ground.db.query(sql).then(function () {
+                return _this.invoke('changed', seed);
+            });
+        };
+        return Join_Count;
+    })(MetaHub.Meta_Object);
+
+    var Multi_Count = (function (_super) {
+        __extends(Multi_Count, _super);
+        function Multi_Count(ground, trellis, count_name, sources) {
+            var _this = this;
+            _super.call(this);
+            this.ground = ground;
+            this.trellis = ground.trellises[trellis];
+            this.count_name = count_name;
+            this.count_fields = sources.map(function (c) {
+                return c['count_name'];
+            });
+            for (var i in sources) {
+                this.listen(sources[i], 'changed', function (seed) {
+                    return _this.count(seed);
+                });
+            }
+        }
+        Multi_Count.prototype.count = function (seed) {
+            var _this = this;
+            var trellis = this.trellis;
+            var identity = typeof seed == 'object' ? seed[trellis.primary_key] : seed;
+            var trellis_key = trellis.properties[trellis.primary_key].get_sql_value(identity);
+            var sql = "UPDATE " + trellis.get_table_name() + " SET " + this.count_name + " =\n" + this.count_fields.join(' + ') + " " + "WHERE " + trellis.query_primary_key() + " = " + trellis_key;
+
+            return this.ground.db.query(sql, [trellis_key]).then(function () {
+                return _this.invoke('changed');
+            });
+        };
+        return Multi_Count;
+    })(MetaHub.Meta_Object);
+})(Ground || (Ground = {}));
+var Ground;
+(function (Ground) {
+    
+
+    var Logic = (function () {
+        function Logic() {
+        }
+        Logic.load = function (ground, statements) {
+            for (var i = 0; i < statements.length; ++i) {
+                var statement = statements[i];
+                if (statement.type == 'constraint') {
+                    Logic.load_constraint(ground, statement);
+                }
+            }
+        };
+
+        Logic.load_constraint = function (ground, source) {
+            if (source.expression.type == 'function') {
+                var func = source.expression;
+                if (func.name == 'count') {
+                    var reference = func.arguments[0];
+                    new Ground.Record_Count(ground, source.trellis, reference.path, source.property);
+                }
+            }
+        };
+        return Logic;
+    })();
+    Ground.Logic = Logic;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
