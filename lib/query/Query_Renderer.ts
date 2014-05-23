@@ -220,14 +220,27 @@ module Ground {
     }
 
     private static add_path(path, trellis:Trellis, result:Internal_Query_Source):any[] {
-      var parts = Ground.path_to_array(path)
-      var property_chain = Join.path_to_property_chain(trellis, parts)
-      var last = property_chain[property_chain.length - 1]
-      if (last.other_trellis)
-        property_chain.push(last.other_trellis.get_primary_property())
+      var property_chain = Query_Renderer.get_chain(path, trellis)
+      return Query_Renderer.add_chain(property_chain, result)
+    }
 
+    public static get_chain(path, trellis:Trellis):Property[] {
+      if (typeof path === 'string') {
+        var parts = Ground.path_to_array(path)
+        var property_chain = Join.path_to_property_chain(trellis, parts)
+        var last = property_chain[property_chain.length - 1]
+        if (last.other_trellis)
+          property_chain.push(last.other_trellis.get_primary_property())
+
+        return property_chain
+      }
+      else {
+        return path
+      }
+    }
+
+    private static add_chain(property_chain, result:Internal_Query_Source):Property[] {
       var property = property_chain[property_chain.length - 1]
-
       if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
         result.property_joins = result.property_joins || []
         result.property_joins.push(property_chain)
@@ -269,6 +282,60 @@ module Ground {
           reference: reference
         }
         operator_action.render(result, filter, property, data)
+        value = data.value
+        placeholder = data.placeholder
+        operator = data.operator
+        reference = data.reference
+      }
+      else {
+        if (value === null || (value === 'null' && property.type != 'string')) {
+//        result.filters.push(property.query() + ' IS NULL');
+//        return result;
+          if (!operator || operator == '=')
+            operator = 'IS'
+          else if (operator == '!=')
+            operator = 'IS NOT'
+
+          value = 'NULL'
+        }
+        else {
+          if (value !== null)
+            value = ground.convert_value(value, property.type);
+          value = property.get_sql_value(value)
+        }
+      }
+
+      result.arguments[placeholder] = value;
+      result.filters.push(reference + ' ' + operator + ' ' + placeholder)
+      return result;
+    }
+
+    private static prepare_condition(source:Query_Builder, condition, ground:Core):Internal_Query_Source {
+      var result:Internal_Query_Source = {
+        filters: [],
+        arguments: {},
+        property_joins: []
+      }
+      var value = condition.value,
+        operator:string = condition.operator || '='
+
+      var placeholder = ':' + condition.path.join('_') + '_filter' + Query_Renderer.counter++;
+      if (Query_Renderer.counter > 10000)
+        Query_Renderer.counter = 1
+
+      var property_chain = Query_Renderer.add_path(condition.path, source.trellis, result)
+      var property = property_chain[property_chain.length - 1]
+      var reference = Join.get_end_query(property_chain)
+
+      var operator_action = Query_Builder.operators[condition.operator]
+      if (operator_action && typeof operator_action.render === 'function') {
+        var data = {
+          value: value,
+          operator: operator,
+          placeholder: placeholder,
+          reference: reference
+        }
+        operator_action.render(result, condition, property, data)
         value = data.value
         placeholder = data.placeholder
         operator = data.operator

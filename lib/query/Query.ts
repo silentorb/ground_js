@@ -13,13 +13,6 @@ module Ground {
     objects:any[]
   }
 
-  export interface Query_Filter_Source {
-    property?:string
-    path?:string
-    value
-    operator?:string
-  }
-
   export interface Query_Wrapper {
     start:string
     end:string

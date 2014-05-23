@@ -70,19 +70,13 @@ declare module Ground {
     interface IService_Response {
         objects: any[];
     }
-    interface Query_Filter_Source {
-        property?: string;
-        path?: string;
-        value: any;
-        operator?: string;
-    }
     interface Query_Wrapper {
         start: string;
         end: string;
     }
     interface Property_Query_Source {
         name: string;
-        filters?: Query_Filter_Source[];
+        filters?: Ground.Query_Filter_Source[];
         sorts?: Ground.Query_Sort[];
         expansions?: string[];
         properties?: any[];
@@ -115,7 +109,7 @@ declare module Ground {
         public sorts: Ground.Query_Sort[];
         public filters: string[];
         public run_stack: any;
-        public property_filters: Query_Filter_Source[];
+        public property_filters: Ground.Query_Filter_Source[];
         static operators: string[];
         private links;
         constructor(trellis: Ground.Trellis, base_path?: string);
@@ -538,7 +532,7 @@ declare module Ground {
         private static convert(branch, previous, result);
         static tree_to_joins(tree: Join_Tree[], previous?: Join_Trellis): IJoin[];
         static render_paths(trellis: Ground.Trellis, paths: Ground.Property[][]): string[];
-        static path_to_property_chain(base: Ground.Trellis, path: any): any[];
+        static path_to_property_chain(base: Ground.Trellis, path: any): Ground.Property[];
         static get_end_query(property_chain: Ground.Property[]): string;
     }
     class Reference_Join implements IJoin {
@@ -563,11 +557,31 @@ declare module Ground {
         limit?: any;
         offset?: any;
     }
+    interface Query_Filter_Source {
+        property?: string;
+        path?: string;
+        value: any;
+        operator?: string;
+    }
     interface Query_Filter {
         path?: string;
         property?: Ground.Property;
         value: any;
-        operator: string;
+        operator?: string;
+    }
+    interface Condition_Source {
+        path?: string;
+        value?: any;
+        operator?: string;
+        type?: string;
+        expressions?: Condition_Source[];
+    }
+    interface Condition {
+        path?: Ground.Property[];
+        value?: any;
+        operator?: string;
+        type?: string;
+        expressions?: Condition[];
     }
     interface Query_Sort {
         property?: any;
@@ -583,6 +597,7 @@ declare module Ground {
         public pager: IPager;
         public type: string;
         public properties: any;
+        public condition: Condition;
         public sorts: Query_Sort[];
         public source: Ground.External_Query_Source;
         public include_links: boolean;
@@ -607,6 +622,7 @@ declare module Ground {
         constructor(trellis: Ground.Trellis);
         static add_operator(symbol: string, action: any): void;
         public add_filter(path: string, value?: any, operator?: string): void;
+        public create_condition(source: Condition_Source): Condition;
         public add_key_filter(value: any): void;
         public add_sort(sort: Query_Sort): void;
         public add_map(target: string, source?: any): void;
@@ -652,7 +668,10 @@ declare module Ground {
         public generate_parts(source: Ground.Query_Builder, query_id?: number): Query_Parts;
         private static get_fields_and_joins(source, properties, include_primary_key?);
         private static add_path(path, trellis, result);
+        static get_chain(path: any, trellis: Ground.Trellis): Ground.Property[];
+        private static add_chain(property_chain, result);
         private static build_filter(source, filter, ground);
+        private static prepare_condition(source, condition, ground);
         static build_filters(source: Ground.Query_Builder, ground: Ground.Core): Internal_Query_Source;
         static process_sorts(sorts: Ground.Query_Sort[], trellis: Ground.Trellis, result: Internal_Query_Source): string;
         static render_pager(pager: Ground.IPager): string;

@@ -280,7 +280,7 @@ module Ground {
   export class Join {
 
     static generate_table_name(trellis:Trellis, property:Property):string {
-      return 'link_' + trellis.name + '_' + property.get_field_name()
+      return 'link_' +  trellis.name + '_' + property.get_field_name() + '_' + property.parent.name
     }
 
     static get_last_reference(property_chain:Property[]):Property {
@@ -368,7 +368,7 @@ module Ground {
       return joins.map((join)=> join.render())
     }
 
-    static path_to_property_chain(base:Trellis, path) {
+    static path_to_property_chain(base:Trellis, path):Property[] {
       var parts = Ground.path_to_array(path)
       var trellis = base
       var result = []

@@ -7,11 +7,37 @@ module Ground {
     offset?
   }
 
+  export interface Query_Filter_Source {
+    property?:string
+    path?:string
+    value
+    operator?:string
+
+  }
+
   export interface Query_Filter {
     path?:string
     property?:Property
     value
-    operator:string
+    operator?:string
+  }
+
+  export interface Condition_Source {
+    path?:string
+    value?
+    operator?:string
+
+    type?:string
+    expressions?:Condition_Source[]
+  }
+
+  export interface Condition {
+    path?:Property[]
+    value?
+    operator?:string
+
+    type?:string
+    expressions?:Condition[]
   }
 
   export interface Query_Sort {
@@ -35,6 +61,7 @@ module Ground {
     pager:IPager
     type:string = 'query'
     properties
+    condition:Condition
     sorts:Query_Sort[] = []
     source:External_Query_Source
     include_links:boolean = false
@@ -95,25 +122,41 @@ module Ground {
       this.filters.push(filter)
     }
 
+    create_condition(source:Condition_Source):Condition {
+      if (source.type == "or" || source.type == "and") {
+        return {
+          type: source.type,
+          expressions: source.expressions.map((x) => this.create_condition(source))
+        }
+      }
+      else {
+        if (Query_Builder.operators[source.operator] === undefined)
+          throw new Error("Invalid operator: '" + source.operator + "'.")
+
+        if (source.value === undefined) {
+          throw new Error('Cannot add property filter where value is undefined; property = '
+            + this.trellis.name + '.' + source.path + '.')
+        }
+
+        return {
+          path: Query_Renderer.get_chain(source.path, this.trellis),
+          value: source.value,
+          operator: source.operator
+        }
+      }
+    }
+
     add_key_filter(value) {
       this.add_filter(this.trellis.primary_key, value)
     }
 
     add_sort(sort:Query_Sort) {
-//      for (var i = 0; i < this.sorts.length; ++i) {
-//        if (this.sorts[i].property == sort.property) {
-//          this.sorts.splice(i, 1)
-//          break
-//        }
-//      }
-
       this.sorts.push(sort)
     }
 
     add_map(target:string, source = null) {
       this.map[target] = source
     }
-
 
     add_query(source):Query_Builder {
       var trellis = this.ground.sanitize_trellis_argument(source.trellis)
@@ -185,6 +228,10 @@ module Ground {
           var filter = source.filters[i]
           this.add_filter(filter.path || filter.property, filter.value, filter.operator)
         }
+      }
+
+      if (source.condition) {
+        this.condition = this.create_condition(source.condition)
       }
 
       if (source.sorts) {

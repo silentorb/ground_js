@@ -3115,7 +3115,7 @@ var Ground;
         function Join() {
         }
         Join.generate_table_name = function (trellis, property) {
-            return 'link_' + trellis.name + '_' + property.get_field_name();
+            return 'link_' + trellis.name + '_' + property.get_field_name() + '_' + property.parent.name;
         };
 
         Join.get_last_reference = function (property_chain) {
@@ -3313,6 +3313,31 @@ var Ground;
             this.filters.push(filter);
         };
 
+        Query_Builder.prototype.create_condition = function (source) {
+            var _this = this;
+            if (source.type == "or" || source.type == "and") {
+                return {
+                    type: source.type,
+                    expressions: source.expressions.map(function (x) {
+                        return _this.create_condition(source);
+                    })
+                };
+            } else {
+                if (Query_Builder.operators[source.operator] === undefined)
+                    throw new Error("Invalid operator: '" + source.operator + "'.");
+
+                if (source.value === undefined) {
+                    throw new Error('Cannot add property filter where value is undefined; property = ' + this.trellis.name + '.' + source.path + '.');
+                }
+
+                return {
+                    path: Ground.Query_Renderer.get_chain(source.path, this.trellis),
+                    value: source.value,
+                    operator: source.operator
+                };
+            }
+        };
+
         Query_Builder.prototype.add_key_filter = function (value) {
             this.add_filter(this.trellis.primary_key, value);
         };
@@ -3396,6 +3421,10 @@ var Ground;
                     var filter = source.filters[i];
                     this.add_filter(filter.path || filter.property, filter.value, filter.operator);
                 }
+            }
+
+            if (source.condition) {
+                this.condition = this.create_condition(source.condition);
             }
 
             if (source.sorts) {
@@ -3687,14 +3716,26 @@ var Ground;
         };
 
         Query_Renderer.add_path = function (path, trellis, result) {
-            var parts = Ground.path_to_array(path);
-            var property_chain = Ground.Join.path_to_property_chain(trellis, parts);
-            var last = property_chain[property_chain.length - 1];
-            if (last.other_trellis)
-                property_chain.push(last.other_trellis.get_primary_property());
+            var property_chain = Query_Renderer.get_chain(path, trellis);
+            return Query_Renderer.add_chain(property_chain, result);
+        };
 
+        Query_Renderer.get_chain = function (path, trellis) {
+            if (typeof path === 'string') {
+                var parts = Ground.path_to_array(path);
+                var property_chain = Ground.Join.path_to_property_chain(trellis, parts);
+                var last = property_chain[property_chain.length - 1];
+                if (last.other_trellis)
+                    property_chain.push(last.other_trellis.get_primary_property());
+
+                return property_chain;
+            } else {
+                return path;
+            }
+        };
+
+        Query_Renderer.add_chain = function (property_chain, result) {
             var property = property_chain[property_chain.length - 1];
-
             if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
                 result.property_joins = result.property_joins || [];
                 result.property_joins.push(property_chain);
@@ -3733,6 +3774,55 @@ var Ground;
                     reference: reference
                 };
                 operator_action.render(result, filter, property, data);
+                value = data.value;
+                placeholder = data.placeholder;
+                operator = data.operator;
+                reference = data.reference;
+            } else {
+                if (value === null || (value === 'null' && property.type != 'string')) {
+                    if (!operator || operator == '=')
+                        operator = 'IS';
+                    else if (operator == '!=')
+                        operator = 'IS NOT';
+
+                    value = 'NULL';
+                } else {
+                    if (value !== null)
+                        value = ground.convert_value(value, property.type);
+                    value = property.get_sql_value(value);
+                }
+            }
+
+            result.arguments[placeholder] = value;
+            result.filters.push(reference + ' ' + operator + ' ' + placeholder);
+            return result;
+        };
+
+        Query_Renderer.prepare_condition = function (source, condition, ground) {
+            var result = {
+                filters: [],
+                arguments: {},
+                property_joins: []
+            };
+            var value = condition.value, operator = condition.operator || '=';
+
+            var placeholder = ':' + condition.path.join('_') + '_filter' + Query_Renderer.counter++;
+            if (Query_Renderer.counter > 10000)
+                Query_Renderer.counter = 1;
+
+            var property_chain = Query_Renderer.add_path(condition.path, source.trellis, result);
+            var property = property_chain[property_chain.length - 1];
+            var reference = Ground.Join.get_end_query(property_chain);
+
+            var operator_action = Ground.Query_Builder.operators[condition.operator];
+            if (operator_action && typeof operator_action.render === 'function') {
+                var data = {
+                    value: value,
+                    operator: operator,
+                    placeholder: placeholder,
+                    reference: reference
+                };
+                operator_action.render(result, condition, property, data);
                 value = data.value;
                 placeholder = data.placeholder;
                 operator = data.operator;
