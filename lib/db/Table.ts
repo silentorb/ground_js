@@ -83,6 +83,9 @@ module Ground {
     create_link(property:Property) {
 
       var other_table = Table.get_other_table(property)
+      if (!other_table)
+        throw new Error('Could not find other table for ' + property.fullname())
+
       var type = property.type == 'reference'
         ? Link_Field_Type.reference
         : Link_Field_Type.identity

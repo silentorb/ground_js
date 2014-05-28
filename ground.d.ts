@@ -47,6 +47,7 @@ declare module Ground {
         public get_core_properties(): {};
         public get_id(source: any): any;
         public get_identity(seed: any): {};
+        public get_identity2(value: any): any;
         public get_ancestor_join(other: Trellis): string;
         public get_links(): Ground.Property[];
         public get_primary_keys(): any[];
@@ -437,6 +438,14 @@ declare module Ground {
         constructor(ground: Ground.Core, property: Ground.Property, count_name: string);
         public count(seed: any, property: Ground.Property): Promise;
     }
+    class Multi_Count extends MetaHub.Meta_Object {
+        public ground: Ground.Core;
+        public trellis: Ground.Trellis;
+        public count_name: string;
+        public count_fields: string[];
+        constructor(ground: Ground.Core, trellis: string, count_name: any, sources: MetaHub.Meta_Object[]);
+        public count(key: any): Promise;
+    }
 }
 declare module Ground {
     interface Statement {
@@ -447,6 +456,10 @@ declare module Ground {
         property: string;
         expression: Ground.Expression;
     }
+    interface Symbol_Statement extends Statement {
+        name: string;
+        expression: Ground.Expression;
+    }
     interface Function_Expression extends Ground.Expression {
         name: string;
         arguments: Ground.Expression[];
@@ -454,9 +467,14 @@ declare module Ground {
     interface Reference_Expression extends Ground.Expression {
         path: string;
     }
+    class Scope {
+        public symbols: {};
+        public add_symbol(name: string, value: any): void;
+    }
     class Logic {
         static load(ground: Ground.Core, statements: Statement[]): void;
-        static load_constraint(ground: Ground.Core, source: Constraint_Statement): void;
+        static load_constraint(ground: Ground.Core, source: Constraint_Statement, scope: Scope): MetaHub.Meta_Object;
+        static create_symbol(ground: Ground.Core, source: Symbol_Statement, scope: Scope): void;
     }
 }
 declare module Ground {

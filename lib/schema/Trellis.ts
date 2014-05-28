@@ -113,6 +113,12 @@ module Ground {
       return result;
     }
 
+    get_identity2(value) {
+      if (typeof value == 'object')
+        return value[this.primary_key]
+
+      return value
+    }
 
     get_ancestor_join(other:Trellis):string {
 //      if (!this.parent)
@@ -307,7 +313,7 @@ module Ground {
       var query = this.ground.create_query(this.name)
       query.add_key_filter(seed[this.primary_key])
       query.extend({
-        properties:required_properties
+        properties: required_properties
       })
       return query.run_single()
     }

@@ -32,7 +32,7 @@ module Ground {
             + "WHERE " + this.parent.query_primary_key() + " = " + parent_key
 
           return this.ground.db.query(sql, [ parent_key ])
-            .then(() => this.invoke('changed', seed[back_reference.name]))
+            .then(() => this.invoke('changed', parent_key))
         })
     }
   }
@@ -72,7 +72,9 @@ module Ground {
         .then((seed)=> {
 
           var trellis = this.property.parent
-          var key = trellis.get_primary_property().get_sql_value(seed[key_name])
+          console.log('seed', seed)
+          var key = trellis.get_primary_property()
+            .get_sql_value(seed[key_name][0])
           var identities = this.link.order_identities(this.property)
 
           var sql =
@@ -85,12 +87,12 @@ module Ground {
 
 //          console.log('update', sql)
           return this.ground.db.query(sql)
-            .then(() => this.invoke('changed', seed))
+            .then(() => this.invoke('changed', key))
         })
     }
   }
 
-  class Multi_Count extends MetaHub.Meta_Object {
+  export class Multi_Count extends MetaHub.Meta_Object {
     ground:Core
     trellis:Trellis
     count_name:string
@@ -103,21 +105,21 @@ module Ground {
       this.count_name = count_name
       this.count_fields = sources.map((c)=> <string>c['count_name'])
       for (var i in sources) {
-        this.listen(sources[i], 'changed', (seed) => this.count(seed))
+        this.listen(sources[i], 'changed', (key) => this.count(key))
       }
     }
 
-    count(seed):Promise {
+    count(key):Promise {
 //    console.log('!!! multi')
       var trellis = this.trellis
-      var identity = typeof seed == 'object' ? seed[trellis.primary_key] : seed
-      var trellis_key = trellis.properties[trellis.primary_key].get_sql_value(identity)
+//      var identity = typeof seed == 'object' ? seed[trellis.primary_key] : seed
+//      var trellis_key = trellis.properties[trellis.primary_key].get_sql_value(identity)
       var sql = "UPDATE " + trellis.get_table_name()
         + " SET " + this.count_name + " =\n"
         + this.count_fields.join(' + ') + " "
-        + "WHERE " + trellis.query_primary_key() + " = " + trellis_key
+        + "WHERE " + trellis.query_primary_key() + " = ?"
 
-      return this.ground.db.query(sql, [ trellis_key ])
+      return this.ground.db.query(sql, [ key ])
         .then(() => this.invoke('changed'))
     }
   }

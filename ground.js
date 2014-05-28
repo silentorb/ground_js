@@ -216,6 +216,13 @@ var Ground;
             return result;
         };
 
+        Trellis.prototype.get_identity2 = function (value) {
+            if (typeof value == 'object')
+                return value[this.primary_key];
+
+            return value;
+        };
+
         Trellis.prototype.get_ancestor_join = function (other) {
             var conditions = this.get_primary_keys().map(function (property) {
                 return property.query() + ' = ' + other.properties[property.name].query();
@@ -1946,6 +1953,9 @@ var Ground;
 
         Table.prototype.create_link = function (property) {
             var other_table = Table.get_other_table(property);
+            if (!other_table)
+                throw new Error('Could not find other table for ' + property.fullname());
+
             var type = property.type == 'reference' ? 1 /* reference */ : 0 /* identity */;
 
             var link = new Link_Field(property.name, this, other_table, type);
@@ -2531,6 +2541,10 @@ var Ground;
             if (property_type && property_type.parent)
                 return this.get_sql_value(value, property_type.parent.name, is_reference);
 
+            if (this.parent.primary_key == this.name) {
+                value = this.parent.get_identity2(value);
+            }
+
             switch (type) {
                 case 'guid':
                     if (!value)
@@ -2767,7 +2781,7 @@ var Ground;
                 var sql = "UPDATE " + _this.parent.get_table_name() + " SET " + _this.count_name + " =\n" + "(SELECT COUNT(*)" + "FROM " + _this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")\n" + "WHERE " + _this.parent.query_primary_key() + " = " + parent_key;
 
                 return _this.ground.db.query(sql, [parent_key]).then(function () {
-                    return _this.invoke('changed', seed[back_reference.name]);
+                    return _this.invoke('changed', parent_key);
                 });
             });
         };
@@ -2806,13 +2820,14 @@ var Ground;
 
             return property.parent.assure_properties(seed, [key_name]).then(function (seed) {
                 var trellis = _this.property.parent;
-                var key = trellis.get_primary_property().get_sql_value(seed[key_name]);
+                console.log('seed', seed);
+                var key = trellis.get_primary_property().get_sql_value(seed[key_name][0]);
                 var identities = _this.link.order_identities(_this.property);
 
                 var sql = "UPDATE " + _this.parent.get_table_name() + "\nSET " + _this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + _this.link.get_table_name() + "\nWHERE " + identities[0].query() + ' = ' + trellis.query_primary_key() + ")" + "\nWHERE " + trellis.query_primary_key() + " = " + key;
 
                 return _this.ground.db.query(sql).then(function () {
-                    return _this.invoke('changed', seed);
+                    return _this.invoke('changed', key);
                 });
             });
         };
@@ -2832,42 +2847,60 @@ var Ground;
                 return c['count_name'];
             });
             for (var i in sources) {
-                this.listen(sources[i], 'changed', function (seed) {
-                    return _this.count(seed);
+                this.listen(sources[i], 'changed', function (key) {
+                    return _this.count(key);
                 });
             }
         }
-        Multi_Count.prototype.count = function (seed) {
+        Multi_Count.prototype.count = function (key) {
             var _this = this;
             var trellis = this.trellis;
-            var identity = typeof seed == 'object' ? seed[trellis.primary_key] : seed;
-            var trellis_key = trellis.properties[trellis.primary_key].get_sql_value(identity);
-            var sql = "UPDATE " + trellis.get_table_name() + " SET " + this.count_name + " =\n" + this.count_fields.join(' + ') + " " + "WHERE " + trellis.query_primary_key() + " = " + trellis_key;
 
-            return this.ground.db.query(sql, [trellis_key]).then(function () {
+            var sql = "UPDATE " + trellis.get_table_name() + " SET " + this.count_name + " =\n" + this.count_fields.join(' + ') + " " + "WHERE " + trellis.query_primary_key() + " = ?";
+
+            return this.ground.db.query(sql, [key]).then(function () {
                 return _this.invoke('changed');
             });
         };
         return Multi_Count;
     })(MetaHub.Meta_Object);
+    Ground.Multi_Count = Multi_Count;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
     
 
+    var Scope = (function () {
+        function Scope() {
+            this.symbols = {};
+        }
+        Scope.prototype.add_symbol = function (name, value) {
+            this.symbols[name] = value;
+        };
+        return Scope;
+    })();
+    Ground.Scope = Scope;
+
     var Logic = (function () {
         function Logic() {
         }
         Logic.load = function (ground, statements) {
+            var scope = new Scope();
+
             for (var i = 0; i < statements.length; ++i) {
                 var statement = statements[i];
-                if (statement.type == 'constraint') {
-                    Logic.load_constraint(ground, statement);
+                switch (statement.type) {
+                    case 'constraint':
+                        Logic.load_constraint(ground, statement, scope);
+                        break;
+                    case 'symbol':
+                        Logic.create_symbol(ground, statement, scope);
+                        break;
                 }
             }
         };
 
-        Logic.load_constraint = function (ground, source) {
+        Logic.load_constraint = function (ground, source, scope) {
             if (source.expression.type == 'function') {
                 var func = source.expression;
                 if (func.name == 'count') {
@@ -2875,11 +2908,21 @@ var Ground;
                     var trellis = ground.sanitize_trellis_argument(source.trellis);
                     var property = trellis.get_property(reference.path);
                     if (property.get_relationship() !== 3 /* many_to_many */)
-                        new Ground.Record_Count(ground, source.trellis, reference.path, source.property);
+                        return new Ground.Record_Count(ground, source.trellis, reference.path, source.property);
                     else
-                        new Ground.Join_Count(ground, property, source.property);
+                        return new Ground.Join_Count(ground, property, source.property);
+                } else if (func.name == 'sum') {
+                    var sources = func.arguments.map(function (x) {
+                        return scope.symbols[x.path];
+                    });
+                    return new Ground.Multi_Count(ground, source.trellis, source.property, sources);
                 }
             }
+        };
+
+        Logic.create_symbol = function (ground, source, scope) {
+            var value = Logic.load_constraint(ground, source.expression, scope);
+            scope.add_symbol(source.name, value);
         };
         return Logic;
     })();
