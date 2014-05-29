@@ -311,7 +311,7 @@ module Ground {
       }
 
       var query = this.ground.create_query(this.name)
-      query.add_key_filter(seed[this.primary_key])
+      query.add_key_filter(this.get_identity2(seed))
       query.extend({
         properties: required_properties
       })

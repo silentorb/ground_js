@@ -403,7 +403,7 @@ var Ground;
             }
 
             var query = this.ground.create_query(this.name);
-            query.add_key_filter(seed[this.primary_key]);
+            query.add_key_filter(this.get_identity2(seed));
             query.extend({
                 properties: required_properties
             });
@@ -2778,7 +2778,7 @@ var Ground;
             return this.child.assure_properties(seed, [back_reference.name]).then(function (seed) {
                 var parent_key = back_reference.get_sql_value(seed[back_reference.name]);
 
-                var sql = "UPDATE " + _this.parent.get_table_name() + " SET " + _this.count_name + " =\n" + "(SELECT COUNT(*)" + "FROM " + _this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")\n" + "WHERE " + _this.parent.query_primary_key() + " = " + parent_key;
+                var sql = "UPDATE " + _this.parent.get_table_name() + "\nSET " + _this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + _this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")" + "\nWHERE " + _this.parent.query_primary_key() + " = " + parent_key;
 
                 return _this.ground.db.query(sql, [parent_key]).then(function () {
                     return _this.invoke('changed', parent_key);
@@ -2820,7 +2820,7 @@ var Ground;
 
             return property.parent.assure_properties(seed, [key_name]).then(function (seed) {
                 var trellis = _this.property.parent;
-                console.log('seed', seed);
+
                 var key = trellis.get_primary_property().get_sql_value(seed[key_name][0]);
                 var identities = _this.link.order_identities(_this.property);
 

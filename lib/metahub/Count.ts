@@ -26,10 +26,10 @@ module Ground {
           var parent_key = back_reference.get_sql_value(seed[back_reference.name])
 
           var sql = "UPDATE " + this.parent.get_table_name()
-            + " SET " + this.count_name + " =\n"
-            + "(SELECT COUNT(*)"
-            + "FROM " + this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")\n"
-            + "WHERE " + this.parent.query_primary_key() + " = " + parent_key
+            + "\nSET " + this.count_name + " ="
+            + "\n(SELECT COUNT(*)"
+            + "\nFROM " + this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")"
+            + "\nWHERE " + this.parent.query_primary_key() + " = " + parent_key
 
           return this.ground.db.query(sql, [ parent_key ])
             .then(() => this.invoke('changed', parent_key))
@@ -72,7 +72,7 @@ module Ground {
         .then((seed)=> {
 
           var trellis = this.property.parent
-          console.log('seed', seed)
+//          console.log('seed', seed)
           var key = trellis.get_primary_property()
             .get_sql_value(seed[key_name][0])
           var identities = this.link.order_identities(this.property)
