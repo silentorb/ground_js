@@ -317,5 +317,20 @@ module Ground {
       })
       return query.run_single()
     }
+
+    export_schema():ITrellis_Source {
+      var result:ITrellis_Source = {}
+      if (this.parent)
+        result.parent = this.parent.name
+      else if (this.primary_key != 'id')
+        result.primary_key = this.primary_key
+
+      if (this.is_virtual)
+        result.is_virtual = true
+
+      result.properties = MetaHub.map(this.properties, (property) => property.export_schema())
+
+      return result
+    }
   }
 }

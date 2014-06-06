@@ -15,8 +15,7 @@ module Ground {
     type:string = null
     insert:string = null
     other_property:string = null
-  "default":
-    any
+  "default"
     other_trellis:Trellis = null
     other_trellis_name:string = null
     is_private:boolean = false
@@ -421,6 +420,31 @@ module Ground {
 
     query():string {
       return '`' + this.parent.get_table_name() + '`.' + this.get_field_name()
+    }
+
+    export_schema():IProperty_Source {
+      var result:IProperty_Source = {
+        type: this.type
+      }
+      if (this.other_trellis)
+        result.trellis = this.other_trellis.name
+
+      if (this.is_virtual)
+        result.is_virtual = true
+
+      if (this.insert)
+        result.insert = this.insert
+
+      if (this.is_readonly)
+        result.is_readonly = true
+
+      if (this.default !== undefined)
+        result['default'] = this.default
+
+      if (this.allow_null)
+        result.allow_null = true
+
+      return result
     }
 
 //    get_referenced_trellis():Trellis {

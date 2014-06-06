@@ -9,22 +9,23 @@
 module Ground {
 
   export interface IProperty_Source {
-    name?:string;
-    type:string;
-    insert?:string;
-    is_virtual?:boolean;
-    is_readonly?:boolean;
-    is_private?:boolean;
-    property?:string;
-    trellis?:string;
+    name?:string
+    type:string
+    insert?:string
+    is_virtual?:boolean
+    is_readonly?:boolean
+    is_private?:boolean
+    property?:string
+    trellis?:string
+    allow_null?:boolean
   }
 
   export interface ITrellis_Source {
-    parent:string;
-    name:string;
-    primary_key:string;
-    properties:IProperty_Source[];
-    is_virtual:boolean;
+    parent?:string
+    name?:string
+    primary_key?:string
+    properties?
+    is_virtual?:boolean
   }
 
   export interface ISeed {
@@ -38,11 +39,11 @@ module Ground {
     get_access_name():string
   }
 
-  interface ISchema_Source {
-    trellises?:any[]
-    tables?:any[]
-    views?:any[]
-    logic?:Statement[]
+  export interface ISchema_Source {
+    trellises?
+    tables?
+    views?
+    logic?
   }
 
   export function path_to_array(path) {
@@ -375,6 +376,12 @@ module Ground {
       }
 
       return !!input;
+    }
+
+    export_schema():ISchema_Source {
+      return {
+        trellises: MetaHub.map(this.trellises, (trellis) => trellis.export_schema())
+      }
     }
   }
 }

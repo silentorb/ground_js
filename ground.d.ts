@@ -65,6 +65,7 @@ declare module Ground {
         public set_parent(parent: Trellis): void;
         private seed_has_properties(seed, properties);
         public assure_properties(seed: any, required_properties: string[]): Promise;
+        public export_schema(): Ground.ITrellis_Source;
     }
 }
 declare module Ground {
@@ -213,13 +214,14 @@ declare module Ground {
         is_private?: boolean;
         property?: string;
         trellis?: string;
+        allow_null?: boolean;
     }
     interface ITrellis_Source {
-        parent: string;
-        name: string;
-        primary_key: string;
-        properties: IProperty_Source[];
-        is_virtual: boolean;
+        parent?: string;
+        name?: string;
+        primary_key?: string;
+        properties?: any;
+        is_virtual?: boolean;
     }
     interface ISeed {
         _deleted?: any;
@@ -229,6 +231,12 @@ declare module Ground {
     interface IUpdate {
         run: () => Promise;
         get_access_name(): string;
+    }
+    interface ISchema_Source {
+        trellises?: any;
+        tables?: any;
+        views?: any;
+        logic?: any;
     }
     function path_to_array(path: any): any;
     class Property_Type {
@@ -275,6 +283,7 @@ declare module Ground {
         public sanitize_trellis_argument(trellis: any): Ground.Trellis;
         public stop(): void;
         static to_bool(input: any): boolean;
+        public export_schema(): ISchema_Source;
     }
 }
 declare module Ground {
@@ -409,6 +418,7 @@ declare module Ground {
         public get_relationship(): Relationships;
         public get_field_query(): string;
         public query(): string;
+        public export_schema(): Ground.IProperty_Source;
     }
 }
 declare module Ground {

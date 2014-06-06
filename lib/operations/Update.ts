@@ -80,7 +80,13 @@ module Ground {
     }
 
     private update_embedded_seed(property, value):Promise {
-      var other_trellis = value.trellis || property.other_trellis
+      var type_property = property.parent.get_property('type')
+
+      var type = type_property && type_property.insert == 'trellis'
+        ? value.type
+        : null
+
+      var other_trellis = value.trellis || type || property.other_trellis
       return this.ground.update_object(other_trellis, value, this.user)
         .then((entity)=> {
 //          var other_id = this.get_other_id(value);
@@ -190,9 +196,9 @@ module Ground {
               else
                 continue
             }
-              var field_string = '`' + property.get_field_name() + '`';
-              var value = this.get_field_value(property, this.seed)
-              updates.push(field_string + ' = ' + value);
+            var field_string = '`' + property.get_field_name() + '`';
+            var value = this.get_field_value(property, this.seed)
+            updates.push(field_string + ' = ' + value);
 
           }
 
@@ -324,7 +330,7 @@ module Ground {
                 other = this.ground.update_object(other_trellis, other, this.user)
                   .then((other)=> {
                     var cross = new Cross_Trellis(property)
-                    sql = cross.generate_insert(property,row,other)
+                    sql = cross.generate_insert(property, row, other)
                     if (this.ground.log_updates)
                       console.log(sql)
 
@@ -335,7 +341,7 @@ module Ground {
               }
               else {
                 var cross = new Cross_Trellis(property)
-                sql = cross.generate_insert(property,row,other)
+                sql = cross.generate_insert(property, row, other)
                 if (this.ground.log_updates)
                   console.log(sql)
 

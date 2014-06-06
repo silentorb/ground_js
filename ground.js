@@ -409,6 +409,23 @@ var Ground;
             });
             return query.run_single();
         };
+
+        Trellis.prototype.export_schema = function () {
+            var result = {};
+            if (this.parent)
+                result.parent = this.parent.name;
+            else if (this.primary_key != 'id')
+                result.primary_key = this.primary_key;
+
+            if (this.is_virtual)
+                result.is_virtual = true;
+
+            result.properties = MetaHub.map(this.properties, function (property) {
+                return property.export_schema();
+            });
+
+            return result;
+        };
         return Trellis;
     })();
     Ground.Trellis = Trellis;
@@ -1113,7 +1130,11 @@ var Ground;
 
         Update.prototype.update_embedded_seed = function (property, value) {
             var _this = this;
-            var other_trellis = value.trellis || property.other_trellis;
+            var type_property = property.parent.get_property('type');
+
+            var type = type_property && type_property.insert == 'trellis' ? value.type : null;
+
+            var other_trellis = value.trellis || type || property.other_trellis;
             return this.ground.update_object(other_trellis, value, this.user).then(function (entity) {
                 _this.seed[property.name] = entity;
             });
@@ -1884,6 +1905,14 @@ var Ground;
             }
 
             return !!input;
+        };
+
+        Core.prototype.export_schema = function () {
+            return {
+                trellises: MetaHub.map(this.trellises, function (trellis) {
+                    return trellis.export_schema();
+                })
+            };
         };
         return Core;
     })(MetaHub.Meta_Object);
@@ -2713,6 +2742,31 @@ var Ground;
 
         Property.prototype.query = function () {
             return '`' + this.parent.get_table_name() + '`.' + this.get_field_name();
+        };
+
+        Property.prototype.export_schema = function () {
+            var result = {
+                type: this.type
+            };
+            if (this.other_trellis)
+                result.trellis = this.other_trellis.name;
+
+            if (this.is_virtual)
+                result.is_virtual = true;
+
+            if (this.insert)
+                result.insert = this.insert;
+
+            if (this.is_readonly)
+                result.is_readonly = true;
+
+            if (this.default !== undefined)
+                result['default'] = this.default;
+
+            if (this.allow_null)
+                result.allow_null = true;
+
+            return result;
         };
         return Property;
     })();
