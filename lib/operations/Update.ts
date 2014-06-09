@@ -80,7 +80,8 @@ module Ground {
     }
 
     private update_embedded_seed(property, value):Promise {
-      var type_property = property.parent.get_property('type')
+      var properties = property.parent.get_all_properties();
+      var type_property = properties['type']
 
       var type = type_property && type_property.insert == 'trellis'
         ? value.type
