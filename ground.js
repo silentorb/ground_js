@@ -122,9 +122,9 @@ var Ground;
             this.table = null;
             this.name = null;
             this.primary_key = 'id';
+            this.is_virtual = false;
             this.properties = {};
             this.all_properties = {};
-            this.is_virtual = false;
             this.ground = ground;
             this.name = name;
         }
@@ -132,6 +132,9 @@ var Ground;
             var property = new Ground.Property(name, source, this);
             this.properties[name] = property;
             this.all_properties[name] = property;
+            if (property.insert == 'trellis' && !this.type_property)
+                this.type_property = property;
+
             return property;
         };
 
@@ -1130,10 +1133,9 @@ var Ground;
 
         Update.prototype.update_embedded_seed = function (property, value) {
             var _this = this;
-            var properties = property.parent.get_all_properties();
-            var type_property = properties['type'];
+            var type_property = property.parent.type_property;
 
-            var type = type_property && type_property.insert == 'trellis' ? value.type : null;
+            var type = type_property ? value[type_property.name] : null;
 
             var other_trellis = value.trellis || type || property.other_trellis;
             return this.ground.update_object(other_trellis, value, this.user).then(function (entity) {
@@ -2876,7 +2878,9 @@ var Ground;
             return property.parent.assure_properties(seed, [key_name]).then(function (seed) {
                 var trellis = _this.property.parent;
 
-                var key = trellis.get_primary_property().get_sql_value(seed[key_name][0]);
+                var initial_key_value = MetaHub.is_array(seed[key_name]) ? seed[key_name][0] : seed[key_name];
+
+                var key = trellis.get_primary_property().get_sql_value(initial_key_value);
                 var identities = _this.link.order_identities(_this.property);
 
                 var sql = "UPDATE " + _this.parent.get_table_name() + "\nSET " + _this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + _this.link.get_table_name() + "\nWHERE " + identities[0].query() + ' = ' + trellis.query_primary_key() + ")" + "\nWHERE " + trellis.query_primary_key() + " = " + key;
@@ -4085,25 +4089,24 @@ var Ground;
             });
         };
 
-        Query_Runner.prototype.process_row = function (row, source) {
+        Query_Runner.prototype.process_map = function (row, source, links) {
             var _this = this;
-            var name, property, replacement = undefined;
-
-            var properties = source.trellis.get_core_properties();
-            for (name in properties) {
-                property = properties[name];
-                var value = row[property.name];
-                if (value === undefined)
-                    continue;
-
-                row[property.name] = this.ground.convert_value(value, property.type);
+            var replacement = undefined;
+            var all_properties = source.trellis.get_all_properties();
+            var context = {
+                properties: row
+            };
+            for (var i in source.map) {
+                var expression = source.map[i];
+                var value = Ground.Expression_Engine.resolve(expression, context);
+                if (i == 'this') {
+                    replacement = value;
+                    break;
+                }
+                if (value !== undefined)
+                    row[i] = value;
             }
-
-            var links = source.trellis.get_all_links(function (p) {
-                return !p.is_virtual;
-            });
-
-            var promises = MetaHub.map_to_array(links, function (property, name) {
+            MetaHub.map_to_array(links, function (property, name) {
                 if (property.is_composite_sub)
                     return null;
 
@@ -4120,42 +4123,78 @@ var Ground;
                 return null;
             });
 
-            if (typeof source.map === 'object') {
-                var all_properties = source.trellis.get_all_properties();
-                var context = {
-                    properties: row
-                };
-                for (var i in source.map) {
-                    var expression = source.map[i];
-                    var value = Ground.Expression_Engine.resolve(expression, context);
-                    if (i == 'this') {
-                        replacement = value;
-                        break;
-                    }
-                    if (value !== undefined)
-                        row[i] = value;
-                }
-                MetaHub.map_to_array(links, function (property, name) {
-                    if (property.is_composite_sub)
-                        return null;
+            return replacement;
+        };
 
-                    var path = Query_Runner.get_path(property.name);
-                    var subquery = source.subqueries[property.name];
+        Query_Runner.prototype.process_row_step_one = function (row, source) {
+            var _this = this;
+            var type_property = source.trellis.type_property;
 
-                    if (source.include_links || subquery) {
-                        return _this.query_link_property(row, property, source).then(function (value) {
-                            row[name] = value;
-                            return row;
-                        });
-                    }
+            var trellis = type_property && row[type_property.name] ? this.ground.sanitize_trellis_argument(row[type_property.name]) : source.trellis;
 
-                    return null;
+            if (trellis != source.trellis) {
+                var query = new Ground.Query_Builder(trellis);
+                query.add_key_filter(trellis.get_identity2(row));
+                if (source.properties)
+                    query.properties = source.properties;
+                if (source.map)
+                    query.map = source.map;
+
+                return query.run_single().then(function (row) {
+                    return _this.process_row_step_two(row, source, trellis);
                 });
+            } else {
+                return this.process_row_step_two(row, source, trellis);
+            }
+        };
+
+        Query_Runner.prototype.process_row_step_two = function (row, source, trellis) {
+            var _this = this;
+            var name, property, replacement = undefined;
+
+            var properties = trellis.get_core_properties();
+            for (name in properties) {
+                property = properties[name];
+                var value = row[property.name];
+                if (value === undefined)
+                    continue;
+
+                row[property.name] = this.ground.convert_value(value, property.type);
+            }
+
+            var links = trellis.get_all_links(function (p) {
+                return !p.is_virtual;
+            });
+
+            var tree = trellis.get_tree().filter(function (t) {
+                return !t.is_virtual;
+            });
+            var promises = MetaHub.map_to_array(links, function (property, name) {
+                if (property.is_composite_sub)
+                    return null;
+
+                var path = Query_Runner.get_path(property.name);
+                var subquery = source.subqueries[property.name];
+
+                if (source.include_links || subquery) {
+                    return _this.query_link_property(row, property, source).then(function (value) {
+                        row[name] = value;
+                        return row;
+                    });
+                }
+
+                return null;
+            }).concat(tree.map(function (trellis) {
+                return function () {
+                    return _this.ground.invoke(trellis.name + '.queried', row, _this);
+                };
+            }));
+
+            if (typeof source.map === 'object') {
+                replacement = this.process_map(row, source, links);
             }
 
             return when.all(promises).then(function () {
-                return _this.ground.invoke(source.trellis.name + '.queried', row, _this);
-            }).then(function () {
                 return replacement === undefined ? row : replacement;
             });
         };
@@ -4304,7 +4343,7 @@ var Ground;
 
             return this.run_core().then(function (result) {
                 return when.all(result.objects.map(function (row) {
-                    return _this.process_row(row, _this.get_source(row));
+                    return _this.process_row_step_one(row, _this.get_source(row));
                 })).then(function (rows) {
                     result.objects = rows;
                     return result;

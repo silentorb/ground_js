@@ -32,11 +32,12 @@ declare module Ground {
         public table: Ground.Table;
         public name: string;
         public primary_key: string;
+        public is_virtual: boolean;
         public properties: {
             [name: string]: Ground.Property;
         };
         public all_properties: {};
-        public is_virtual: boolean;
+        public type_property: Ground.Property;
         constructor(name: string, ground: Ground.Core);
         public add_property(name: string, source: any): Ground.Property;
         public check_primary_key(): void;
@@ -726,7 +727,9 @@ declare module Ground {
         private static get_many_list(seed, property, relationship, source);
         private static get_path(...args);
         private static get_reference_object(row, property, source);
-        public process_row(row: any, source: Ground.Query_Builder): Promise;
+        public process_map(row: any, source: Ground.Query_Builder, links: any): any;
+        public process_row_step_one(row: any, source: Ground.Query_Builder): Promise;
+        public process_row_step_two(row: any, source: Ground.Query_Builder, trellis: Ground.Trellis): Promise;
         public query_link_property(seed: any, property: any, source: Ground.Query_Builder): Promise;
         public prepare(): Promise;
         public render(query_id?: number): Promise;

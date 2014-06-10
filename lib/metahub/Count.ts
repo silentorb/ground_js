@@ -59,7 +59,6 @@ module Ground {
     }
 
     count(seed, property:Property):Promise {
-//    console.log('!!! join')
       var key_name
       if (property == this.property) {
         key_name = this.property.parent.primary_key
@@ -73,8 +72,11 @@ module Ground {
 
           var trellis = this.property.parent
 //          console.log('seed', seed)
-          var key = trellis.get_primary_property()
-            .get_sql_value(seed[key_name][0])
+          var initial_key_value = MetaHub.is_array(seed[key_name])
+            ? seed[key_name][0]
+            : seed[key_name]
+
+          var key = trellis.get_primary_property().get_sql_value(initial_key_value)
           var identities = this.link.order_identities(this.property)
 
           var sql =

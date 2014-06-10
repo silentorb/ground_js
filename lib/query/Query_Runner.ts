@@ -89,22 +89,24 @@ module Ground {
         .then((result) => result.objects[0])
     }
 
-    process_row(row, source:Query_Builder):Promise {
-      var name, property, replacement = undefined
-
-      var properties = source.trellis.get_core_properties()
-      for (name in properties) {
-        property = properties[name]
-        var value = row[property.name]
-        if (value === undefined)
-          continue
-
-        row[property.name] = this.ground.convert_value(value, property.type)
+    process_map(row, source:Query_Builder, links) {
+      var replacement = undefined
+      var all_properties = source.trellis.get_all_properties()
+      var context = {
+//          properties: source.trellis.get_all_properties()
+        properties: row
       }
-
-      var links = source.trellis.get_all_links((p)=> !p.is_virtual);
-
-      var promises = MetaHub.map_to_array(links, (property, name) => {
+      for (var i in source.map) {
+        var expression = source.map[i]
+        var value = Expression_Engine.resolve(expression, context)
+        if (i == 'this') {
+          replacement = value
+          break
+        }
+        if (value !== undefined)
+          row[i] = value
+      }
+      MetaHub.map_to_array(links, (property, name) => {
         if (property.is_composite_sub)
           return null
 
@@ -121,42 +123,72 @@ module Ground {
         return null
       })
 
-      if (typeof source.map === 'object') {
-        var all_properties = source.trellis.get_all_properties()
-        var context = {
-//          properties: source.trellis.get_all_properties()
-          properties: row
-        }
-        for (var i in source.map) {
-          var expression = source.map[i]
-          var value = Expression_Engine.resolve(expression, context)
-          if (i == 'this') {
-            replacement = value
-            break
-          }
-          if (value !== undefined)
-            row[i] = value
-        }
-        MetaHub.map_to_array(links, (property, name) => {
-          if (property.is_composite_sub)
-            return null
+      return replacement
+    }
 
-          var path = Query_Runner.get_path(property.name)
-          var subquery = source.subqueries[property.name]
+    process_row_step_one(row, source:Query_Builder):Promise {
+      var type_property = source.trellis.type_property
 
-          if (source.include_links || subquery) {
-            return this.query_link_property(row, property, source).then((value) => {
-              row[name] = value
-              return row
-            })
-          }
+      var trellis = type_property && row[type_property.name]
+        ? this.ground.sanitize_trellis_argument(row[type_property.name])
+        : source.trellis
 
+      if (trellis != source.trellis) {
+        var query = new Query_Builder(trellis)
+        query.add_key_filter(trellis.get_identity2(row))
+        if (source.properties)
+          query.properties = source.properties
+        if (source.map)
+          query.map = source.map
+
+        return query.run_single()
+          .then((row)=> this.process_row_step_two(row, source, trellis))
+      }
+      else {
+        return this.process_row_step_two(row, source, trellis)
+      }
+    }
+
+    process_row_step_two(row, source:Query_Builder, trellis:Trellis):Promise {
+      var name, property, replacement = undefined
+
+      var properties = trellis.get_core_properties()
+      for (name in properties) {
+        property = properties[name]
+        var value = row[property.name]
+        if (value === undefined)
+          continue
+
+        row[property.name] = this.ground.convert_value(value, property.type)
+      }
+
+      var links = trellis.get_all_links((p)=> !p.is_virtual);
+
+      var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
+      var promises = MetaHub.map_to_array(links, (property, name) => {
+        if (property.is_composite_sub)
           return null
-        })
+
+        var path = Query_Runner.get_path(property.name)
+        var subquery = source.subqueries[property.name]
+
+        if (source.include_links || subquery) {
+          return this.query_link_property(row, property, source).then((value) => {
+            row[name] = value
+            return row
+          })
+        }
+
+        return null
+      })
+        .concat(tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this)))
+
+      if (typeof source.map === 'object') {
+        replacement = this.process_map(row, source, links)
       }
 
       return when.all(promises)
-        .then(()=> this.ground.invoke(source.trellis.name + '.queried', row, this))
+//        .then(()=> this.ground.invoke(trellis.name + '.queried', row, this))
         .then(()=> replacement === undefined ? row : replacement)
     }
 
@@ -301,7 +333,7 @@ module Ground {
       }
 
       return this.run_core()
-        .then((result) => when.all(result.objects.map((row) => this.process_row(row, this.get_source(row))))
+        .then((result) => when.all(result.objects.map((row) => this.process_row_step_one(row, this.get_source(row))))
           .then((rows)=> {
             result.objects = rows
             return result

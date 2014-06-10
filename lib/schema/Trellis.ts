@@ -7,17 +7,24 @@ module Ground {
   }
 
   export class Trellis implements ITrellis {
-    parent:Trellis = null;
-    ground:Core;
-    table:Table = null;
-    name:string = null;
-    primary_key:string = 'id';
-    // Property that are specific to this trellis and not inherited from a parent trellis
-    properties:{ [name: string]: Property
-    } = {};
+    parent:Trellis = null
+    ground:Core
+    table:Table = null
+    name:string = null
+    primary_key:string = 'id'
+    is_virtual:boolean = false
+
+    // Property objects that are specific to this trellis and not inherited from a parent trellis
+    properties:{
+      [name: string]: Property
+    } = {}
+
     // Every property including inherited properties
-    all_properties = {};
-    is_virtual:boolean = false;
+    all_properties = {}
+
+    // If a trellis has one or more properties configured to insert the trellis name, the first of
+    // those are stored here
+    type_property:Property
 
     constructor(name:string, ground:Core) {
       this.ground = ground;
@@ -25,9 +32,12 @@ module Ground {
     }
 
     add_property(name:string, source):Property {
-      var property = new Property(name, source, this);
-      this.properties[name] = property;
-      this.all_properties[name] = property;
+      var property = new Property(name, source, this)
+      this.properties[name] = property
+      this.all_properties[name] = property
+      if (property.insert == 'trellis' && !this.type_property)
+        this.type_property = property
+
       return property;
     }
 
