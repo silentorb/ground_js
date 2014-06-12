@@ -263,6 +263,8 @@ declare module Ground {
         constructor(config: any, db_name: string);
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
         public get_base_property_type(type: any): any;
+        public get_identity(trellis: string, seed: any): any;
+        public get_trellis(trellis: any): Ground.Trellis;
         public convert_value(value: any, type: any): any;
         private create_remaining_tables();
         private create_missing_table_links();
@@ -285,6 +287,7 @@ declare module Ground {
         public stop(): void;
         static to_bool(input: any): boolean;
         public export_schema(): ISchema_Source;
+        static perspective(seed: any, trellis: Ground.Trellis, property: Ground.Property): any;
     }
 }
 declare module Ground {
@@ -649,6 +652,7 @@ declare module Ground {
         };
         public filters: Query_Filter[];
         constructor(trellis: Ground.Trellis);
+        static create(ground: Ground.Core, source?: any): Query_Builder;
         static add_operator(symbol: string, action: any): void;
         public add_filter(path: string, value?: any, operator?: string): void;
         public create_condition(source: Condition_Source): Condition;

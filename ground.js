@@ -1681,6 +1681,24 @@ var Ground;
             return property_type;
         };
 
+        Core.prototype.get_identity = function (trellis, seed) {
+            return this.get_trellis(trellis).get_identity2(seed);
+        };
+
+        Core.prototype.get_trellis = function (trellis) {
+            if (!trellis)
+                throw new Error('Trellis argument is empty');
+
+            if (typeof trellis === 'string') {
+                if (!this.trellises[trellis])
+                    throw new Error('Could not find trellis named: ' + trellis + '.');
+
+                return this.trellises[trellis];
+            }
+
+            return trellis;
+        };
+
         Core.prototype.convert_value = function (value, type) {
             if (value === undefined || value === null || value === false) {
                 if (type == 'bool')
@@ -1883,17 +1901,7 @@ var Ground;
         };
 
         Core.prototype.sanitize_trellis_argument = function (trellis) {
-            if (!trellis)
-                throw new Error('Trellis is empty');
-
-            if (typeof trellis === 'string') {
-                if (!this.trellises[trellis])
-                    throw new Error('Could not find trellis named: ' + trellis + '.');
-
-                return this.trellises[trellis];
-            }
-
-            return trellis;
+            return this.get_trellis(trellis);
         };
 
         Core.prototype.stop = function () {
@@ -1916,6 +1924,28 @@ var Ground;
                     return trellis.export_schema();
                 })
             };
+        };
+
+        Core.perspective = function (seed, trellis, property) {
+            if (trellis === property.parent) {
+                return seed;
+            } else {
+                var result = {};
+                var other_property = property.get_other_property();
+
+                var identity = seed[other_property.name];
+                var reference = seed[other_property.parent.primary_key];
+
+                if (other_property.type == 'list') {
+                    result[property.parent.primary_key] = identity[0];
+                    result[other_property.name] = [reference];
+                } else {
+                    result[property.parent.primary_key] = identity;
+                    result[other_property.name] = reference;
+                }
+
+                return result;
+            }
         };
         return Core;
     })(MetaHub.Meta_Object);
@@ -3388,6 +3418,14 @@ var Ground;
             this.trellis = trellis;
             this.ground = trellis.ground;
         }
+        Query_Builder.create = function (ground, source) {
+            if (typeof source === "undefined") { source = null; }
+            var trellis = ground.sanitize_trellis_argument(source.trellis);
+            var result = new Query_Builder(trellis);
+            result.extend(source);
+            return result;
+        };
+
         Query_Builder.add_operator = function (symbol, action) {
             Query_Builder.operators[symbol] = action;
         };

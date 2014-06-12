@@ -148,6 +148,24 @@ module Ground {
       return property_type
     }
 
+    get_identity(trellis:string, seed) {
+      return this.get_trellis(trellis).get_identity2(seed)
+    }
+
+    get_trellis(trellis):Trellis {
+      if (!trellis)
+        throw new Error('Trellis argument is empty');
+
+      if (typeof trellis === 'string') {
+        if (!this.trellises[trellis])
+          throw new Error('Could not find trellis named: ' + trellis + '.');
+
+        return this.trellises[trellis];
+      }
+
+      return trellis;
+    }
+
     convert_value(value, type) {
       if (value === undefined || value === null || value === false) {
         if (type == 'bool')
@@ -350,18 +368,9 @@ module Ground {
       return object;
     }
 
+    // Deprecated in favor of get_trellis()
     sanitize_trellis_argument(trellis):Trellis {
-      if (!trellis)
-        throw new Error('Trellis is empty');
-
-      if (typeof trellis === 'string') {
-        if (!this.trellises[trellis])
-          throw new Error('Could not find trellis named: ' + trellis + '.');
-
-        return this.trellises[trellis];
-      }
-
-      return trellis;
+      return this.get_trellis(trellis)
     }
 
     stop() {
@@ -383,6 +392,31 @@ module Ground {
         trellises: MetaHub.map(this.trellises, (trellis) => trellis.export_schema())
       }
     }
+
+    static perspective(seed, trellis:Trellis, property:Property) {
+      if (trellis === property.parent) {
+        return seed
+      }
+      else {
+        var result = {}
+        var other_property = property.get_other_property()
+
+        var identity = seed[other_property.name]
+        var reference = seed[other_property.parent.primary_key]
+
+        if (other_property.type == 'list') {
+          result[property.parent.primary_key] = identity[0]
+          result[other_property.name] = [ reference ]
+        }
+        else {
+          result[property.parent.primary_key] = identity
+          result[other_property.name] = reference
+        }
+
+        return result
+      }
+    }
+
   }
 }
 

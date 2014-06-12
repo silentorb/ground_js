@@ -93,6 +93,14 @@ module Ground {
       this.ground = trellis.ground
     }
 
+
+    public static create(ground:Core, source = null):Query_Builder {
+      var trellis = ground.sanitize_trellis_argument(source.trellis)
+      var result = new Query_Builder(trellis)
+      result.extend(source)
+      return result
+    }
+
     static add_operator(symbol:string, action) {
       Query_Builder.operators[symbol] = action
     }
