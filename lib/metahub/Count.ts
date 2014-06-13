@@ -31,7 +31,7 @@ module Ground {
             + "\nFROM " + this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")"
             + "\nWHERE " + this.parent.query_primary_key() + " = " + parent_key
 
-          return this.ground.db.query(sql, [ parent_key ])
+          return this.ground.db.query(sql)
             .then(() => this.invoke('changed', parent_key))
         })
     }
@@ -112,16 +112,15 @@ module Ground {
     }
 
     count(key):Promise {
-//    console.log('!!! multi')
       var trellis = this.trellis
 //      var identity = typeof seed == 'object' ? seed[trellis.primary_key] : seed
 //      var trellis_key = trellis.properties[trellis.primary_key].get_sql_value(identity)
       var sql = "UPDATE " + trellis.get_table_name()
         + " SET " + this.count_name + " =\n"
         + this.count_fields.join(' + ') + " "
-        + "WHERE " + trellis.query_primary_key() + " = ?"
+        + "WHERE " + trellis.query_primary_key() + " = " + key
 
-      return this.ground.db.query(sql, [ key ])
+      return this.ground.db.query(sql)
         .then(() => this.invoke('changed'))
     }
   }

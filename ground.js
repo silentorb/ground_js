@@ -2867,7 +2867,7 @@ var Ground;
 
                 var sql = "UPDATE " + _this.parent.get_table_name() + "\nSET " + _this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + _this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")" + "\nWHERE " + _this.parent.query_primary_key() + " = " + parent_key;
 
-                return _this.ground.db.query(sql, [parent_key]).then(function () {
+                return _this.ground.db.query(sql).then(function () {
                     return _this.invoke('changed', parent_key);
                 });
             });
@@ -2945,9 +2945,9 @@ var Ground;
             var _this = this;
             var trellis = this.trellis;
 
-            var sql = "UPDATE " + trellis.get_table_name() + " SET " + this.count_name + " =\n" + this.count_fields.join(' + ') + " " + "WHERE " + trellis.query_primary_key() + " = ?";
+            var sql = "UPDATE " + trellis.get_table_name() + " SET " + this.count_name + " =\n" + this.count_fields.join(' + ') + " " + "WHERE " + trellis.query_primary_key() + " = " + key;
 
-            return this.ground.db.query(sql, [key]).then(function () {
+            return this.ground.db.query(sql).then(function () {
                 return _this.invoke('changed');
             });
         };
