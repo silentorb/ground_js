@@ -252,7 +252,9 @@ declare module Ground {
         public get_field_type(): any;
     }
     class Core extends MetaHub.Meta_Object {
-        public trellises: Ground.Trellis[];
+        public trellises: {
+            [key: string]: Ground.Trellis;
+        };
         public custom_tables: Ground.Table[];
         public tables: Ground.Table[];
         public views: any[];
@@ -260,6 +262,7 @@ declare module Ground {
         public db: Ground.Database;
         public log_queries: boolean;
         public log_updates: boolean;
+        public hub: any;
         constructor(config: any, db_name: string);
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
         public get_base_property_type(type: any): any;
@@ -277,6 +280,7 @@ declare module Ground {
         static is_private_or_readonly(property: Ground.Property): boolean;
         public update_object(trellis: any, seed?: ISeed, user?: Ground.IUser, as_service?: boolean): Promise;
         static load_json_from_file(filename: string): any;
+        public load_metahub_file(filename: string): void;
         public load_property_types(filename: string): void;
         public load_schema_from_file(filename: string): void;
         public load_tables(tables: any[]): void;
@@ -465,9 +469,17 @@ declare module Ground {
     interface Statement {
         type: string;
     }
+    interface Statement_Block extends Statement {
+        path: string;
+        statements: Statement[];
+    }
     interface Constraint_Statement extends Statement {
         trellis: string;
         property: string;
+        expression: Ground.Expression;
+    }
+    interface Constraint_Statement2 extends Statement {
+        path: string[];
         expression: Ground.Expression;
     }
     interface Symbol_Statement extends Statement {
@@ -478,17 +490,31 @@ declare module Ground {
         name: string;
         arguments: Ground.Expression[];
     }
+    interface Function_Expression2 extends Ground.Expression {
+        name: string;
+        inputs: Ground.Expression[];
+    }
     interface Reference_Expression extends Ground.Expression {
         path: string;
     }
     class Scope {
         public symbols: {};
+        public constraints: {};
+        public _this: any;
+        public parent: Scope;
+        constructor(parent?: Scope);
         public add_symbol(name: string, value: any): void;
+        public get_symbol(name: string): any;
+        public get_constraint(name: string): any;
     }
     class Logic {
         static load(ground: Ground.Core, statements: Statement[]): void;
         static load_constraint(ground: Ground.Core, source: Constraint_Statement, scope: Scope): MetaHub.Meta_Object;
         static create_symbol(ground: Ground.Core, source: Symbol_Statement, scope: Scope): void;
+        static load2(ground: Ground.Core, statements: Statement[], scope?: Scope): void;
+        static load_constraint2(ground: Ground.Core, source: Constraint_Statement2, scope: Scope): MetaHub.Meta_Object;
+        static create_symbol2(ground: Ground.Core, source: Symbol_Statement, scope: Scope): void;
+        static trellis_scope(ground: Ground.Core, source: Statement_Block, scope: Scope): void;
     }
 }
 declare module Ground {

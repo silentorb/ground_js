@@ -100,7 +100,8 @@ module Ground {
   }
 
   export class Core extends MetaHub.Meta_Object {
-    trellises:Trellis[] = []
+    trellises:{ [key: string]: Trellis
+    } = {}
     custom_tables:Table[] = []
     tables:Table[] = []
     views:any[] = []
@@ -108,13 +109,22 @@ module Ground {
     db:Database
     log_queries:boolean = false
     log_updates:boolean = false
+    hub
 
     constructor(config, db_name:string) {
       super();
       this.db = new Database(config, db_name);
       var path = require('path');
       var filename = path.resolve(__dirname, 'property_types.json');
-      this.load_property_types(filename);
+      this.load_property_types(filename)
+      var path = require('path')
+      var fs = require('fs')
+      var metahub_path = path.dirname(require.resolve('vineyard-metahub'))
+      var metahub3_path = path.join(metahub_path, 'metahub3.js')
+      if (fs.existsSync(metahub3_path)) {
+        var MetaHub3 = require(metahub3_path)
+        this.hub = new MetaHub3.Hub()
+      }
     }
 
     add_trellis(name:string, source:ITrellis_Source, initialize_parent = true):Trellis {
@@ -304,6 +314,16 @@ module Ground {
       return JSON.parse(json);
     }
 
+    load_metahub_file(filename:string) {
+      var fs = require('fs')
+      var code = fs.readFileSync(filename, { encoding: 'ascii' })
+      var match = this.hub.parse_code(code)
+      var block = match.get_data()
+
+      console.log('data', require('util').inspect(block.expressions, true, 10))
+      Logic.load2(this, block.expressions)
+    }
+
     load_property_types(filename:string) {
       var property_types = Core.load_json_from_file(filename);
       for (var name in property_types) {
@@ -315,7 +335,14 @@ module Ground {
 
     load_schema_from_file(filename:string) {
       var data = Core.load_json_from_file(filename);
-      this.parse_schema(data);
+      this.parse_schema(data)
+
+      // Eventually MetaHub will replace the bulk of Ground's schema loading.
+      // Until then, there will be some redundancy as they are loaded side-by-side.
+      if (this.hub) {
+        this.hub.load_schema_from_file(filename)
+//        console.log(this.hub.schema.trellises)
+      }
     }
 
     load_tables(tables:any[]) {

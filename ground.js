@@ -1637,7 +1637,7 @@ var Ground;
         __extends(Core, _super);
         function Core(config, db_name) {
             _super.call(this);
-            this.trellises = [];
+            this.trellises = {};
             this.custom_tables = [];
             this.tables = [];
             this.views = [];
@@ -1648,6 +1648,14 @@ var Ground;
             var path = require('path');
             var filename = path.resolve(__dirname, 'property_types.json');
             this.load_property_types(filename);
+            var path = require('path');
+            var fs = require('fs');
+            var metahub_path = path.dirname(require.resolve('vineyard-metahub'));
+            var metahub3_path = path.join(metahub_path, 'metahub3.js');
+            if (fs.existsSync(metahub3_path)) {
+                var MetaHub3 = require(metahub3_path);
+                this.hub = new MetaHub3.Hub();
+            }
         }
         Core.prototype.add_trellis = function (name, source, initialize_parent) {
             if (typeof initialize_parent === "undefined") { initialize_parent = true; }
@@ -1836,6 +1844,16 @@ var Ground;
             return JSON.parse(json);
         };
 
+        Core.prototype.load_metahub_file = function (filename) {
+            var fs = require('fs');
+            var code = fs.readFileSync(filename, { encoding: 'ascii' });
+            var match = this.hub.parse_code(code);
+            var block = match.get_data();
+
+            console.log('data', require('util').inspect(block.expressions, true, 10));
+            Ground.Logic.load2(this, block.expressions);
+        };
+
         Core.prototype.load_property_types = function (filename) {
             var property_types = Core.load_json_from_file(filename);
             for (var name in property_types) {
@@ -1848,6 +1866,10 @@ var Ground;
         Core.prototype.load_schema_from_file = function (filename) {
             var data = Core.load_json_from_file(filename);
             this.parse_schema(data);
+
+            if (this.hub) {
+                this.hub.load_schema_from_file(filename);
+            }
         };
 
         Core.prototype.load_tables = function (tables) {
@@ -2960,11 +2982,34 @@ var Ground;
     
 
     var Scope = (function () {
-        function Scope() {
+        function Scope(parent) {
+            if (typeof parent === "undefined") { parent = null; }
             this.symbols = {};
+            this.constraints = {};
+            this.parent = parent;
         }
         Scope.prototype.add_symbol = function (name, value) {
             this.symbols[name] = value;
+        };
+
+        Scope.prototype.get_symbol = function (name) {
+            if (this.symbols[name] !== undefined)
+                return this.symbols[name];
+
+            if (this.parent)
+                return this.parent.get_symbol(name);
+
+            throw new Error('Symbol not found: ' + name + '.');
+        };
+
+        Scope.prototype.get_constraint = function (name) {
+            if (this.constraints[name] !== undefined)
+                return this.constraints[name];
+
+            if (this.parent)
+                return this.parent.get_constraint(name);
+
+            throw new Error('Constraint not found: ' + name + '.');
         };
         return Scope;
     })();
@@ -3012,6 +3057,62 @@ var Ground;
         Logic.create_symbol = function (ground, source, scope) {
             var value = Logic.load_constraint(ground, source.expression, scope);
             scope.add_symbol(source.name, value);
+        };
+
+        Logic.load2 = function (ground, statements, scope) {
+            if (typeof scope === "undefined") { scope = null; }
+            scope = scope || new Scope();
+
+            for (var i = 0; i < statements.length; ++i) {
+                var statement = statements[i];
+                switch (statement.type) {
+                    case 'constraint':
+                        Logic.load_constraint2(ground, statement, scope);
+                        break;
+                    case 'symbol':
+                        Logic.create_symbol2(ground, statement, scope);
+                        break;
+                    case 'trellis_scope':
+                        Logic.trellis_scope(ground, statement, scope);
+                        break;
+                }
+            }
+        };
+
+        Logic.load_constraint2 = function (ground, source, scope) {
+            if (source.expression.type == 'function') {
+                var func = source.expression;
+                var target = source.path[0];
+                var trellis = scope._this;
+                var constraint;
+                if (func.name == 'count') {
+                    var reference = func.inputs[0];
+                    var property = trellis.get_property(reference.path[0]);
+                    if (property.get_relationship() !== 3 /* many_to_many */)
+                        constraint = new Ground.Record_Count(ground, trellis, reference.path, target);
+                    else
+                        constraint = new Ground.Join_Count(ground, property, target);
+                } else if (func.name == 'sum') {
+                    var sources = func.inputs.map(function (x) {
+                        return scope.get_constraint(x.path[0]);
+                    });
+                    constraint = new Ground.Multi_Count(ground, trellis.name, target, sources);
+                }
+
+                scope.constraints[target] = constraint;
+                return constraint;
+            }
+        };
+
+        Logic.create_symbol2 = function (ground, source, scope) {
+            var value = Logic.load_constraint2(ground, source.expression, scope);
+            scope.add_symbol(source.name, value);
+        };
+
+        Logic.trellis_scope = function (ground, source, scope) {
+            var new_scope = new Scope(scope);
+            new_scope._this = ground.get_trellis(source.path[0]);
+            Logic.load2(ground, source.statements, new_scope);
         };
         return Logic;
     })();
