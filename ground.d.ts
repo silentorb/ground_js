@@ -213,7 +213,7 @@ declare module Ground {
         is_virtual?: boolean;
         is_readonly?: boolean;
         is_private?: boolean;
-        property?: string;
+        other_property?: string;
         trellis?: string;
         allow_null?: boolean;
     }

@@ -93,6 +93,7 @@ module Ground {
       var result:IProperty_Source = {
         type: this.type
       };
+
       if (this.other_trellis_name)
         result.trellis = this.other_trellis_name;
 
@@ -104,6 +105,9 @@ module Ground {
 
       if (this.insert)
         result.insert = this.insert;
+
+      if (this.other_property)
+        result.other_property = this.other_property;
 
       return result;
     }
@@ -444,6 +448,9 @@ module Ground {
       if (this.allow_null)
         result.allow_null = true
 
+      if (this.other_property)
+        result.other_property = this.other_property;
+      
       return result
     }
 

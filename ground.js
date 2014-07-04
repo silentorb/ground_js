@@ -2527,6 +2527,7 @@ var Ground;
             var result = {
                 type: this.type
             };
+
             if (this.other_trellis_name)
                 result.trellis = this.other_trellis_name;
 
@@ -2538,6 +2539,9 @@ var Ground;
 
             if (this.insert)
                 result.insert = this.insert;
+
+            if (this.other_property)
+                result.other_property = this.other_property;
 
             return result;
         };
@@ -2820,6 +2824,9 @@ var Ground;
 
             if (this.allow_null)
                 result.allow_null = true;
+
+            if (this.other_property)
+                result.other_property = this.other_property;
 
             return result;
         };
