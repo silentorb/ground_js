@@ -159,7 +159,13 @@ module Ground {
         if (value === undefined)
           continue
 
-        row[property.name] = this.ground.convert_value(value, property.type)
+        if (property.type == 'json') {
+          var json = new Buffer( value, 'binary').toString();
+          row[property.name] = JSON.parse(json)
+        }
+        else {
+          row[property.name] = this.ground.convert_value(value, property.type)
+        }
       }
 
       var links = trellis.get_all_links((p)=> !p.is_virtual);

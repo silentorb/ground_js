@@ -1,48 +1,48 @@
 {
-  "int" : {
-    "field_type" : "INT",
-    "default" : 0
+  "int": {
+    "field_type": "INT",
+    "default": 0
   },
-  "string" : {
-    "field_type" : "VARCHAR(255)",
-    "default" : ""
+  "string": {
+    "field_type": "VARCHAR(255)",
+    "default": ""
   },
-  "text" : {
-    "field_type" : "TEXT",
-    "allow_null" : true
+  "text": {
+    "field_type": "TEXT",
+    "allow_null": true
   },
-  "bool" : {
-    "field_type" : "TINYINT(4)",
-    "default" : true
+  "bool": {
+    "field_type": "TINYINT(4)",
+    "default": true
   },
-  "reference" : {
-    "field_type" : "INT",
-    "default" : null
+  "reference": {
+    "field_type": "INT",
+    "default": null
   },
-  "unsigned bigint" : {
-    "parent" : "int",
-    "field_type" : "BIGINT UNSIGNED"
+  "unsigned bigint": {
+    "parent": "int",
+    "field_type": "BIGINT UNSIGNED"
   },
-  "datetime" : {
-    "field_type" : "INT(11)",
-    "default" : 0,
-    "parent" : "int"
+  "datetime": {
+    "field_type": "INT(11)",
+    "default": 0,
+    "parent": "int"
   },
-  "date" : {
-    "parent" : "datetime"
+  "date": {
+    "parent": "datetime"
   },
   "float": {
-    "field_type" : "FLOAT",
-    "default" : 0
+    "field_type": "FLOAT",
+    "default": 0
   },
   "decimal": {
-    "parent" : "float",
-    "field_type" : "DECIMAL",
-    "default" : 0
+    "parent": "float",
+    "field_type": "DECIMAL",
+    "default": 0
   },
   "money": {
     "parent": "float",
-    "field_type" : "DECIMAL(19,2)"
+    "field_type": "DECIMAL(19,2)"
   },
   "created": {
     "parent": "datetime",
@@ -57,5 +57,9 @@
   },
   "guid": {
     "field_type": "BINARY (16)"
+  },
+  "json": {
+    "field_type": "BLOB",
+    "default": 0
   }
 }

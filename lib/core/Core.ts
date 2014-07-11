@@ -320,7 +320,7 @@ module Ground {
       var match = this.hub.parse_code(code)
       var block = match.get_data()
 
-      console.log('data', require('util').inspect(block.expressions, true, 10))
+//      console.log('data', require('util').inspect(block.expressions, true, 10))
       Logic.load2(this, block.expressions)
     }
 

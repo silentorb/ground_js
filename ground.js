@@ -1850,7 +1850,6 @@ var Ground;
             var match = this.hub.parse_code(code);
             var block = match.get_data();
 
-            console.log('data', require('util').inspect(block.expressions, true, 10));
             Ground.Logic.load2(this, block.expressions);
         };
 
@@ -2617,6 +2616,11 @@ var Ground;
             if (typeof type === "undefined") { type = null; }
             if (typeof is_reference === "undefined") { is_reference = false; }
             type = type || this.type;
+            if (type == 'json') {
+                var bin = new Buffer(JSON.stringify(value), "base64").toString();
+                return "'" + bin + "'";
+            }
+
             var property_type = this.parent.ground.property_types[type];
             if (value === undefined || value === null) {
                 value = this.get_default();
@@ -4305,7 +4309,12 @@ var Ground;
                 if (value === undefined)
                     continue;
 
-                row[property.name] = this.ground.convert_value(value, property.type);
+                if (property.type == 'json') {
+                    var json = new Buffer(value, 'binary').toString();
+                    row[property.name] = JSON.parse(json);
+                } else {
+                    row[property.name] = this.ground.convert_value(value, property.type);
+                }
             }
 
             var links = trellis.get_all_links(function (p) {
