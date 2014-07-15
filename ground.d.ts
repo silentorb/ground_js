@@ -9,6 +9,7 @@ declare module Ground {
         public database: string;
         public log_queries: boolean;
         public pool: any;
+        public script_pool: any;
         public active: boolean;
         constructor(settings: {}, database: string);
         public add_table_to_database(table: Ground.Table, ground: Ground.Core): Promise;
@@ -21,6 +22,7 @@ declare module Ground {
         public get_tables(): Promise;
         public query(sql: string, args?: any[]): Promise;
         public query_single(sql: string, args?: any[]): Promise;
+        public run_script(sql: string, args?: any[]): Promise;
     }
 }
 declare module Ground {

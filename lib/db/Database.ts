@@ -11,6 +11,7 @@ module Ground {
     database:string
     log_queries:boolean = false
     pool
+    script_pool = null
     active:boolean = true
 
     constructor(settings:{
@@ -54,6 +55,10 @@ module Ground {
         this.pool.end()
         this.pool = null
       }
+      if (this.script_pool) {
+        this.script_pool.end()
+        this.script_pool = null
+      }
       this.active = false
     }
 
@@ -91,8 +96,6 @@ module Ground {
 
     query(sql:string, args:any[] = undefined):Promise {
       var def = when.defer()
-//      connection = this.pool.createConnection(this.settings[this.database])
-//      connection.connect()
       if (this.log_queries)
         console.log('start', sql)
 
@@ -106,7 +109,6 @@ module Ground {
 
         return null
       });
-//      connection.end()
 
       return def.promise
     }
@@ -114,6 +116,30 @@ module Ground {
     query_single(sql:string, args:any[] = undefined):Promise {
       return this.query(sql, args)
         .then((rows) => rows[0])
+    }
+
+    // Identical to query(), except that it uses a connection that allows
+    // multiple SQL statements in one call.  (By default that is disabled in the main connection pool.)
+    run_script(sql:string, args:any[] = undefined):Promise {
+      if (!this.script_pool) {
+        var settings = MetaHub.extend({}, this.settings[this.database])
+        settings.multipleStatements = true
+        this.script_pool = mysql.createPool(settings)
+      }
+      var def = when.defer()
+      if (this.log_queries)
+        console.log('start', sql)
+
+      this.script_pool.query(sql, args, (err, rows, fields) => {
+        if (err) {
+          console.log('error', sql)
+          throw err
+        }
+        def.resolve(rows, fields)
+        return null
+      });
+
+      return def.promise
     }
 
   }

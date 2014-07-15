@@ -6,6 +6,7 @@ var Ground;
     var Database = (function () {
         function Database(settings, database) {
             this.log_queries = false;
+            this.script_pool = null;
             this.active = true;
             this.settings = settings;
             this.database = database;
@@ -44,6 +45,10 @@ var Ground;
             if (this.pool) {
                 this.pool.end();
                 this.pool = null;
+            }
+            if (this.script_pool) {
+                this.script_pool.end();
+                this.script_pool = null;
             }
             this.active = false;
         };
@@ -86,7 +91,6 @@ var Ground;
         Database.prototype.query = function (sql, args) {
             if (typeof args === "undefined") { args = undefined; }
             var def = when.defer();
-
             if (this.log_queries)
                 console.log('start', sql);
 
@@ -109,6 +113,29 @@ var Ground;
             return this.query(sql, args).then(function (rows) {
                 return rows[0];
             });
+        };
+
+        Database.prototype.run_script = function (sql, args) {
+            if (typeof args === "undefined") { args = undefined; }
+            if (!this.script_pool) {
+                var settings = MetaHub.extend({}, this.settings[this.database]);
+                settings.multipleStatements = true;
+                this.script_pool = mysql.createPool(settings);
+            }
+            var def = when.defer();
+            if (this.log_queries)
+                console.log('start', sql);
+
+            this.script_pool.query(sql, args, function (err, rows, fields) {
+                if (err) {
+                    console.log('error', sql);
+                    throw err;
+                }
+                def.resolve(rows, fields);
+                return null;
+            });
+
+            return def.promise;
         };
         return Database;
     })();
@@ -2617,7 +2644,9 @@ var Ground;
             if (typeof is_reference === "undefined") { is_reference = false; }
             type = type || this.type;
             if (type == 'json') {
-                var bin = new Buffer(JSON.stringify(value), "base64").toString();
+                var json = JSON.stringify(value);
+                var base64 = new Buffer(json).toString('base64');
+                var bin = new Buffer(base64, "binary").toString();
                 return "'" + bin + "'";
             }
 
@@ -4310,8 +4339,13 @@ var Ground;
                     continue;
 
                 if (property.type == 'json') {
-                    var json = new Buffer(value, 'binary').toString();
-                    row[property.name] = JSON.parse(json);
+                    if (!value) {
+                        row[property.name] = null;
+                    } else {
+                        var bin = new Buffer(value, 'binary').toString();
+                        var json = new Buffer(bin, 'base64').toString('ascii');
+                        row[property.name] = JSON.parse(json);
+                    }
                 } else {
                     row[property.name] = this.ground.convert_value(value, property.type);
                 }

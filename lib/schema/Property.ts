@@ -197,8 +197,10 @@ module Ground {
     get_sql_value(value, type = null, is_reference = false) {
       type = type || this.type
       if (type == 'json') {
-        var bin = new Buffer(JSON.stringify(value), "binary").toString()
-        return "'" + bin + "'"
+        var json = JSON.stringify(value)
+        var base64 = new Buffer(json).toString('base64')
+        var bin = new Buffer(base64, "binary").toString()
+        return "'" + bin + "'";
       }
 
       var property_type = this.parent.ground.property_types[type];

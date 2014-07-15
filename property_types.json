@@ -59,7 +59,6 @@
     "field_type": "BINARY (16)"
   },
   "json": {
-    "field_type": "BLOB",
-    "default": 0
+    "field_type": "BLOB"
   }
 }

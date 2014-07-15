@@ -160,8 +160,14 @@ module Ground {
           continue
 
         if (property.type == 'json') {
-          var json = new Buffer( value, 'binary').toString();
-          row[property.name] = JSON.parse(json)
+          if (!value) {
+            row[property.name] = null
+          }
+          else {
+            var bin = new Buffer(value, 'binary').toString()
+            var json = new Buffer(bin, 'base64').toString('ascii');
+            row[property.name] = JSON.parse(json);
+          }
         }
         else {
           row[property.name] = this.ground.convert_value(value, property.type)
