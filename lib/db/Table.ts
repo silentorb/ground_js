@@ -116,7 +116,7 @@ module Ground {
           Link_Field_Type.reference // Cross-table links are always references
         )
 
-        other_table.links[other_link.name]= other_link
+        other_table.links[other_link.name] = other_link
       }
       else {
         var other_field_name = link.field && link.field.other_field
@@ -168,9 +168,9 @@ module Ground {
         }
 
         var auto_increment =
-          primary_keys.indexOf(name) > -1
-            && type.search(/INT/) > -1
+          primary_keys.length < 2
             && primary_keys[0] == name
+            && type.search(/INT/) > -1
 
         var field_sql = '`' + name + '` ' + type;
         if (auto_increment)

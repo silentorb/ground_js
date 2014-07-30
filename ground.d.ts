@@ -17,7 +17,9 @@ declare module Ground {
         public start(): void;
         public close(): void;
         public create_table(trellis: Ground.Trellis): Promise;
-        public create_trellis_tables(trellises: Ground.Trellis[]): Promise;
+        public create_trellis_tables(trellises: {
+            [key: string]: Ground.Trellis;
+        }): Promise;
         public drop_all_tables(): Promise;
         public get_tables(): Promise;
         public query(sql: string, args?: any[]): Promise;
@@ -647,6 +649,8 @@ declare module Ground {
         property?: any;
         path?: any;
         dir?: any;
+        type?: any;
+        sql?: any;
     }
     interface Query_Transform {
         clause: string;

@@ -2128,7 +2128,7 @@ var Ground;
                     throw new Error('Field ' + name + ' is missing a type.');
                 }
 
-                var auto_increment = primary_keys.indexOf(name) > -1 && type.search(/INT/) > -1 && primary_keys[0] == name;
+                var auto_increment = primary_keys.length < 2 && primary_keys[0] == name && type.search(/INT/) > -1;
 
                 var field_sql = '`' + name + '` ' + type;
                 if (auto_increment)

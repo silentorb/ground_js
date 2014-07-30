@@ -72,7 +72,7 @@ module Ground {
         .then(()=>table)
     }
 
-    create_trellis_tables(trellises:Trellis[]):Promise {
+    create_trellis_tables(trellises:{[key: string]: Trellis}):Promise {
 //      console.log(Object.keys(trellises));
       var promises = MetaHub.map_to_array(trellises, (trellis:Trellis)=>this.create_table(trellis));
       return when.all(promises)
