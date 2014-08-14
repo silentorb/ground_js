@@ -4549,5 +4549,4 @@ var Ground;
     })();
     Ground.Query_Runner = Query_Runner;
 })(Ground || (Ground = {}));
-require('source-map-support').install();
 //# sourceMappingURL=ground.js.map

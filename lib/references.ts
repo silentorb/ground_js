@@ -23,4 +23,4 @@
 /// <reference path="query/Query_Renderer.ts"/>
 /// <reference path="query/Query_Runner.ts"/>
 
-require('source-map-support').install();
+//require('source-map-support').install();

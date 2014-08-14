@@ -649,8 +649,6 @@ declare module Ground {
         property?: any;
         path?: any;
         dir?: any;
-        type?: any;
-        sql?: any;
     }
     interface Query_Transform {
         clause: string;
