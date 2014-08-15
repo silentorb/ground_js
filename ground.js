@@ -1537,7 +1537,7 @@ var Ground;
         };
 
         Delete.prototype.delete_record = function (trellis, id) {
-            var sql = 'DELETE FROM ' + trellis.get_table_name() + "\nWHERE " + trellis.query_primary_key() + ' = ' + id;
+            var sql = 'DELETE FROM `' + trellis.get_table_name() + '`' + "\nWHERE " + trellis.query_primary_key() + ' = ' + id;
 
             if (this.ground.log_updates)
                 console.log(sql);

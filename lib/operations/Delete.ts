@@ -42,7 +42,7 @@ module Ground {
 
     delete_record(trellis:Trellis, id):Promise {
 //      var primary_property = trellis.properties[trellis.primary_key]
-      var sql = 'DELETE FROM ' + trellis.get_table_name()
+      var sql = 'DELETE FROM `' + trellis.get_table_name() + '`'
         + "\nWHERE " + trellis.query_primary_key() + ' = ' + id
 
       if (this.ground.log_updates)
