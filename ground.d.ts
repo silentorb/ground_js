@@ -41,6 +41,7 @@ declare module Ground {
             [name: string]: Ground.Property;
         };
         private all_properties;
+        private core_properties;
         public type_property: Ground.Property;
         constructor(name: string, ground: Ground.Core);
         public add_property(name: string, source: any): Ground.Property;
@@ -49,7 +50,7 @@ declare module Ground {
         public get_all_links(filter?: (property: Ground.Property) => boolean): {};
         public get_all_properties(): any;
         public get_property(name: string): Ground.Property;
-        public get_core_properties(): {};
+        public get_core_properties(): any;
         public get_id(source: any): any;
         public get_identity(seed: any): {};
         public get_identity2(value: any): any;
@@ -768,15 +769,16 @@ declare module Ground {
         private row_cache;
         public ground: Ground.Core;
         public renderer: Ground.Query_Renderer;
+        static trellis_cache: any;
         constructor(source: Ground.Query_Builder);
         private static generate_property_join(property, seeds);
         private static create_sub_query(trellis, property, source);
         private static get_many_list(seed, property, relationship, source);
-        private static get_path(...args);
         private static get_reference_object(row, property, source);
         public process_map(row: any, source: Ground.Query_Builder, links: any): any;
         public process_row_step_one(row: any, source: Ground.Query_Builder): Promise;
         public process_row_step_two(row: any, source: Ground.Query_Builder, trellis: Ground.Trellis): Promise;
+        private static get_trellis_cache(trellis);
         public query_link_property(seed: any, property: any, source: Ground.Query_Builder): Promise;
         public prepare(): Promise;
         public render(query_id?: number): Promise;

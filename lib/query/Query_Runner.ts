@@ -12,12 +12,18 @@ module Ground {
     parts
   }
 
+  interface Trellis_Cache {
+    links
+    tree
+  }
+
   export class Query_Runner {
     source:Query_Builder
     run_stack
     private row_cache
     ground:Core
     renderer:Query_Renderer
+    static trellis_cache:any = {}
 
     constructor(source:Query_Builder) {
       this.source = source
@@ -69,14 +75,14 @@ module Ground {
       return query.run();
     }
 
-    private static get_path(...args:string[]):string {
-      var items:string[] = [];
-//      if (this.base_path)
-//        items.push(this.base_path);
-
-      items = items.concat(args);
-      return items.join('/');
-    }
+//    private static get_path(...args:string[]):string {
+//      var items:string[] = [];
+////      if (this.base_path)
+////        items.push(this.base_path);
+//
+//      items = items.concat(args);
+//      return items.join('/');
+//    }
 
     private static get_reference_object(row, property:Property, source:Query_Builder) {
       var query = Query_Runner.create_sub_query(property.other_trellis, property, source)
@@ -110,7 +116,7 @@ module Ground {
         if (property.is_composite_sub)
           return null
 
-        var path = Query_Runner.get_path(property.name)
+//        var path = Query_Runner.get_path(property.name)
         var subquery = source.subqueries[property.name]
 
         if (source.include_links || subquery) {
@@ -174,14 +180,15 @@ module Ground {
         }
       }
 
-      var links = trellis.get_all_links((p)=> !p.is_virtual);
+      var cache = Query_Runner.get_trellis_cache(trellis)
+//      var links = trellis.get_all_links((p)=> !p.is_virtual);
+//      var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
 
-      var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
-      var promises = MetaHub.map_to_array(links, (property, name) => {
+      var promises = MetaHub.map_to_array(cache.links, (property, name) => {
         if (property.is_composite_sub)
           return null
 
-        var path = Query_Runner.get_path(property.name)
+//        var path = Query_Runner.get_path(property.name)
         var subquery = source.subqueries[property.name]
 
         if (source.include_links || subquery) {
@@ -193,15 +200,27 @@ module Ground {
 
         return null
       })
-        .concat(tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this)))
+        .concat(cache.tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this)))
 
       if (typeof source.map === 'object') {
-        replacement = this.process_map(row, source, links)
+        replacement = this.process_map(row, source, cache.links)
       }
 
       return when.all(promises)
 //        .then(()=> this.ground.invoke(trellis.name + '.queried', row, this))
         .then(()=> replacement === undefined ? row : replacement)
+    }
+
+    private static get_trellis_cache(trellis):Trellis_Cache {
+      var cache = Query_Runner.trellis_cache[trellis.name]
+      if (!cache) {
+        Query_Runner.trellis_cache[trellis.name] = cache = {
+          links: trellis.get_all_links((p)=> !p.is_virtual),
+          tree: trellis.get_tree().filter((t:Trellis)=> !t.is_virtual)
+        }
+      }
+
+      return cache
     }
 
     query_link_property(seed, property, source:Query_Builder):Promise {
@@ -226,10 +245,20 @@ module Ground {
       if (this.row_cache)
         return when.resolve(this.row_cache)
 
-      var tree = source.trellis.get_tree()
-      var promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
-      promises = promises.concat(()=> this.ground.invoke('*.query', source))
-
+      // This requires a new version of vineyard-metahub, which isn't updated as frequently so
+      // we're supporting both the more and less optimized methods.
+      var promises = null, tree = null
+      if (typeof this.ground.has_event == 'function') {
+        tree = source.trellis.get_tree().filter((t)=> this.ground.has_event(t.name + '.query'))
+        promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
+        if (this.ground.has_event('*.query'))
+          promises = promises.concat(()=> this.ground.invoke('*.query', source))
+      }
+      else {
+        tree = source.trellis.get_tree()
+        promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
+          .concat(()=> this.ground.invoke('*.query', source))
+      }
       var is_empty = false
 
       if (source.filters) {

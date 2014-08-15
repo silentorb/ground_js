@@ -22,6 +22,8 @@ module Ground {
     // Every property including inherited properties
     private all_properties:any = null
 
+    private core_properties:any = null
+
     // If a trellis has one or more properties configured to insert the trellis name, the first of
     // those are stored here
     type_property:Property
@@ -92,6 +94,9 @@ module Ground {
     }
 
     get_core_properties() {
+      if (this.core_properties)
+        return this.core_properties
+
       var result = {}
       for (var i in this.properties) {
         var property = this.properties[i];
@@ -231,6 +236,9 @@ module Ground {
     harden() {
       if (!this.all_properties)
         this.all_properties = this.get_all_properties()
+
+      if (!this.core_properties)
+        this.core_properties = this.get_core_properties()
     }
 
     initialize(all) {

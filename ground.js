@@ -152,6 +152,7 @@ var Ground;
             this.is_virtual = false;
             this.properties = {};
             this.all_properties = null;
+            this.core_properties = null;
             this.ground = ground;
             this.name = name;
         }
@@ -217,6 +218,9 @@ var Ground;
         };
 
         Trellis.prototype.get_core_properties = function () {
+            if (this.core_properties)
+                return this.core_properties;
+
             var result = {};
             for (var i in this.properties) {
                 var property = this.properties[i];
@@ -345,6 +349,9 @@ var Ground;
         Trellis.prototype.harden = function () {
             if (!this.all_properties)
                 this.all_properties = this.get_all_properties();
+
+            if (!this.core_properties)
+                this.core_properties = this.get_core_properties();
         };
 
         Trellis.prototype.initialize = function (all) {
@@ -4284,17 +4291,6 @@ var Ground;
             return query.run();
         };
 
-        Query_Runner.get_path = function () {
-            var args = [];
-            for (var _i = 0; _i < (arguments.length - 0); _i++) {
-                args[_i] = arguments[_i + 0];
-            }
-            var items = [];
-
-            items = items.concat(args);
-            return items.join('/');
-        };
-
         Query_Runner.get_reference_object = function (row, property, source) {
             var query = Query_Runner.create_sub_query(property.other_trellis, property, source);
             var value = row[property.name];
@@ -4328,7 +4324,6 @@ var Ground;
                 if (property.is_composite_sub)
                     return null;
 
-                var path = Query_Runner.get_path(property.name);
                 var subquery = source.subqueries[property.name];
 
                 if (source.include_links || subquery) {
@@ -4390,18 +4385,12 @@ var Ground;
                 }
             }
 
-            var links = trellis.get_all_links(function (p) {
-                return !p.is_virtual;
-            });
+            var cache = Query_Runner.get_trellis_cache(trellis);
 
-            var tree = trellis.get_tree().filter(function (t) {
-                return !t.is_virtual;
-            });
-            var promises = MetaHub.map_to_array(links, function (property, name) {
+            var promises = MetaHub.map_to_array(cache.links, function (property, name) {
                 if (property.is_composite_sub)
                     return null;
 
-                var path = Query_Runner.get_path(property.name);
                 var subquery = source.subqueries[property.name];
 
                 if (source.include_links || subquery) {
@@ -4412,19 +4401,35 @@ var Ground;
                 }
 
                 return null;
-            }).concat(tree.map(function (trellis) {
+            }).concat(cache.tree.map(function (trellis) {
                 return function () {
                     return _this.ground.invoke(trellis.name + '.queried', row, _this);
                 };
             }));
 
             if (typeof source.map === 'object') {
-                replacement = this.process_map(row, source, links);
+                replacement = this.process_map(row, source, cache.links);
             }
 
             return when.all(promises).then(function () {
                 return replacement === undefined ? row : replacement;
             });
+        };
+
+        Query_Runner.get_trellis_cache = function (trellis) {
+            var cache = Query_Runner.trellis_cache[trellis.name];
+            if (!cache) {
+                Query_Runner.trellis_cache[trellis.name] = cache = {
+                    links: trellis.get_all_links(function (p) {
+                        return !p.is_virtual;
+                    }),
+                    tree: trellis.get_tree().filter(function (t) {
+                        return !t.is_virtual;
+                    })
+                };
+            }
+
+            return cache;
         };
 
         Query_Runner.prototype.query_link_property = function (seed, property, source) {
@@ -4451,16 +4456,30 @@ var Ground;
             if (this.row_cache)
                 return when.resolve(this.row_cache);
 
-            var tree = source.trellis.get_tree();
-            var promises = tree.map(function (trellis) {
-                return function () {
-                    return _this.ground.invoke(trellis.name + '.query', source);
-                };
-            });
-            promises = promises.concat(function () {
-                return _this.ground.invoke('*.query', source);
-            });
-
+            var promises = null, tree = null;
+            if (typeof this.ground.has_event == 'function') {
+                tree = source.trellis.get_tree().filter(function (t) {
+                    return _this.ground.has_event(t.name + '.query');
+                });
+                promises = tree.map(function (trellis) {
+                    return function () {
+                        return _this.ground.invoke(trellis.name + '.query', source);
+                    };
+                });
+                if (this.ground.has_event('*.query'))
+                    promises = promises.concat(function () {
+                        return _this.ground.invoke('*.query', source);
+                    });
+            } else {
+                tree = source.trellis.get_tree();
+                promises = tree.map(function (trellis) {
+                    return function () {
+                        return _this.ground.invoke(trellis.name + '.query', source);
+                    };
+                }).concat(function () {
+                    return _this.ground.invoke('*.query', source);
+                });
+            }
             var is_empty = false;
 
             if (source.filters) {
@@ -4584,6 +4603,7 @@ var Ground;
                 return result.objects[0];
             });
         };
+        Query_Runner.trellis_cache = {};
         return Query_Runner;
     })();
     Ground.Query_Runner = Query_Runner;
