@@ -46,6 +46,40 @@ module Ground {
     dir?
   }
 
+  function generate_operator_map() {
+    var like = {
+      "render": (result, filter, property, data)=> {
+        if (data.value !== null)
+          data.value = "'%" + data.value + "%'"
+      }
+    }
+
+    var in_operator = {
+      "render": (result, filter, property:Property, data)=> {
+        var values = data.value.map((v)=> property.get_sql_value(v))
+        data.value = "(" + values.join(', ') + ")"
+      },
+      "validate": (value, path, query)=> {
+        return MetaHub.is_array(value)
+      }
+    }
+
+    return {
+      '=': null,
+      'like': like,
+      'LIKE': like,
+      '!=': null,
+      '<': null,
+      '>': null,
+      '<=': null,
+      '>=': null,
+      '=>': null,
+      '=<': null,
+      'in': in_operator,
+      'IN': in_operator
+    }
+  }
+
 //  export interface Filter_Operator {
 //    symbol:string
 //    action
@@ -69,22 +103,7 @@ module Ground {
     subqueries = {}
     map = {}
     queries:Query_Builder[] = undefined // used for Unions
-    public static operators = {
-      '=': null,
-      'LIKE': {
-        "render": (result, filter, property, data)=> {
-          if (data.value !== null)
-            data.value = "'%" + data.value + "%'"
-        }
-      },
-      '!=': null,
-      '<': null,
-      '>': null,
-      '<=': null,
-      '>=': null,
-      '=>': null,
-      '=<': null
-    }
+    public static operators = generate_operator_map()
 
     filters:Query_Filter[] = []
 
@@ -106,15 +125,17 @@ module Ground {
     }
 
     add_filter(path:string, value = null, operator:string = '=') {
-
-//      if (!property)
-//        throw new Error('Trellis ' + this.trellis.name + ' does not contain a property named ' + property_name + '.')
-//      console.log('q', Query_Builder.operators)
-      if (Query_Builder.operators[operator] === undefined)
+      var operator_entry = Query_Builder.operators[operator]
+      if (operator_entry === undefined)
         throw new Error("Invalid operator: '" + operator + "'.")
 
-      if (value === undefined)
+      if (operator_entry && typeof operator_entry.validate === 'function') {
+        if (!operator_entry.validate(value, path, this))
+          throw new Error('Invalid value for filtering ' + path + ' using operator "' + operator + '".')
+      }
+      else if (value === undefined) {
         throw new Error('Cannot add property filter where value is undefined; property = ' + this.trellis.name + '.' + path + '.')
+      }
 
       var filter = <Query_Filter>{
         path: path,

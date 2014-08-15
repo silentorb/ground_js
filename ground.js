@@ -151,14 +151,13 @@ var Ground;
             this.primary_key = 'id';
             this.is_virtual = false;
             this.properties = {};
-            this.all_properties = {};
+            this.all_properties = null;
             this.ground = ground;
             this.name = name;
         }
         Trellis.prototype.add_property = function (name, source) {
             var property = new Ground.Property(name, source, this);
             this.properties[name] = property;
-            this.all_properties[name] = property;
             if (property.insert == 'trellis' && !this.type_property)
                 this.type_property = property;
 
@@ -193,6 +192,9 @@ var Ground;
         };
 
         Trellis.prototype.get_all_properties = function () {
+            if (this.all_properties)
+                return this.all_properties;
+
             var result = {};
             var tree = this.get_tree();
             for (var i = 0; i < tree.length; ++i) {
@@ -338,6 +340,11 @@ var Ground;
             } while(trellis = trellis.parent);
 
             return tree;
+        };
+
+        Trellis.prototype.harden = function () {
+            if (!this.all_properties)
+                this.all_properties = this.get_all_properties();
         };
 
         Trellis.prototype.initialize = function (all) {
@@ -1995,6 +2002,12 @@ var Ground;
                 return result;
             }
         };
+
+        Core.prototype.harden_schema = function () {
+            for (var i in this.trellises) {
+                this.trellises[i].harden();
+            }
+        };
         return Core;
     })(MetaHub.Meta_Object);
     Ground.Core = Core;
@@ -3544,6 +3557,42 @@ var Ground;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
+    function generate_operator_map() {
+        var like = {
+            "render": function (result, filter, property, data) {
+                if (data.value !== null)
+                    data.value = "'%" + data.value + "%'";
+            }
+        };
+
+        var in_operator = {
+            "render": function (result, filter, property, data) {
+                var values = data.value.map(function (v) {
+                    return property.get_sql_value(v);
+                });
+                data.value = "(" + values.join(', ') + ")";
+            },
+            "validate": function (value, path, query) {
+                return MetaHub.is_array(value);
+            }
+        };
+
+        return {
+            '=': null,
+            'like': like,
+            'LIKE': like,
+            '!=': null,
+            '<': null,
+            '>': null,
+            '<=': null,
+            '>=': null,
+            '=>': null,
+            '=<': null,
+            'in': in_operator,
+            'IN': in_operator
+        };
+    }
+
     
 
     var Query_Builder = (function () {
@@ -3574,11 +3623,16 @@ var Ground;
         Query_Builder.prototype.add_filter = function (path, value, operator) {
             if (typeof value === "undefined") { value = null; }
             if (typeof operator === "undefined") { operator = '='; }
-            if (Query_Builder.operators[operator] === undefined)
+            var operator_entry = Query_Builder.operators[operator];
+            if (operator_entry === undefined)
                 throw new Error("Invalid operator: '" + operator + "'.");
 
-            if (value === undefined)
+            if (operator_entry && typeof operator_entry.validate === 'function') {
+                if (!operator_entry.validate(value, path, this))
+                    throw new Error('Invalid value for filtering ' + path + ' using operator "' + operator + '".');
+            } else if (value === undefined) {
                 throw new Error('Cannot add property filter where value is undefined; property = ' + this.trellis.name + '.' + path + '.');
+            }
 
             var filter = {
                 path: path,
@@ -3802,22 +3856,7 @@ var Ground;
                 return result.objects[0];
             });
         };
-        Query_Builder.operators = {
-            '=': null,
-            'LIKE': {
-                "render": function (result, filter, property, data) {
-                    if (data.value !== null)
-                        data.value = "'%" + data.value + "%'";
-                }
-            },
-            '!=': null,
-            '<': null,
-            '>': null,
-            '<=': null,
-            '>=': null,
-            '=>': null,
-            '=<': null
-        };
+        Query_Builder.operators = generate_operator_map();
         return Query_Builder;
     })();
     Ground.Query_Builder = Query_Builder;

@@ -444,6 +444,12 @@ module Ground {
       }
     }
 
+    harden_schema() {
+      for (var i in this.trellises) {
+        this.trellises[i].harden()
+      }
+    }
+
   }
 }
 

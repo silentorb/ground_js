@@ -40,14 +40,14 @@ declare module Ground {
         public properties: {
             [name: string]: Ground.Property;
         };
-        public all_properties: {};
+        private all_properties;
         public type_property: Ground.Property;
         constructor(name: string, ground: Ground.Core);
         public add_property(name: string, source: any): Ground.Property;
         public check_primary_key(): void;
         public clone_property(property_name: string, target_trellis: Trellis): void;
         public get_all_links(filter?: (property: Ground.Property) => boolean): {};
-        public get_all_properties(): {};
+        public get_all_properties(): any;
         public get_property(name: string): Ground.Property;
         public get_core_properties(): {};
         public get_id(source: any): any;
@@ -62,6 +62,7 @@ declare module Ground {
         public get_table_name(): string;
         public get_table_query(): string;
         public get_tree(): Trellis[];
+        public harden(): void;
         public initialize(all: any): void;
         public load_from_object(source: Ground.ITrellis_Source): void;
         public query(): string;
@@ -296,6 +297,7 @@ declare module Ground {
         static to_bool(input: any): boolean;
         public export_schema(): ISchema_Source;
         static perspective(seed: any, trellis: Ground.Trellis, property: Ground.Property): any;
+        public harden_schema(): void;
     }
 }
 declare module Ground {
@@ -669,6 +671,9 @@ declare module Ground {
         public queries: Query_Builder[];
         static operators: {
             '=': any;
+            'like': {
+                "render": (result: any, filter: any, property: any, data: any) => void;
+            };
             'LIKE': {
                 "render": (result: any, filter: any, property: any, data: any) => void;
             };
@@ -679,6 +684,14 @@ declare module Ground {
             '>=': any;
             '=>': any;
             '=<': any;
+            'in': {
+                "render": (result: any, filter: any, property: Ground.Property, data: any) => void;
+                "validate": (value: any, path: any, query: any) => boolean;
+            };
+            'IN': {
+                "render": (result: any, filter: any, property: Ground.Property, data: any) => void;
+                "validate": (value: any, path: any, query: any) => boolean;
+            };
         };
         public filters: Query_Filter[];
         constructor(trellis: Ground.Trellis);
@@ -722,7 +735,7 @@ declare module Ground {
         static counter: number;
         constructor(ground: Ground.Core);
         static apply_arguments(sql: string, args: any): string;
-        static get_properties(source: Ground.Query_Builder): {};
+        static get_properties(source: Ground.Query_Builder): any;
         static generate_property_join(property: Ground.Property, seeds: any): string;
         public generate_sql(parts: Query_Parts, source: Ground.Query_Builder): string;
         public generate_count(parts: Query_Parts): string;
