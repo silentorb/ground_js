@@ -308,6 +308,7 @@ declare module Ground {
         share?: string;
         other_table?: string;
         other_field?: string;
+        sql?: string;
     }
     enum Link_Field_Type {
         identity = 0,

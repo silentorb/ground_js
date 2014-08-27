@@ -148,8 +148,16 @@ module Ground {
         var property = properties[name];
         // Virtual properties aren't saved to the database
         // Useful when you define custom serialization hooks
-        if (property.type == 'list' || property.is_virtual)
+        if (property.type == 'list')
           return
+
+        if (property.is_virtual) {
+          var field = property.get_field_override()
+          if (field && typeof field.sql == 'string')
+            fields.push(field.sql + ' AS ' + property.get_field_name())
+
+          return
+        }
 
         if (property.name != source.trellis.primary_key || include_primary_key) {
           var sql = property.get_field_query()
@@ -265,8 +273,14 @@ module Ground {
 
       var property_chain = Query_Renderer.add_path(filter.path, source.trellis, result)
       var property = property_chain[property_chain.length - 1]
-
-      if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
+      if (property.is_virtual) {
+        var field = property.get_field_override()
+        if (field && typeof field.sql == 'string')
+          reference = field.sql
+        else
+          throw new Error("Cannot create filter with invalid virtual property: " + property.name + ".")
+      }
+      else if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
         reference = Join.get_end_query(property_chain)
       }
       else {
@@ -396,7 +410,11 @@ module Ground {
         var sql
         if (sort.path) {
           var property_chain = Query_Renderer.add_path(sort.path, trellis, result)
-          sql = Join.get_end_query(property_chain)
+          var property = property_chain[property_chain.length - 1]
+
+          sql = property.is_virtual
+            ? property.get_field_name()
+            : Join.get_end_query(property_chain)
         }
         else {
           if (!properties[sort.property])

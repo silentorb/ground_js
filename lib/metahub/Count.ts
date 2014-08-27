@@ -121,7 +121,7 @@ module Ground {
         + "WHERE " + trellis.query_primary_key() + " = " + key
 
       return this.ground.db.query(sql)
-        .then(() => this.invoke('changed'))
+        .then(() => this.invoke('changed', key))
     }
   }
 }

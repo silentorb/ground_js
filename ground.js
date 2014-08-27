@@ -3030,7 +3030,7 @@ var Ground;
             var sql = "UPDATE " + trellis.get_table_name() + " SET " + this.count_name + " =\n" + this.count_fields.join(' + ') + " " + "WHERE " + trellis.query_primary_key() + " = " + key;
 
             return this.ground.db.query(sql).then(function () {
-                return _this.invoke('changed');
+                return _this.invoke('changed', key);
             });
         };
         return Multi_Count;
@@ -3976,8 +3976,16 @@ var Ground;
             var render_field = function (name) {
                 var property = properties[name];
 
-                if (property.type == 'list' || property.is_virtual)
+                if (property.type == 'list')
                     return;
+
+                if (property.is_virtual) {
+                    var field = property.get_field_override();
+                    if (field && typeof field.sql == 'string')
+                        fields.push(field.sql + ' AS ' + property.get_field_name());
+
+                    return;
+                }
 
                 if (property.name != source.trellis.primary_key || include_primary_key) {
                     var sql = property.get_field_query();
@@ -4085,8 +4093,13 @@ var Ground;
 
             var property_chain = Query_Renderer.add_path(filter.path, source.trellis, result);
             var property = property_chain[property_chain.length - 1];
-
-            if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
+            if (property.is_virtual) {
+                var field = property.get_field_override();
+                if (field && typeof field.sql == 'string')
+                    reference = field.sql;
+                else
+                    throw new Error("Cannot create filter with invalid virtual property: " + property.name + ".");
+            } else if (property.get_relationship() == 3 /* many_to_many */ || property_chain.length > 1) {
                 reference = Ground.Join.get_end_query(property_chain);
             } else {
                 reference = property.query();
@@ -4206,7 +4219,9 @@ var Ground;
                 var sql;
                 if (sort.path) {
                     var property_chain = Query_Renderer.add_path(sort.path, trellis, result);
-                    sql = Ground.Join.get_end_query(property_chain);
+                    var property = property_chain[property_chain.length - 1];
+
+                    sql = property.is_virtual ? property.get_field_name() : Ground.Join.get_end_query(property_chain);
                 } else {
                     if (!properties[sort.property])
                         throw new Error(trellis.name + ' does not contain sort property: ' + sort.property);

@@ -7,6 +7,7 @@ module Ground {
     share?:string
     other_table?:string
     other_field?:string
+    sql?:string
   }
 
   export enum Link_Field_Type {
