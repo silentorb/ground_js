@@ -53,7 +53,7 @@ module Ground {
       return query
     }
 
-    private static get_many_list(seed, property:Property, relationship:Relationships, source:Query_Builder):Promise {
+    private static get_many_list(seed, property:Property, relationship:Relationships, source:Query_Builder, query_result:Query_Result):Promise {
       var id = seed[property.parent.primary_key]
       if (id === undefined || id === null)
         throw new Error('Cannot get many-to-many list when seed id is null.')
@@ -72,7 +72,7 @@ module Ground {
 //        query.add_filter(other_property.name, id)
 
       query.add_filter(other_property.name, id)
-      return query.run();
+      return query.run(query_result);
     }
 
 //    private static get_path(...args:string[]):string {
@@ -84,18 +84,18 @@ module Ground {
 //      return items.join('/');
 //    }
 
-    private static get_reference_object(row, property:Property, source:Query_Builder) {
+    private static get_reference_object(row, property:Property, source:Query_Builder, query_result:Query_Result) {
       var query = Query_Runner.create_sub_query(property.other_trellis, property, source)
       var value = row[property.name]
       if (!value)
         return when.resolve(value)
 
       query.add_key_filter(value);
-      return query.run()
+      return query.run(query_result)
         .then((result) => result.objects[0])
     }
 
-    process_map(row, source:Query_Builder, links) {
+    process_map(row, source:Query_Builder, links, query_result:Query_Result) {
       var replacement = undefined
       var all_properties = source.trellis.get_all_properties()
       var context = {
@@ -120,7 +120,7 @@ module Ground {
         var subquery = source.subqueries[property.name]
 
         if (source.include_links || subquery) {
-          return this.query_link_property(row, property, source).then((value) => {
+          return this.query_link_property(row, property, source, query_result).then((value) => {
             row[name] = value
             return row
           })
@@ -132,7 +132,7 @@ module Ground {
       return replacement
     }
 
-    process_row_step_one(row, source:Query_Builder):Promise {
+    process_row_step_one(row, source:Query_Builder, query_result:Query_Result):Promise {
       var type_property = source.trellis.type_property
 
       var trellis = type_property && row[type_property.name]
@@ -147,15 +147,15 @@ module Ground {
         if (source.map)
           query.map = source.map
 
-        return query.run_single()
-          .then((row)=> this.process_row_step_two(row, source, trellis))
+        return query.run_single(query_result)
+          .then((row)=> this.process_row_step_two(row, source, trellis, query_result))
       }
       else {
-        return this.process_row_step_two(row, source, trellis)
+        return this.process_row_step_two(row, source, trellis, query_result)
       }
     }
 
-    process_row_step_two(row, source:Query_Builder, trellis:Trellis):Promise {
+    process_row_step_two(row, source:Query_Builder, trellis:Trellis, query_result:Query_Result):Promise {
       var name, property, replacement = undefined
 
       var properties = trellis.get_core_properties()
@@ -192,7 +192,7 @@ module Ground {
         var subquery = source.subqueries[property.name]
 
         if (source.include_links || subquery) {
-          return this.query_link_property(row, property, source).then((value) => {
+          return this.query_link_property(row, property, source, query_result).then((value) => {
             row[name] = value
             return row
           })
@@ -203,7 +203,7 @@ module Ground {
         .concat(cache.tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this)))
 
       if (typeof source.map === 'object') {
-        replacement = this.process_map(row, source, cache.links)
+        replacement = this.process_map(row, source, cache.links, query_result)
       }
 
       return when.all(promises)
@@ -223,16 +223,16 @@ module Ground {
       return cache
     }
 
-    query_link_property(seed, property, source:Query_Builder):Promise {
+    query_link_property(seed, property, source:Query_Builder, query_result:Query_Result):Promise {
       var relationship = property.get_relationship()
 
       switch (relationship) {
         case Relationships.one_to_one:
-          return Query_Runner.get_reference_object(seed, property, source)
+          return Query_Runner.get_reference_object(seed, property, source, query_result)
           break
         case Relationships.one_to_many:
         case Relationships.many_to_many:
-          return Query_Runner.get_many_list(seed, property, relationship, source)
+          return Query_Runner.get_many_list(seed, property, relationship, source, query_result)
             .then((result)=> result ? result.objects : [])
           break
       }
@@ -248,10 +248,10 @@ module Ground {
       // This requires a new version of vineyard-metahub, which isn't updated as frequently so
       // we're supporting both the more and less optimized methods.
       var promises = null, tree = null
-      if (typeof this.ground.has_event == 'function') {
-        tree = source.trellis.get_tree().filter((t)=> this.ground.has_event(t.name + '.query'))
+      if (typeof this.ground['has_event'] == 'function') {
+        tree = source.trellis.get_tree().filter((t)=> this.ground['has_event'](t.name + '.query'))
         promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
-        if (this.ground.has_event('*.query'))
+        if (this.ground['has_event']('*.query'))
           promises = promises.concat(()=> this.ground.invoke('*.query', source))
       }
       else {
@@ -370,23 +370,24 @@ module Ground {
       return this.source.queries[row._query_id_]
     }
 
-    run():Promise {
+    run(query_result:Query_Result):Promise {
       if (this.ground.log_queries) {
         var temp = new Error()
         this.run_stack = temp['stack']
       }
 
       return this.run_core()
-        .then((result) => when.all(result.objects.map((row) => this.process_row_step_one(row, this.get_source(row))))
+        .then((result) => when.all(result.objects.map((row) => this.process_row_step_one(row, this.get_source(row), query_result)))
           .then((rows)=> {
             result.objects = rows
+            result.query_count = query_result.queries
             return result
           })
       )
     }
 
-    run_single():Promise {
-      return this.run()
+    run_single(query_result:Query_Result):Promise {
+      return this.run(query_result)
         .then((result)=> result.objects[0])
     }
   }

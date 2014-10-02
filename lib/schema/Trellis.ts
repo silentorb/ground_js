@@ -340,7 +340,7 @@ module Ground {
       query.extend({
         properties: required_properties
       })
-      return query.run_single()
+      return query.run_single({ queries: 0 })
     }
 
     export_schema():ITrellis_Source {

@@ -2,6 +2,10 @@
 
 module Ground {
 
+  export interface Query_Result {
+    queries:number
+  }
+
   export interface IPager {
     limit?
     offset?
@@ -346,14 +350,15 @@ module Ground {
       return undefined
     }
 
-    run():Promise {
+    run(query_result:Query_Result):Promise {
+      ++query_result.queries
       var runner = new Query_Runner(this)
 //      console.log('filters', this.filters)
-      return runner.run()
+      return runner.run(query_result)
     }
 
-    run_single():Promise {
-      return this.run()
+    run_single(query_result:Query_Result):Promise {
+      return this.run(query_result)
         .then((result)=> result.objects[0])
     }
   }

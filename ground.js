@@ -451,7 +451,7 @@ var Ground;
             query.extend({
                 properties: required_properties
             });
-            return query.run_single();
+            return query.run_single({ queries: 0 });
         };
 
         Trellis.prototype.export_schema = function () {
@@ -1534,7 +1534,7 @@ var Ground;
             var other_trellis = other_property.parent;
             var query = other_trellis.ground.create_query(other_trellis.name);
             query.add_key_filter(id);
-            return query.run().then(function (objects) {
+            return query.run({ queries: 0 }).then(function (objects) {
                 return when.all(objects.map(function (object) {
                     return _this.run_delete(other_trellis, object, depth + 1);
                 }));
@@ -3852,14 +3852,15 @@ var Ground;
             return undefined;
         };
 
-        Query_Builder.prototype.run = function () {
+        Query_Builder.prototype.run = function (query_result) {
+            ++query_result.queries;
             var runner = new Ground.Query_Runner(this);
 
-            return runner.run();
+            return runner.run(query_result);
         };
 
-        Query_Builder.prototype.run_single = function () {
-            return this.run().then(function (result) {
+        Query_Builder.prototype.run_single = function (query_result) {
+            return this.run(query_result).then(function (result) {
                 return result.objects[0];
             });
         };
@@ -4293,7 +4294,7 @@ var Ground;
             return query;
         };
 
-        Query_Runner.get_many_list = function (seed, property, relationship, source) {
+        Query_Runner.get_many_list = function (seed, property, relationship, source, query_result) {
             var id = seed[property.parent.primary_key];
             if (id === undefined || id === null)
                 throw new Error('Cannot get many-to-many list when seed id is null.');
@@ -4305,22 +4306,22 @@ var Ground;
             var query = Query_Runner.create_sub_query(other_property.parent, property, source);
 
             query.add_filter(other_property.name, id);
-            return query.run();
+            return query.run(query_result);
         };
 
-        Query_Runner.get_reference_object = function (row, property, source) {
+        Query_Runner.get_reference_object = function (row, property, source, query_result) {
             var query = Query_Runner.create_sub_query(property.other_trellis, property, source);
             var value = row[property.name];
             if (!value)
                 return when.resolve(value);
 
             query.add_key_filter(value);
-            return query.run().then(function (result) {
+            return query.run(query_result).then(function (result) {
                 return result.objects[0];
             });
         };
 
-        Query_Runner.prototype.process_map = function (row, source, links) {
+        Query_Runner.prototype.process_map = function (row, source, links, query_result) {
             var _this = this;
             var replacement = undefined;
             var all_properties = source.trellis.get_all_properties();
@@ -4344,7 +4345,7 @@ var Ground;
                 var subquery = source.subqueries[property.name];
 
                 if (source.include_links || subquery) {
-                    return _this.query_link_property(row, property, source).then(function (value) {
+                    return _this.query_link_property(row, property, source, query_result).then(function (value) {
                         row[name] = value;
                         return row;
                     });
@@ -4356,7 +4357,7 @@ var Ground;
             return replacement;
         };
 
-        Query_Runner.prototype.process_row_step_one = function (row, source) {
+        Query_Runner.prototype.process_row_step_one = function (row, source, query_result) {
             var _this = this;
             var type_property = source.trellis.type_property;
 
@@ -4370,15 +4371,15 @@ var Ground;
                 if (source.map)
                     query.map = source.map;
 
-                return query.run_single().then(function (row) {
-                    return _this.process_row_step_two(row, source, trellis);
+                return query.run_single(query_result).then(function (row) {
+                    return _this.process_row_step_two(row, source, trellis, query_result);
                 });
             } else {
-                return this.process_row_step_two(row, source, trellis);
+                return this.process_row_step_two(row, source, trellis, query_result);
             }
         };
 
-        Query_Runner.prototype.process_row_step_two = function (row, source, trellis) {
+        Query_Runner.prototype.process_row_step_two = function (row, source, trellis, query_result) {
             var _this = this;
             var name, property, replacement = undefined;
 
@@ -4411,7 +4412,7 @@ var Ground;
                 var subquery = source.subqueries[property.name];
 
                 if (source.include_links || subquery) {
-                    return _this.query_link_property(row, property, source).then(function (value) {
+                    return _this.query_link_property(row, property, source, query_result).then(function (value) {
                         row[name] = value;
                         return row;
                     });
@@ -4425,7 +4426,7 @@ var Ground;
             }));
 
             if (typeof source.map === 'object') {
-                replacement = this.process_map(row, source, cache.links);
+                replacement = this.process_map(row, source, cache.links, query_result);
             }
 
             return when.all(promises).then(function () {
@@ -4449,16 +4450,16 @@ var Ground;
             return cache;
         };
 
-        Query_Runner.prototype.query_link_property = function (seed, property, source) {
+        Query_Runner.prototype.query_link_property = function (seed, property, source, query_result) {
             var relationship = property.get_relationship();
 
             switch (relationship) {
                 case 1 /* one_to_one */:
-                    return Query_Runner.get_reference_object(seed, property, source);
+                    return Query_Runner.get_reference_object(seed, property, source, query_result);
                     break;
                 case 2 /* one_to_many */:
                 case 3 /* many_to_many */:
-                    return Query_Runner.get_many_list(seed, property, relationship, source).then(function (result) {
+                    return Query_Runner.get_many_list(seed, property, relationship, source, query_result).then(function (result) {
                         return result ? result.objects : [];
                     });
                     break;
@@ -4474,16 +4475,16 @@ var Ground;
                 return when.resolve(this.row_cache);
 
             var promises = null, tree = null;
-            if (typeof this.ground.has_event == 'function') {
+            if (typeof this.ground['has_event'] == 'function') {
                 tree = source.trellis.get_tree().filter(function (t) {
-                    return _this.ground.has_event(t.name + '.query');
+                    return _this.ground['has_event'](t.name + '.query');
                 });
                 promises = tree.map(function (trellis) {
                     return function () {
                         return _this.ground.invoke(trellis.name + '.query', source);
                     };
                 });
-                if (this.ground.has_event('*.query'))
+                if (this.ground['has_event']('*.query'))
                     promises = promises.concat(function () {
                         return _this.ground.invoke('*.query', source);
                     });
@@ -4600,7 +4601,7 @@ var Ground;
             return this.source.queries[row._query_id_];
         };
 
-        Query_Runner.prototype.run = function () {
+        Query_Runner.prototype.run = function (query_result) {
             var _this = this;
             if (this.ground.log_queries) {
                 var temp = new Error();
@@ -4609,16 +4610,17 @@ var Ground;
 
             return this.run_core().then(function (result) {
                 return when.all(result.objects.map(function (row) {
-                    return _this.process_row_step_one(row, _this.get_source(row));
+                    return _this.process_row_step_one(row, _this.get_source(row), query_result);
                 })).then(function (rows) {
                     result.objects = rows;
+                    result.query_count = query_result.queries;
                     return result;
                 });
             });
         };
 
-        Query_Runner.prototype.run_single = function () {
-            return this.run().then(function (result) {
+        Query_Runner.prototype.run_single = function (query_result) {
+            return this.run(query_result).then(function (result) {
                 return result.objects[0];
             });
         };

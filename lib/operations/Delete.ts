@@ -26,7 +26,7 @@ module Ground {
       var other_trellis = other_property.parent
       var query = other_trellis.ground.create_query(other_trellis.name)
       query.add_key_filter(id)
-      return query.run()
+      return query.run({ queries: 0 })
         .then((objects)=> when.all(
           objects.map((object)=> this.run_delete(other_trellis, object, depth + 1))
         )

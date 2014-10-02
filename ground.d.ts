@@ -621,6 +621,9 @@ declare module Ground {
     }
 }
 declare module Ground {
+    interface Query_Result {
+        queries: number;
+    }
     interface IPager {
         limit?: any;
         offset?: any;
@@ -713,8 +716,8 @@ declare module Ground {
         static create_join_filter(property: Ground.Property, seed: any): Query_Filter;
         public extend(source: any): void;
         public get_primary_key_value(): any;
-        public run(): Promise;
-        public run_single(): Promise;
+        public run(query_result: Query_Result): Promise;
+        public run_single(query_result: Query_Result): Promise;
     }
 }
 declare module Ground {
@@ -776,19 +779,19 @@ declare module Ground {
         constructor(source: Ground.Query_Builder);
         private static generate_property_join(property, seeds);
         private static create_sub_query(trellis, property, source);
-        private static get_many_list(seed, property, relationship, source);
-        private static get_reference_object(row, property, source);
-        public process_map(row: any, source: Ground.Query_Builder, links: any): any;
-        public process_row_step_one(row: any, source: Ground.Query_Builder): Promise;
-        public process_row_step_two(row: any, source: Ground.Query_Builder, trellis: Ground.Trellis): Promise;
+        private static get_many_list(seed, property, relationship, source, query_result);
+        private static get_reference_object(row, property, source, query_result);
+        public process_map(row: any, source: Ground.Query_Builder, links: any, query_result: Ground.Query_Result): any;
+        public process_row_step_one(row: any, source: Ground.Query_Builder, query_result: Ground.Query_Result): Promise;
+        public process_row_step_two(row: any, source: Ground.Query_Builder, trellis: Ground.Trellis, query_result: Ground.Query_Result): Promise;
         private static get_trellis_cache(trellis);
-        public query_link_property(seed: any, property: any, source: Ground.Query_Builder): Promise;
+        public query_link_property(seed: any, property: any, source: Ground.Query_Builder, query_result: Ground.Query_Result): Promise;
         public prepare(): Promise;
         public render(query_id?: number): Promise;
         public run_core(): Promise;
         public get_source(row: any): Ground.Query_Builder;
-        public run(): Promise;
-        public run_single(): Promise;
+        public run(query_result: Ground.Query_Result): Promise;
+        public run_single(query_result: Ground.Query_Result): Promise;
     }
 }
 declare module "vineyard-ground" {
