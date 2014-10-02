@@ -35,6 +35,7 @@ module Ground {
     queries?:External_Query_Source[]
     expires?:number
     key?:string
+    version?
   }
 
   export class Query {

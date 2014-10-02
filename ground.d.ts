@@ -99,6 +99,7 @@ declare module Ground {
         queries?: External_Query_Source[];
         expires?: number;
         key?: string;
+        version?: any;
     }
     class Query {
         public ground: Ground.Core;
