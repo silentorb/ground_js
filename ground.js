@@ -3907,9 +3907,11 @@ var Ground;
         };
 
         Query_Renderer.prototype.generate_sql = function (parts, source) {
-            var sql = 'SELECT ' + parts.fields + parts.from + parts.joins + parts.filters + parts.sorts;
+            var sql = 'SELECT ' + parts.fields + parts.from + parts.joins + parts.filters;
 
             sql += "\nGROUP BY " + source.trellis.query_primary_key();
+
+            sql += parts.sorts;
 
             for (var i = 0; i < source.transforms.length; ++i) {
                 var transform = source.transforms[i];
