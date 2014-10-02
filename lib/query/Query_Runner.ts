@@ -380,7 +380,7 @@ module Ground {
         .then((result) => when.all(result.objects.map((row) => this.process_row_step_one(row, this.get_source(row), query_result)))
           .then((rows)=> {
             result.objects = rows
-            result.query_count = query_result.queries
+            result.query_stats = { count: query_result.queries }
             return result
           })
       )

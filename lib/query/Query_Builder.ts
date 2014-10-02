@@ -350,14 +350,17 @@ module Ground {
       return undefined
     }
 
-    run(query_result:Query_Result):Promise {
+    run(query_result:Query_Result = undefined):Promise {
+      if (!query_result)
+        query_result = { queries: 0 }
+
       ++query_result.queries
       var runner = new Query_Runner(this)
 //      console.log('filters', this.filters)
       return runner.run(query_result)
     }
 
-    run_single(query_result:Query_Result):Promise {
+    run_single(query_result:Query_Result = undefined):Promise {
       return this.run(query_result)
         .then((result)=> result.objects[0])
     }

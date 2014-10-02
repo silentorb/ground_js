@@ -3853,6 +3853,10 @@ var Ground;
         };
 
         Query_Builder.prototype.run = function (query_result) {
+            if (typeof query_result === "undefined") { query_result = undefined; }
+            if (!query_result)
+                query_result = { queries: 0 };
+
             ++query_result.queries;
             var runner = new Ground.Query_Runner(this);
 
@@ -3860,6 +3864,7 @@ var Ground;
         };
 
         Query_Builder.prototype.run_single = function (query_result) {
+            if (typeof query_result === "undefined") { query_result = undefined; }
             return this.run(query_result).then(function (result) {
                 return result.objects[0];
             });
@@ -4613,7 +4618,7 @@ var Ground;
                     return _this.process_row_step_one(row, _this.get_source(row), query_result);
                 })).then(function (rows) {
                     result.objects = rows;
-                    result.query_count = query_result.queries;
+                    result.query_stats = { count: query_result.queries };
                     return result;
                 });
             });

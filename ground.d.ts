@@ -716,8 +716,8 @@ declare module Ground {
         static create_join_filter(property: Ground.Property, seed: any): Query_Filter;
         public extend(source: any): void;
         public get_primary_key_value(): any;
-        public run(query_result: Query_Result): Promise;
-        public run_single(query_result: Query_Result): Promise;
+        public run(query_result?: Query_Result): Promise;
+        public run_single(query_result?: Query_Result): Promise;
     }
 }
 declare module Ground {
