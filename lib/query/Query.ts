@@ -33,6 +33,8 @@ module Ground {
     map?
     type?:string
     queries?:External_Query_Source[]
+    expires?:number
+    key?:string
   }
 
   export class Query {

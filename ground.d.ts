@@ -97,6 +97,8 @@ declare module Ground {
         map?: any;
         type?: string;
         queries?: External_Query_Source[];
+        expires?: number;
+        key?: string;
     }
     class Query {
         public ground: Ground.Core;

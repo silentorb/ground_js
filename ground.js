@@ -3903,6 +3903,8 @@ var Ground;
         Query_Renderer.prototype.generate_sql = function (parts, source) {
             var sql = 'SELECT ' + parts.fields + parts.from + parts.joins + parts.filters + parts.sorts;
 
+            sql += "\nGROUP BY " + source.trellis.query_primary_key();
+
             for (var i = 0; i < source.transforms.length; ++i) {
                 var transform = source.transforms[i];
                 var temp_table = 'transform_' + (i + 1);
@@ -4548,17 +4550,19 @@ var Ground;
 
                 var source = _this.source;
                 var parts = _this.renderer.generate_parts(source, query_id);
-                var sql = source.type == 'union' ? _this.renderer.generate_union(parts, preparation.queries, source) : _this.renderer.generate_sql(parts, source);
+                return _this.ground.invoke(source.trellis.name + '.query.sql', parts, source).then(function () {
+                    var sql = source.type == 'union' ? _this.renderer.generate_union(parts, preparation.queries, source) : _this.renderer.generate_sql(parts, source);
 
-                sql = sql.replace(/\r/g, "\n");
-                if (_this.ground.log_queries)
-                    console.log('\nquery', sql + '\n');
+                    sql = sql.replace(/\r/g, "\n");
+                    if (_this.ground.log_queries)
+                        console.log('\nquery', sql + '\n');
 
-                return {
-                    sql: sql,
-                    parts: parts,
-                    preparation: preparation
-                };
+                    return {
+                        sql: sql,
+                        parts: parts,
+                        preparation: preparation
+                    };
+                });
             });
         };
 

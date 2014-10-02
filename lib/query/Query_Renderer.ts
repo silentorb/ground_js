@@ -61,6 +61,8 @@ module Ground {
         + parts.filters
         + parts.sorts
 
+      sql += "\nGROUP BY " + source.trellis.query_primary_key()
+
       for (var i = 0; i < source.transforms.length; ++i) {
         var transform = source.transforms[i]
         var temp_table = 'transform_' + (i + 1)

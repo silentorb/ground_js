@@ -311,19 +311,22 @@ module Ground {
 
           var source = this.source
           var parts = this.renderer.generate_parts(source, query_id)
-          var sql = source.type == 'union'
-            ? this.renderer.generate_union(parts, preparation.queries, source)
-            : this.renderer.generate_sql(parts, source)
+          return this.ground.invoke(source.trellis.name + '.query.sql', parts, source)
+            .then(()=> {
+              var sql = source.type == 'union'
+                ? this.renderer.generate_union(parts, preparation.queries, source)
+                : this.renderer.generate_sql(parts, source)
 
-          sql = sql.replace(/\r/g, "\n")
-          if (this.ground.log_queries)
-            console.log('\nquery', sql + '\n')
+              sql = sql.replace(/\r/g, "\n")
+              if (this.ground.log_queries)
+                console.log('\nquery', sql + '\n')
 
-          return {
-            sql: sql,
-            parts: parts,
-            preparation: preparation
-          }
+              return {
+                sql: sql,
+                parts: parts,
+                preparation: preparation
+              }
+            })
         })
     }
 
