@@ -146,7 +146,7 @@ module Ground {
             ' = ' + other.properties[property.name].query()
       )
 
-      return 'JOIN  ' + other.get_table_query() +
+      return 'JOIN ' + other.get_table_query() +
         ' ON ' + conditions.join(' AND ');
     }
 
@@ -340,7 +340,7 @@ module Ground {
       query.extend({
         properties: required_properties
       })
-      return query.run_single({ queries: 0 })
+      return query.run_single({ query_count: 0 })
     }
 
     export_schema():ITrellis_Source {

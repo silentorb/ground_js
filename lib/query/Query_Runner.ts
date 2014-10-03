@@ -56,7 +56,7 @@ module Ground {
     private static get_many_list(seed, property:Property, relationship:Relationships, source:Query_Builder, query_result:Query_Result):Promise {
       var id = seed[property.parent.primary_key]
       if (id === undefined || id === null)
-        throw new Error('Cannot get many-to-many list when seed id is null.')
+        throw new Error('Cannot get many-to-many list when seed id is null for property ' + property.fullname())
 
       var other_property = property.get_other_property();
       if (!other_property)
@@ -132,7 +132,7 @@ module Ground {
       return replacement
     }
 
-    process_row_step_one(row, source:Query_Builder, query_result:Query_Result):Promise {
+    process_row_step_one(row, source:Query_Builder, query_result:Query_Result, parts:Query_Parts):Promise {
       var type_property = source.trellis.type_property
 
       var trellis = type_property && row[type_property.name]
@@ -148,14 +148,14 @@ module Ground {
           query.map = source.map
 
         return query.run_single(query_result)
-          .then((row)=> this.process_row_step_two(row, source, trellis, query_result))
+          .then((row)=> this.process_row_step_two(row, source, trellis, query_result, parts))
       }
       else {
-        return this.process_row_step_two(row, source, trellis, query_result)
+        return this.process_row_step_two(row, source, trellis, query_result, parts)
       }
     }
 
-    process_row_step_two(row, source:Query_Builder, trellis:Trellis, query_result:Query_Result):Promise {
+    process_row_step_two(row, source:Query_Builder, trellis:Trellis, query_result:Query_Result, parts:Query_Parts):Promise {
       var name, property, replacement = undefined
 
       var properties = trellis.get_core_properties()
@@ -180,6 +180,10 @@ module Ground {
         }
       }
 
+      for (var i in parts.reference_hierarchy) {
+        parts.reference_hierarchy[i].cleanup_entity(row, row)
+      }
+
       var cache = Query_Runner.get_trellis_cache(trellis)
 //      var links = trellis.get_all_links((p)=> !p.is_virtual);
 //      var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
@@ -188,27 +192,55 @@ module Ground {
         if (property.is_composite_sub)
           return null
 
-//        var path = Query_Runner.get_path(property.name)
         var subquery = source.subqueries[property.name]
 
-        if (source.include_links || subquery) {
+        if (property.type == 'list' && (source.include_links || subquery)) {
           return this.query_link_property(row, property, source, query_result).then((value) => {
             row[name] = value
             return row
           })
+        }
+        else if (property.type == 'reference' && subquery) {
+          return this.process_reference_children(row[property.name], subquery, query_result)
+          .then(()=> row)
         }
 
         return null
       })
         .concat(cache.tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this)))
 
-      if (typeof source.map === 'object') {
+      if (typeof source.map === 'object' && Object.keys(source.map).length > 0) {
         replacement = this.process_map(row, source, cache.links, query_result)
       }
 
       return when.all(promises)
 //        .then(()=> this.ground.invoke(trellis.name + '.queried', row, this))
         .then(()=> replacement === undefined ? row : replacement)
+    }
+
+    process_reference_children(child, query:Query_Builder, query_result:Query_Result):Promise {
+      if (!child)
+        return when.resolve()
+
+      var promises = []
+
+      for (name in query.subqueries) {
+        var property = query.trellis.get_property(name)
+        var subquery = query.subqueries[name]
+        promises.push(()=> property.type == 'list'
+            ? subquery.run(query_result)
+            .then((result)=> {
+              child[property.name] = result.objects
+            })
+            : subquery.run_single(query_result)
+            .then((row)=> {
+              child[property.name] = row
+            })
+        )
+      }
+
+      var sequence = require('when/sequence')
+      return sequence(promises)
     }
 
     private static get_trellis_cache(trellis):Trellis_Cache {
@@ -240,25 +272,16 @@ module Ground {
       throw new Error('Could not find relationship: ' + relationship + '.')
     }
 
-    prepare():Promise {
+    prepare(query_id:number = undefined):Promise {
       var source = this.source
       if (this.row_cache)
         return when.resolve(this.row_cache)
 
-      // This requires a new version of vineyard-metahub, which isn't updated as frequently so
-      // we're supporting both the more and less optimized methods.
-      var promises = null, tree = null
-      if (typeof this.ground['has_event'] == 'function') {
-        tree = source.trellis.get_tree().filter((t)=> this.ground['has_event'](t.name + '.query'))
-        promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
-        if (this.ground['has_event']('*.query'))
-          promises = promises.concat(()=> this.ground.invoke('*.query', source))
-      }
-      else {
-        tree = source.trellis.get_tree()
-        promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
-          .concat(()=> this.ground.invoke('*.query', source))
-      }
+      var tree = source.trellis.get_tree().filter((t)=> this.ground['has_event'](t.name + '.query'))
+      var promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
+      if (this.ground['has_event']('*.query'))
+        promises = promises.concat(()=> this.ground.invoke('*.query', source))
+
       var is_empty = false
 
       if (source.filters) {
@@ -278,89 +301,101 @@ module Ground {
           }
         }
       }
-
-      var queries:string[] = []
-
-      if (source.type == 'union') {
-        var query_index = 0
-        promises = promises.concat(source.queries.map((query)=> ()=> {
-          var runner = new Query_Runner(query)
-          return runner.render(query_index++)
-            .then((result)=> {
-              queries.push(result.sql)
-              return when.resolve()
-            })
-        }))
-      }
-
       var sequence = require('when/sequence')
       return sequence(promises)
         .then(()=> {
+          return is_empty
+            ? null
+            : this.renderer.generate_parts(source, query_id)
+        })
+    }
+
+    render(parts):Promise {
+      if (!parts)
+        return when.resolve(null)
+
+      var source = this.source
+      return this.ground.invoke(source.trellis.name + '.query.sql', parts, source)
+        .then(()=> source.type == 'union'
+          ? this.render_union(parts)
+          : when.resolve({sql: this.renderer.generate_sql(parts, source), queries: []})
+      )
+        .then((render_result)=> {
+          var sql = render_result.sql
+
+          sql = sql.replace(/\r/g, "\n")
+          if (this.ground.log_queries)
+            console.log('\nquery', sql + '\n')
+
           return {
-            queries: queries,
-            is_empty: is_empty
+            sql: sql,
+            parts: parts,
+            queries: render_result.queries
           }
         })
     }
 
-    render(query_id:number = undefined):Promise {
-      return this.prepare()
-        .then((preparation)=> {
-          if (preparation.is_empty)
-            return when.resolve(null)
-
-          var source = this.source
-          var parts = this.renderer.generate_parts(source, query_id)
-          return this.ground.invoke(source.trellis.name + '.query.sql', parts, source)
-            .then(()=> {
-              var sql = source.type == 'union'
-                ? this.renderer.generate_union(parts, preparation.queries, source)
-                : this.renderer.generate_sql(parts, source)
-
-              sql = sql.replace(/\r/g, "\n")
-              if (this.ground.log_queries)
-                console.log('\nquery', sql + '\n')
-
-              return {
-                sql: sql,
-                parts: parts,
-                preparation: preparation
-              }
+    render_union(parts):Promise {
+      var sequence = require('when/sequence')
+      var queries:string[] = []
+      var query_index = 0
+      var runner_parts = []
+      var promises = this.source.queries.map((query)=> ()=> {
+        var runner = new Query_Runner(query)
+        return runner.prepare(query_index++)
+          .then((parts)=> {
+            runner_parts.push({
+              runner: runner,
+              parts: parts
             })
+          })
+      })
+        .concat(()=> when.resolve(this.normalize_union_fields(runner_parts)))
+        .concat(()=> sequence(runner_parts.map((runner_part)=> ()=> {
+            return runner_part.runner.render(runner_part.parts)
+              .then((render_result)=> {
+                queries.push(render_result.sql)
+                //return when.resolve()
+              })
+          })
+        ))
+      return sequence(promises)
+        .then(()=> {
+          console.log('runner_parts', runner_parts.length)
+          console.log('queries', queries)
+          return {
+            sql: this.renderer.generate_union(parts, queries, this.source),
+            queries: queries
+          }
         })
     }
 
-    run_core():Promise {
-      return this.render()
-        .then((render_result)=> {
-          if (!render_result.sql)
-            return when.resolve([])
+    normalize_union_fields(runner_parts) {
+      var parts_list:Query_Parts[] = runner_parts.map((x)=> x.parts)
+      var parts_list_length = parts_list.length
 
-          return this.ground.db.query(render_result.sql)
-            .then((rows)=> {
-              var result = {
-                objects: rows
-              }
-              this.row_cache = result
-              if (this.source.pager) {
-                var sql = this.source.type != 'union'
-                  ? this.renderer.generate_count(render_result.parts)
-                  : this.renderer.generate_union_count(render_result.parts,
-                  render_result.preparation.queries, this.source)
+      for (var i = 0; i < parts_list_length; ++i) {
+        var parts = parts_list[i]
+        for (var a = 0; a < parts_list_length; ++a) {
+          if (a == i)
+            continue
 
-                if (this.ground.log_queries)
-                  console.log('\nquery', sql + '\n')
-                return this.ground.db.query_single(sql)
-                  .then((count)=> {
-                    result['total'] = count.total_number
-                    return result
-                  })
+          var other = parts_list[a]
+
+          for (var b in other.all_references) {
+            var other_reference = other.all_references[b]
+            if (!Embedded_Reference.has_reference(parts.all_references, other_reference)) {
+              var fields = [parts.fields]
+              for (var c in other_reference.properties) {
+                var property:Property = other_reference.properties[c]
+                fields.push(other_reference.render_dummy_field(property))
               }
-              else {
-                return when.resolve(result)
-              }
-            })
-        })
+              parts.fields = fields.join(',\n')
+              parts.dummy_references.push(other_reference)
+            }
+          }
+        }
+      }
     }
 
     get_source(row):Query_Builder {
@@ -376,14 +411,50 @@ module Ground {
         this.run_stack = temp['stack']
       }
 
-      return this.run_core()
-        .then((result) => when.all(result.objects.map((row) => this.process_row_step_one(row, this.get_source(row), query_result)))
-          .then((rows)=> {
-            result.objects = rows
-            result.query_stats = { count: query_result.queries }
-            return result
-          })
-      )
+      return this.prepare()
+        .then((parts)=> this.render(parts))
+        .then((render_result)=> {
+          if (!render_result.sql)
+            return when.resolve([])
+
+          return this.ground.db.query(render_result.sql)
+            .then((rows)=> {
+              var result:IService_Response = {
+                objects: rows
+              }
+              //this.row_cache = result
+              if (query_result.return_sql)
+                result.sql = render_result.sql
+
+              return this.paging(render_result, result)
+                .then((result) => when.all(result.objects.map((row) => this.process_row_step_one(row, this.get_source(row), query_result, render_result.parts)))
+                  .then((rows)=> {
+                    result.objects = rows
+                    result.query_stats = {count: query_result.query_count}
+                    return result
+                  })
+              )
+            })
+        })
+    }
+
+    paging(render_result, result):Promise {
+      if (!this.source.pager)
+        return when.resolve(result)
+
+      var sql = this.source.type != 'union'
+        ? this.renderer.generate_count(render_result.parts)
+        : this.renderer.generate_union_count(render_result.parts,
+        render_result.queries, this.source)
+
+      if (this.ground.log_queries)
+        console.log('\nquery', sql + '\n')
+
+      return this.ground.db.query_single(sql)
+        .then((count)=> {
+          result['total'] = count.total_number
+          return result
+        })
     }
 
     run_single(query_result:Query_Result):Promise {

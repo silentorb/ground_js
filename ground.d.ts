@@ -78,6 +78,7 @@ declare module Ground {
 declare module Ground {
     interface IService_Response {
         objects: any[];
+        sql?: string;
     }
     interface Query_Wrapper {
         start: string;
@@ -100,6 +101,7 @@ declare module Ground {
         expires?: number;
         key?: string;
         version?: any;
+        return_sql?: boolean;
     }
     class Query {
         public ground: Ground.Core;
@@ -437,6 +439,8 @@ declare module Ground {
         public get_relationship(): Relationships;
         public get_field_query(): string;
         public query(): string;
+        public query_virtual(table_name?: string): string;
+        public query_virtual_field(table_name?: string): string;
         public export_schema(): Ground.IProperty_Source;
     }
 }
@@ -623,7 +627,8 @@ declare module Ground {
 }
 declare module Ground {
     interface Query_Result {
-        queries: number;
+        query_count: number;
+        return_sql?: boolean;
     }
     interface IPager {
         limit?: any;
@@ -717,6 +722,8 @@ declare module Ground {
         static create_join_filter(property: Ground.Property, seed: any): Query_Filter;
         public extend(source: any): void;
         public get_primary_key_value(): any;
+        public get_properties(): any;
+        public get_field_properties(): {};
         public run(query_result?: Query_Result): Promise;
         public run_single(query_result?: Query_Result): Promise;
     }
@@ -728,6 +735,7 @@ declare module Ground {
         joins?: string[];
         property_joins?: Ground.Property[][];
         arguments?: any;
+        references?: any;
     }
     interface Query_Parts {
         fields: string;
@@ -737,20 +745,21 @@ declare module Ground {
         sorts: string;
         pager: string;
         args: any;
+        all_references: Ground.Embedded_Reference[];
+        reference_hierarchy: Ground.Embedded_Reference[];
+        dummy_references: Ground.Embedded_Reference[];
     }
     class Query_Renderer {
         public ground: Ground.Core;
         static counter: number;
         constructor(ground: Ground.Core);
         static apply_arguments(sql: string, args: any): string;
-        static get_properties(source: Ground.Query_Builder): any;
         static generate_property_join(property: Ground.Property, seeds: any): string;
         public generate_sql(parts: Query_Parts, source: Ground.Query_Builder): string;
         public generate_count(parts: Query_Parts): string;
         public generate_union(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
         public generate_union_count(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
         public generate_parts(source: Ground.Query_Builder, query_id?: number): Query_Parts;
-        private static get_fields_and_joins(source, properties, include_primary_key?);
         private static add_path(path, trellis, result);
         static get_chain(path: any, trellis: Ground.Trellis): Ground.Property[];
         private static add_chain(property_chain, result);
@@ -783,16 +792,50 @@ declare module Ground {
         private static get_many_list(seed, property, relationship, source, query_result);
         private static get_reference_object(row, property, source, query_result);
         public process_map(row: any, source: Ground.Query_Builder, links: any, query_result: Ground.Query_Result): any;
-        public process_row_step_one(row: any, source: Ground.Query_Builder, query_result: Ground.Query_Result): Promise;
-        public process_row_step_two(row: any, source: Ground.Query_Builder, trellis: Ground.Trellis, query_result: Ground.Query_Result): Promise;
+        public process_row_step_one(row: any, source: Ground.Query_Builder, query_result: Ground.Query_Result, parts: Ground.Query_Parts): Promise;
+        public process_row_step_two(row: any, source: Ground.Query_Builder, trellis: Ground.Trellis, query_result: Ground.Query_Result, parts: Ground.Query_Parts): Promise;
+        public process_reference_children(child: any, query: Ground.Query_Builder, query_result: Ground.Query_Result): Promise;
         private static get_trellis_cache(trellis);
         public query_link_property(seed: any, property: any, source: Ground.Query_Builder, query_result: Ground.Query_Result): Promise;
-        public prepare(): Promise;
-        public render(query_id?: number): Promise;
-        public run_core(): Promise;
+        public prepare(query_id?: number): Promise;
+        public render(parts: any): Promise;
+        public render_union(parts: any): Promise;
+        public normalize_union_fields(runner_parts: any): void;
         public get_source(row: any): Ground.Query_Builder;
         public run(query_result: Ground.Query_Result): Promise;
+        public paging(render_result: any, result: any): Promise;
         public run_single(query_result: Ground.Query_Result): Promise;
+    }
+}
+declare module Ground {
+    class Embedded_Reference {
+        public property: Ground.Property;
+        public properties: any[];
+        public tables: {};
+        public children: Embedded_Reference[];
+        constructor(property: Ground.Property, id: number, properties: any, previous?: Ground.Join_Trellis);
+        public get_field_name(property: Ground.Property): string;
+        private get_table(property);
+        public render(): string;
+        public render_field(property: Ground.Property): string;
+        public render_dummy_field(property: Ground.Property): string;
+        public cleanup_entity(source: any, target: any): void;
+        static has_reference(list: Embedded_Reference[], reference: Embedded_Reference): boolean;
+    }
+    class Field_List implements Ground.Internal_Query_Source {
+        public source: Ground.Query_Builder;
+        public properties: any;
+        public fields: any[];
+        public joins: string[];
+        public trellises: {};
+        public reference_hierarchy: Embedded_Reference[];
+        public all_references: Embedded_Reference[];
+        public reference_join_count: number;
+        constructor(source: Ground.Query_Builder);
+        private render_field(property);
+        private render_reference_fields(property, query, previous?);
+        private map_fields();
+        private map_field(name);
     }
 }
 declare module "vineyard-ground" {

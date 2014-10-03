@@ -3,7 +3,8 @@
 module Ground {
 
   export interface Query_Result {
-    queries:number
+    query_count:number
+    return_sql?:boolean
   }
 
   export interface IPager {
@@ -333,7 +334,7 @@ module Ground {
       if (MetaHub.is_array(source.expansions)) {
         for (i = 0; i < source.expansions.length; ++i) {
           var expansion = source.expansions[i]
-          var tokens = expansion.split('/')
+          var tokens = expansion.split(/[\/\.]/g)
           var subquery = this
           for (var j = 0; j < tokens.length; ++j) {
             subquery = subquery.add_subquery(tokens[j], {})
@@ -350,11 +351,41 @@ module Ground {
       return undefined
     }
 
+    get_properties() {
+      if (this.properties && Object.keys(this.properties).length > 0) {
+        var properties = this.trellis.get_all_properties()
+        return MetaHub.map(this.properties, (property, key)=> properties[key])
+      }
+      else {
+        return this.trellis.get_all_properties()
+      }
+    }
+
+    get_field_properties() {
+      var result = {}
+      var properties = this.get_properties()
+      for (var i in properties) {
+        var property = properties[i]
+        if (property.type == 'list')
+          continue
+
+        if (property.is_virtual) {
+          var field = property.get_field_override()
+          if (!field || typeof field.sql != 'string')
+            continue
+        }
+
+        result[property.name] = property
+      }
+
+      return result
+    }
+
     run(query_result:Query_Result = undefined):Promise {
       if (!query_result)
-        query_result = { queries: 0 }
-
-      ++query_result.queries
+        query_result = { query_count: 0 }
+//console.log('query-count', this.trellis.name, query_result.query_count)
+      ++query_result.query_count
       var runner = new Query_Runner(this)
 //      console.log('filters', this.filters)
       return runner.run(query_result)

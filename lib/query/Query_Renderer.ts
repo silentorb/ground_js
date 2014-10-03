@@ -8,6 +8,7 @@ module Ground {
     joins?:string[]
     property_joins?:Property[][]
     arguments?
+    references?
   }
 
   export interface Query_Parts {
@@ -18,6 +19,9 @@ module Ground {
     sorts:string
     pager:string
     args
+    all_references:Embedded_Reference[]
+    reference_hierarchy:Embedded_Reference[]
+    dummy_references:Embedded_Reference[]
   }
 
   export class Query_Renderer {
@@ -35,16 +39,6 @@ module Ground {
       }
 
       return sql
-    }
-
-    static get_properties(source:Query_Builder) {
-      if (source.properties && Object.keys(source.properties).length > 0) {
-        var properties = source.trellis.get_all_properties()
-        return MetaHub.map(source.properties, (property, key)=> properties[key])
-      }
-      else {
-        return source.trellis.get_all_properties()
-      }
     }
 
     static generate_property_join(property:Property, seeds) {
@@ -71,7 +65,7 @@ module Ground {
       }
 
       sql = Query_Renderer.apply_arguments(sql, parts.args)
-        + parts.pager
+      + parts.pager
 
       return sql;
     }
@@ -96,7 +90,7 @@ module Ground {
         + parts.sorts
 
       sql = Query_Renderer.apply_arguments(sql, parts.args)
-        + parts.pager
+      + parts.pager
 
       return sql;
     }
@@ -115,8 +109,7 @@ module Ground {
     }
 
     generate_parts(source:Query_Builder, query_id:number = undefined):Query_Parts {
-      var properties = Query_Renderer.get_properties(source)
-      var data = Query_Renderer.get_fields_and_joins(source, properties)
+      var data = new Field_List(source)
       var data2 = Query_Renderer.build_filters(source, this.ground)
       var sorts = source.sorts.length > 0
         ? Query_Renderer.process_sorts(source.sorts, source.trellis, data2)
@@ -130,7 +123,7 @@ module Ground {
         throw new Error('No authorized fields found for trellis ' + source.trellis.name + '.');
 
       if (typeof query_id === 'number') {
-        fields.push(query_id.toString() + ' AS _query_id_')
+        fields.unshift(query_id.toString() + ' AS _query_id_')
       }
 
       return {
@@ -140,93 +133,10 @@ module Ground {
         filters: filters.length > 0 ? "\nWHERE " + filters.join(" AND ") : '',
         sorts: sorts ? ' ' + sorts : '',
         pager: source.pager ? ' ' + Query_Renderer.render_pager(source.pager) : '',
-        args: args
-      }
-    }
-
-    private static get_fields_and_joins(source:Query_Builder, properties, include_primary_key:boolean = true):Internal_Query_Source {
-      var name, fields:string[] = [], trellises = {}, joins = []
-
-      var render_field = (name)=> {
-        var property = properties[name];
-        // Virtual properties aren't saved to the database
-        // Useful when you define custom serialization hooks
-        if (property.type == 'list')
-          return
-
-        if (property.is_virtual) {
-          var field = property.get_field_override()
-          if (field && typeof field.sql == 'string')
-            fields.push(field.sql + ' AS ' + property.get_field_name())
-
-          return
-        }
-
-        if (property.name != source.trellis.primary_key || include_primary_key) {
-          var sql = property.get_field_query()
-          fields.push(sql);
-          if (property.parent.name != source.trellis.name)
-            trellises[property.parent.name] = property.parent
-        }
-      }
-
-      if (source.map && Object.keys(source.map).length > 0) {
-        if (!source.map[source.trellis.primary_key])
-          render_field(source.trellis.primary_key)
-
-        for (var name in source.map) {
-          if (!name.match(/^[\w_]+$/))
-            throw new Error('Invalid field name for mapping: ' + name + '.')
-
-          var expression = source.map[name]
-          if (!expression.type) {
-            render_field(name)
-          }
-          else if (expression.type == 'literal') {
-            var value = expression.value
-            if (value === null) {
-              value = 'NULL'
-            }
-            else if (!expression.value.toString().match(/^[\w_]*$/))
-              throw new Error('Invalid mapping value: ' + value + '.')
-
-            if (typeof value === 'object') {
-              value = "'object'"
-            }
-            else {
-              value = source.ground.convert_value(expression.value, typeof expression.value)
-              if (typeof value === 'string')
-                value = "'" + value + "'"
-            }
-
-            var sql = value + " AS " + name
-            fields.push(sql)
-          }
-          else if (expression.type == 'reference') {
-            if (!properties[expression.path])
-              throw new Error('Invalid map path: ' + expression.path + '.')
-
-            var sql = expression.path + " AS " + name
-            fields.push(sql)
-          }
-        }
-      }
-      else {
-        for (name in properties) {
-          render_field(name)
-        }
-      }
-
-      for (name in trellises) {
-        var trellis = trellises[name];
-        var join = source.trellis.get_ancestor_join(trellis);
-        if (join)
-          joins.push(join);
-      }
-
-      return {
-        fields: fields,
-        joins: joins
+        args: args,
+        reference_hierarchy: data.reference_hierarchy,
+        all_references: data.all_references,
+        dummy_references: []
       }
     }
 
@@ -277,10 +187,8 @@ module Ground {
       var property_chain = Query_Renderer.add_path(filter.path, source.trellis, result)
       var property = property_chain[property_chain.length - 1]
       if (property.is_virtual) {
-        var field = property.get_field_override()
-        if (field && typeof field.sql == 'string')
-          reference = field.sql
-        else
+        reference = property.query_virtual()
+        if (!reference)
           throw new Error("Cannot create filter with invalid virtual property: " + property.name + ".")
       }
       else if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {

@@ -11,6 +11,7 @@ module Ground {
 
   export interface IService_Response {
     objects:any[]
+    sql?:string
   }
 
   export interface Query_Wrapper {
@@ -36,6 +37,7 @@ module Ground {
     expires?:number
     key?:string
     version?
+    return_sql?:boolean
   }
 
   export class Query {

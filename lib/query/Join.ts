@@ -6,12 +6,6 @@ module Ground {
     render():string
   }
 
-//  export interface ITable_Reference {
-//    get_table_name():string
-//    query_reference():string
-//    query_identity():string
-//  }
-
   export interface Join_Trellis {
     get_table_name():string
     get_primary_keys():Join_Property[]

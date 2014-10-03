@@ -433,6 +433,21 @@ module Ground {
       return '`' + this.parent.get_table_name() + '`.' + this.get_field_name()
     }
 
+    query_virtual(table_name:string = null):string {
+      table_name = table_name || this.parent.get_table_query()
+      var field = this.get_field_override()
+      return field && typeof field.sql == 'string'
+        ? field.sql.replace(/@trellis@/g, table_name)
+        : null
+    }
+
+    query_virtual_field(table_name:string = null):string {
+      var field_sql = this.query_virtual(table_name)
+      return field_sql != null
+        ? field_sql + ' AS ' + this.get_field_name()
+        : null
+    }
+
     export_schema():IProperty_Source {
       var result:IProperty_Source = {
         type: this.type
