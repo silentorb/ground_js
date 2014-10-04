@@ -4415,6 +4415,7 @@ var Ground;
         };
 
         Query_Runner.prototype.process_reference_children = function (child, query, query_result) {
+            var _this = this;
             if (!child)
                 return when.resolve();
 
@@ -4426,9 +4427,7 @@ var Ground;
                 promises.push(function () {
                     return property.type == 'list' ? subquery.run(query_result).then(function (result) {
                         child[property.name] = result.objects;
-                    }) : subquery.run_single(query_result).then(function (row) {
-                        child[property.name] = row;
-                    });
+                    }) : _this.process_reference_children(child[property.name], subquery, query_result);
                 });
             }
 

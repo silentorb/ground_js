@@ -237,15 +237,17 @@ module Ground {
       for (name in query.subqueries) {
         var property = query.trellis.get_property(name)
         var subquery = query.subqueries[name]
-        promises.push(()=> property.type == 'list'
-            ? subquery.run(query_result)
-            .then((result)=> {
-              child[property.name] = result.objects
-            })
-            : subquery.run_single(query_result)
-            .then((row)=> {
-              child[property.name] = row
-            })
+        promises.push(()=>
+            property.type == 'list'
+              ? subquery.run(query_result)
+              .then((result)=> {
+                child[property.name] = result.objects
+              })
+              : this.process_reference_children(child[property.name], subquery, query_result)
+              //: subquery.run_single(query_result)
+              //.then((row)=> {
+              //  child[property.name] = row
+              //})
         )
       }
 
