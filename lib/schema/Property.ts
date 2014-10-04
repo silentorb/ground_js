@@ -417,14 +417,31 @@ module Ground {
       var sql = this.query()
       var type = this.get_type()
       if (type == 'guid')
-        sql = "INSERT(INSERT(INSERT(INSERT(HEX(" + sql + ")"
-          + ",9,0,'-')"
-          + ",14,0,'-')"
-          + ",19,0,'-')"
-          + ",24,0,'-') AS `" + this.name + '`'
-//      sql = 'HEX(' + sql + ') AS `' + this.name + '`'
+        sql = this.format_guid(sql) + " AS `" + this.name + '`'
       else if (field_name != this.name)
         sql += ' AS `' + this.name + '`'
+
+      return sql
+    }
+
+    format_guid(name:string):string {
+        return "INSERT(INSERT(INSERT(INSERT(HEX(" + name + ")"
+        + ",9,0,'-')"
+        + ",14,0,'-')"
+        + ",19,0,'-')"
+        + ",24,0,'-')"
+    }
+
+    get_field_query2(input_name, output_name = null):string {
+      output_name = output_name || this.name
+      var type = this.get_type()
+      if (type == 'guid')
+        input_name = this.format_guid(input_name)
+
+      var sql = input_name
+
+      if (input_name != output_name)
+        sql += ' AS `' + output_name + '`'
 
       return sql
     }

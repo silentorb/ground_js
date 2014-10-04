@@ -438,6 +438,8 @@ declare module Ground {
         public get_referenced_trellis(): Ground.Trellis;
         public get_relationship(): Relationships;
         public get_field_query(): string;
+        public format_guid(name: string): string;
+        public get_field_query2(input_name: any, output_name?: any): string;
         public query(): string;
         public query_virtual(table_name?: string): string;
         public query_virtual_field(table_name?: string): string;
@@ -819,6 +821,7 @@ declare module Ground {
         public render(): string;
         public render_field(property: Ground.Property): string;
         public render_dummy_field(property: Ground.Property): string;
+        public cleanup_empty(source: any): void;
         public cleanup_entity(source: any, target: any): void;
         static has_reference(list: Embedded_Reference[], reference: Embedded_Reference): boolean;
     }

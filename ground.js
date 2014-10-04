@@ -2845,9 +2845,28 @@ var Ground;
             var sql = this.query();
             var type = this.get_type();
             if (type == 'guid')
-                sql = "INSERT(INSERT(INSERT(INSERT(HEX(" + sql + ")" + ",9,0,'-')" + ",14,0,'-')" + ",19,0,'-')" + ",24,0,'-') AS `" + this.name + '`';
+                sql = this.format_guid(sql) + " AS `" + this.name + '`';
             else if (field_name != this.name)
                 sql += ' AS `' + this.name + '`';
+
+            return sql;
+        };
+
+        Property.prototype.format_guid = function (name) {
+            return "INSERT(INSERT(INSERT(INSERT(HEX(" + name + ")" + ",9,0,'-')" + ",14,0,'-')" + ",19,0,'-')" + ",24,0,'-')";
+        };
+
+        Property.prototype.get_field_query2 = function (input_name, output_name) {
+            if (typeof output_name === "undefined") { output_name = null; }
+            output_name = output_name || this.name;
+            var type = this.get_type();
+            if (type == 'guid')
+                input_name = this.format_guid(input_name);
+
+            var sql = input_name;
+
+            if (input_name != output_name)
+                sql += ' AS `' + output_name + '`';
 
             return sql;
         };
@@ -4705,17 +4724,35 @@ var Ground;
             if (property.is_virtual)
                 return property.query_virtual_field(table_name);
 
-            return table_name + '.' + property.get_field_name() + ' AS ' + this.get_field_name(property);
+            return property.get_field_query2(table_name + '.' + property.get_field_name(), this.get_field_name(property));
         };
 
         Embedded_Reference.prototype.render_dummy_field = function (property) {
             return 'NULL AS ' + this.get_field_name(property);
         };
 
+        Embedded_Reference.prototype.cleanup_empty = function (source) {
+            for (var p in this.properties) {
+                var property = this.properties[p];
+                var field_name = this.get_field_name(property);
+                if (source[field_name] === undefined)
+                    continue;
+
+                delete source[field_name];
+            }
+
+            for (var i = 0; i < this.children.length; ++i) {
+                this.children[i].cleanup_empty(source);
+            }
+        };
+
         Embedded_Reference.prototype.cleanup_entity = function (source, target) {
             var primary_key = source[this.property.name];
-            if (primary_key === null || primary_key === undefined)
+            if (primary_key === null || primary_key === undefined) {
+                this.cleanup_empty(source);
+                source[this.property.name] = null;
                 return;
+            }
 
             var child_entity = target[this.property.name] = {};
             for (var p in this.properties) {
@@ -4724,7 +4761,7 @@ var Ground;
                 if (source[field_name] === undefined)
                     continue;
 
-                child_entity[property.name] = source[field_name];
+                child_entity[property.name] = property.parent.ground.convert_value(source[field_name], property.type);
                 delete source[field_name];
             }
 
