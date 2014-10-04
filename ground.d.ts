@@ -442,7 +442,7 @@ declare module Ground {
         public get_field_query2(input_name: any, output_name?: any): string;
         public query(): string;
         public query_virtual(table_name?: string): string;
-        public query_virtual_field(table_name?: string): string;
+        public query_virtual_field(table_name?: string, output_name?: string): string;
         public export_schema(): Ground.IProperty_Source;
     }
 }
@@ -750,6 +750,7 @@ declare module Ground {
         all_references: Ground.Embedded_Reference[];
         reference_hierarchy: Ground.Embedded_Reference[];
         dummy_references: Ground.Embedded_Reference[];
+        field_list: Ground.Field_List;
     }
     class Query_Renderer {
         public ground: Ground.Core;
@@ -802,7 +803,9 @@ declare module Ground {
         public prepare(query_id?: number): Promise;
         public render(parts: any): Promise;
         public render_union(parts: any): Promise;
+        static hack_field_alias(field: string): string;
         public normalize_union_fields(runner_parts: any): void;
+        public normalize_union_fields_old(runner_parts: any): void;
         public get_source(row: any): Ground.Query_Builder;
         public run(query_result: Ground.Query_Result): Promise;
         public paging(render_result: any, result: any): Promise;

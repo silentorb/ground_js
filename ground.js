@@ -2882,10 +2882,11 @@ var Ground;
             return field && typeof field.sql == 'string' ? field.sql.replace(/@trellis@/g, table_name) : null;
         };
 
-        Property.prototype.query_virtual_field = function (table_name) {
+        Property.prototype.query_virtual_field = function (table_name, output_name) {
             if (typeof table_name === "undefined") { table_name = null; }
+            if (typeof output_name === "undefined") { output_name = null; }
             var field_sql = this.query_virtual(table_name);
-            return field_sql != null ? field_sql + ' AS ' + this.get_field_name() : null;
+            return field_sql != null ? field_sql + ' AS ' + (output_name || this.get_field_name()) : null;
         };
 
         Property.prototype.export_schema = function () {
@@ -4027,7 +4028,8 @@ var Ground;
                 args: args,
                 reference_hierarchy: data.reference_hierarchy,
                 all_references: data.all_references,
-                dummy_references: []
+                dummy_references: [],
+                field_list: data
             };
         };
 
@@ -4579,7 +4581,52 @@ var Ground;
             });
         };
 
+        Query_Runner.hack_field_alias = function (field) {
+            var match = field.match(/\w+`?\s*$/);
+            if (!match)
+                throw new Error("Could not find alias in field SQL: " + field);
+
+            return match[0].replace(/\s*`/g, '');
+        };
+
         Query_Runner.prototype.normalize_union_fields = function (runner_parts) {
+            var field_lists = runner_parts.map(function (x) {
+                return x.parts.field_list;
+            });
+            var field_list_length = field_lists.length;
+
+            var field_names = [];
+            var aliases = [];
+
+            for (var i = 0; i < field_list_length; ++i) {
+                var field_list = field_lists[i];
+                var alias_list = [];
+                for (var f in field_list.fields) {
+                    var field = field_list.fields[f];
+                    var alias = Query_Runner.hack_field_alias(field);
+                    alias_list.push(alias);
+                    if (field_names.indexOf(alias) == -1)
+                        field_names.push(alias);
+                }
+
+                aliases.push(alias_list);
+            }
+
+            for (var i = 0; i < field_list_length; ++i) {
+                var field_list = field_lists[i];
+                var alias_list = aliases[i];
+                var parts = runner_parts[i].parts;
+                for (var f in field_names) {
+                    var field_name = field_names[f];
+                    if (alias_list.indexOf(field_name) == -1)
+                        parts.fields += ',\nNULL AS `' + field_name + '`';
+
+                    parts.dummy_references.push(field_name);
+                }
+            }
+        };
+
+        Query_Runner.prototype.normalize_union_fields_old = function (runner_parts) {
             var parts_list = runner_parts.map(function (x) {
                 return x.parts;
             });
@@ -4722,7 +4769,7 @@ var Ground;
             var table = this.get_table(property);
             var table_name = table.second.get_alias();
             if (property.is_virtual)
-                return property.query_virtual_field(table_name);
+                return property.query_virtual_field(table_name, this.get_field_name(property));
 
             return property.get_field_query2(table_name + '.' + property.get_field_name(), this.get_field_name(property));
         };
@@ -4791,6 +4838,7 @@ var Ground;
             this.all_references = [];
             this.reference_join_count = 0;
             this.source = source;
+
             this.properties = source.get_field_properties();
             var name;
 
@@ -4868,6 +4916,9 @@ var Ground;
 
             var expression = this.source.map[name];
             if (!expression.type) {
+                if (!this.properties[name])
+                    return;
+
                 this.render_field(this.properties[name]);
             } else if (expression.type == 'literal') {
                 var value = expression.value;
@@ -4887,10 +4938,11 @@ var Ground;
                 var sql = value + " AS " + name;
                 this.fields.push(sql);
             } else if (expression.type == 'reference') {
-                if (!this.properties[expression.path])
-                    throw new Error('Invalid map path: ' + expression.path + '.');
+                var property = this.properties[expression.path];
+                if (!property)
+                    return;
 
-                var sql = this.properties[expression.path].query() + " AS " + name;
+                var sql = property.query() + " AS " + name;
                 this.fields.push(sql);
             }
         };

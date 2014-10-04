@@ -22,6 +22,7 @@ module Ground {
     all_references:Embedded_Reference[]
     reference_hierarchy:Embedded_Reference[]
     dummy_references:Embedded_Reference[]
+    field_list:Field_List
   }
 
   export class Query_Renderer {
@@ -136,7 +137,8 @@ module Ground {
         args: args,
         reference_hierarchy: data.reference_hierarchy,
         all_references: data.all_references,
-        dummy_references: []
+        dummy_references: [],
+        field_list: data
       }
     }
 

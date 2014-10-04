@@ -458,10 +458,10 @@ module Ground {
         : null
     }
 
-    query_virtual_field(table_name:string = null):string {
+    query_virtual_field(table_name:string = null, output_name:string = null):string {
       var field_sql = this.query_virtual(table_name)
       return field_sql != null
-        ? field_sql + ' AS ' + this.get_field_name()
+        ? field_sql + ' AS ' + (output_name || this.get_field_name())
         : null
     }
 

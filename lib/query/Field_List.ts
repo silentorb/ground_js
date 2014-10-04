@@ -61,7 +61,7 @@ module Ground {
       var table = this.get_table(property)
       var table_name = table.second.get_alias()
       if (property.is_virtual)
-        return property.query_virtual_field(table_name)
+        return property.query_virtual_field(table_name, this.get_field_name(property))
 
       //var name = table_name + '.' + property.get_field_name()
       //if (property.get_type() == 'guid')
@@ -133,6 +133,7 @@ module Ground {
 
     source:Query_Builder
     properties
+    //all_properties
     fields:any[] = []
     joins:string[] = []
     trellises = {}
@@ -142,6 +143,7 @@ module Ground {
 
     constructor(source:Query_Builder) {
       this.source = source
+      //this.all_properties = source.get_properties()
       this.properties = source.get_field_properties()
       var name
 
@@ -227,6 +229,9 @@ module Ground {
 
       var expression = this.source.map[name]
       if (!expression.type) {
+        if (!this.properties[name])
+          return
+
         this.render_field(this.properties[name])
       }
       else if (expression.type == 'literal') {
@@ -250,10 +255,13 @@ module Ground {
         this.fields.push(sql)
       }
       else if (expression.type == 'reference') {
-        if (!this.properties[expression.path])
-          throw new Error('Invalid map path: ' + expression.path + '.')
+        var property = this.properties[expression.path]
+        if (!property)
+          return
 
-        var sql = this.properties[expression.path].query() + " AS " + name
+          //throw new Error('Invalid map path: ' + expression.path + '.')
+
+        var sql = property.query() + " AS " + name
         this.fields.push(sql)
       }
     }

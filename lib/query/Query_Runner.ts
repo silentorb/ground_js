@@ -202,7 +202,7 @@ module Ground {
         }
         else if (property.type == 'reference' && subquery) {
           return this.process_reference_children(row[property.name], subquery, query_result)
-          .then(()=> row)
+            .then(()=> row)
         }
 
         return null
@@ -370,7 +370,50 @@ module Ground {
         })
     }
 
+    static hack_field_alias(field:string):string {
+      var match = field.match(/\w+`?\s*$/)
+      if (!match)
+        throw new Error("Could not find alias in field SQL: " + field)
+
+      return match[0].replace(/\s*`/g, '')
+    }
+
     normalize_union_fields(runner_parts) {
+      var field_lists:Field_List[] = runner_parts.map((x)=> x.parts.field_list)
+      var field_list_length = field_lists.length
+
+      var field_names = []
+      var aliases:any[][] = []
+
+      for (var i = 0; i < field_list_length; ++i) {
+        var field_list = field_lists[i]
+        var alias_list = []
+        for (var f in field_list.fields) {
+          var field = field_list.fields[f]
+          var alias = Query_Runner.hack_field_alias(field)
+          alias_list.push(alias)
+          if (field_names.indexOf(alias) == -1)
+            field_names.push(alias)
+        }
+
+        aliases.push(alias_list)
+      }
+
+      for (var i = 0; i < field_list_length; ++i) {
+        var field_list = field_lists[i]
+        var alias_list = aliases[i]
+        var parts = runner_parts[i].parts
+        for (var f in field_names) {
+          var field_name = field_names[f]
+          if (alias_list.indexOf(field_name) == -1)
+            parts.fields += ',\nNULL AS `' + field_name + '`'
+
+          parts.dummy_references.push(field_name)
+        }
+      }
+    }
+
+    normalize_union_fields_old(runner_parts) {
       var parts_list:Query_Parts[] = runner_parts.map((x)=> x.parts)
       var parts_list_length = parts_list.length
 
