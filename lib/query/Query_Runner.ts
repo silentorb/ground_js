@@ -112,22 +112,22 @@ module Ground {
         if (value !== undefined)
           row[i] = value
       }
-      MetaHub.map_to_array(links, (property, name) => {
-        if (property.is_composite_sub)
-          return null
-
-//        var path = Query_Runner.get_path(property.name)
-        var subquery = source.subqueries[property.name]
-
-        if (source.include_links || subquery) {
-          return this.query_link_property(row, property, source, query_result).then((value) => {
-            row[name] = value
-            return row
-          })
-        }
-
-        return null
-      })
+//      MetaHub.map_to_array(links, (property, name) => {
+//        if (property.is_composite_sub)
+//          return null
+//
+////        var path = Query_Runner.get_path(property.name)
+//        var subquery = source.subqueries[property.name]
+//
+//        if (source.include_links || subquery) {
+//          return this.query_link_property(row, property, source, query_result).then((value) => {
+//            row[name] = value
+//            return row
+//          })
+//        }
+//
+//        return null
+//      })
 
       return replacement
     }
@@ -183,6 +183,16 @@ module Ground {
       for (var i in parts.reference_hierarchy) {
         parts.reference_hierarchy[i].cleanup_entity(row, row)
       }
+
+      var dummy_references = parts.dummy_references
+      if (dummy_references) {
+        //console.log('dummy', dummy_references)
+        for (var i in dummy_references) {
+          delete row[dummy_references[i]]
+        }
+      }
+
+      delete row['_query_id_']
 
       var cache = Query_Runner.get_trellis_cache(trellis)
 //      var links = trellis.get_all_links((p)=> !p.is_virtual);
@@ -330,7 +340,8 @@ module Ground {
           return {
             sql: sql,
             parts: parts,
-            queries: render_result.queries
+            queries: render_result.queries,
+            parts_list: render_result.parts_list
           }
         })
     }
@@ -361,11 +372,16 @@ module Ground {
         ))
       return sequence(promises)
         .then(()=> {
-          console.log('runner_parts', runner_parts.length)
-          console.log('queries', queries)
+          //console.log('runner_parts', runner_parts.length)
+          //console.log('queries', queries)
+          var parts_list = {}
+          for (var i in runner_parts) {
+            parts_list[runner_parts[i].parts.query_id] = runner_parts[i].parts
+          }
           return {
             sql: this.renderer.generate_union(parts, queries, this.source),
-            queries: queries
+            queries: queries,
+            parts_list: parts_list
           }
         })
     }
@@ -382,16 +398,16 @@ module Ground {
       var field_lists:Field_List[] = runner_parts.map((x)=> x.parts.field_list)
       var field_list_length = field_lists.length
 
-      var field_names = []
-      var aliases:any[][] = []
+      var field_names = ['_query_id_']
+      var aliases = []
 
       for (var i = 0; i < field_list_length; ++i) {
         var field_list = field_lists[i]
-        var alias_list = []
+        var alias_list = {}
         for (var f in field_list.fields) {
           var field = field_list.fields[f]
           var alias = Query_Runner.hack_field_alias(field)
-          alias_list.push(alias)
+          alias_list[alias] = field
           if (field_names.indexOf(alias) == -1)
             field_names.push(alias)
         }
@@ -399,45 +415,25 @@ module Ground {
         aliases.push(alias_list)
       }
 
+      field_names = field_names.sort()
+
       for (var i = 0; i < field_list_length; ++i) {
         var field_list = field_lists[i]
-        var alias_list = aliases[i]
+        var alias_list:{} = aliases[i]
         var parts = runner_parts[i].parts
-        for (var f in field_names) {
-          var field_name = field_names[f]
-          if (alias_list.indexOf(field_name) == -1)
-            parts.fields += ',\nNULL AS `' + field_name + '`'
+        parts.dummy_references = field_names.filter((name)=> alias_list[name] == undefined)
+        //console.log('dummy', parts.dummy_references)
+        parts.fields = field_names.map((name)=>
+          alias_list[name] || 'NULL AS `' + name + '`'
+        ).join(',\n')
 
-          parts.dummy_references.push(field_name)
-        }
-      }
-    }
-
-    normalize_union_fields_old(runner_parts) {
-      var parts_list:Query_Parts[] = runner_parts.map((x)=> x.parts)
-      var parts_list_length = parts_list.length
-
-      for (var i = 0; i < parts_list_length; ++i) {
-        var parts = parts_list[i]
-        for (var a = 0; a < parts_list_length; ++a) {
-          if (a == i)
-            continue
-
-          var other = parts_list[a]
-
-          for (var b in other.all_references) {
-            var other_reference = other.all_references[b]
-            if (!Embedded_Reference.has_reference(parts.all_references, other_reference)) {
-              var fields = [parts.fields]
-              for (var c in other_reference.properties) {
-                var property:Property = other_reference.properties[c]
-                fields.push(other_reference.render_dummy_field(property))
-              }
-              parts.fields = fields.join(',\n')
-              parts.dummy_references.push(other_reference)
-            }
-          }
-        }
+        //for (var f in field_names) {
+        //  var field_name = field_names[f]
+        //  if (alias_list.indexOf(field_name) == -1)
+        //    parts.fields += 'NULL AS `' + field_name + '`'
+        //
+        //  parts.dummy_references.push(field_name)
+        //}
       }
     }
 
@@ -446,6 +442,13 @@ module Ground {
         return this.source
 
       return this.source.queries[row._query_id_]
+    }
+
+    get_parts(row, render_result):Query_Parts {
+      if (this.source.type !== 'union')
+        return render_result.parts
+
+      return render_result.parts_list[row._query_id_]
     }
 
     run(query_result:Query_Result):Promise {
@@ -470,7 +473,8 @@ module Ground {
                 result.sql = render_result.sql
 
               return this.paging(render_result, result)
-                .then((result) => when.all(result.objects.map((row) => this.process_row_step_one(row, this.get_source(row), query_result, render_result.parts)))
+                .then((result) => when.all(result.objects.map(
+                  (row) => this.process_row_step_one(row, this.get_source(row), query_result, this.get_parts(row, render_result))))
                   .then((rows)=> {
                     result.objects = rows
                     result.query_stats = {count: query_result.query_count}

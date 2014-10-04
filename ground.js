@@ -4029,7 +4029,8 @@ var Ground;
                 reference_hierarchy: data.reference_hierarchy,
                 all_references: data.all_references,
                 dummy_references: [],
-                field_list: data
+                field_list: data,
+                query_id: query_id
             };
         };
 
@@ -4300,7 +4301,6 @@ var Ground;
         };
 
         Query_Runner.prototype.process_map = function (row, source, links, query_result) {
-            var _this = this;
             var replacement = undefined;
             var all_properties = source.trellis.get_all_properties();
             var context = {
@@ -4316,21 +4316,6 @@ var Ground;
                 if (value !== undefined)
                     row[i] = value;
             }
-            MetaHub.map_to_array(links, function (property, name) {
-                if (property.is_composite_sub)
-                    return null;
-
-                var subquery = source.subqueries[property.name];
-
-                if (source.include_links || subquery) {
-                    return _this.query_link_property(row, property, source, query_result).then(function (value) {
-                        row[name] = value;
-                        return row;
-                    });
-                }
-
-                return null;
-            });
 
             return replacement;
         };
@@ -4384,6 +4369,15 @@ var Ground;
             for (var i in parts.reference_hierarchy) {
                 parts.reference_hierarchy[i].cleanup_entity(row, row);
             }
+
+            var dummy_references = parts.dummy_references;
+            if (dummy_references) {
+                for (var i in dummy_references) {
+                    delete row[dummy_references[i]];
+                }
+            }
+
+            delete row['_query_id_'];
 
             var cache = Query_Runner.get_trellis_cache(trellis);
 
@@ -4539,7 +4533,8 @@ var Ground;
                 return {
                     sql: sql,
                     parts: parts,
-                    queries: render_result.queries
+                    queries: render_result.queries,
+                    parts_list: render_result.parts_list
                 };
             });
         };
@@ -4572,11 +4567,14 @@ var Ground;
                 }));
             });
             return sequence(promises).then(function () {
-                console.log('runner_parts', runner_parts.length);
-                console.log('queries', queries);
+                var parts_list = {};
+                for (var i in runner_parts) {
+                    parts_list[runner_parts[i].parts.query_id] = runner_parts[i].parts;
+                }
                 return {
                     sql: _this.renderer.generate_union(parts, queries, _this.source),
-                    queries: queries
+                    queries: queries,
+                    parts_list: parts_list
                 };
             });
         };
@@ -4595,16 +4593,16 @@ var Ground;
             });
             var field_list_length = field_lists.length;
 
-            var field_names = [];
+            var field_names = ['_query_id_'];
             var aliases = [];
 
             for (var i = 0; i < field_list_length; ++i) {
                 var field_list = field_lists[i];
-                var alias_list = [];
+                var alias_list = {};
                 for (var f in field_list.fields) {
                     var field = field_list.fields[f];
                     var alias = Query_Runner.hack_field_alias(field);
-                    alias_list.push(alias);
+                    alias_list[alias] = field;
                     if (field_names.indexOf(alias) == -1)
                         field_names.push(alias);
                 }
@@ -4612,47 +4610,19 @@ var Ground;
                 aliases.push(alias_list);
             }
 
+            field_names = field_names.sort();
+
             for (var i = 0; i < field_list_length; ++i) {
                 var field_list = field_lists[i];
                 var alias_list = aliases[i];
                 var parts = runner_parts[i].parts;
-                for (var f in field_names) {
-                    var field_name = field_names[f];
-                    if (alias_list.indexOf(field_name) == -1)
-                        parts.fields += ',\nNULL AS `' + field_name + '`';
+                parts.dummy_references = field_names.filter(function (name) {
+                    return alias_list[name] == undefined;
+                });
 
-                    parts.dummy_references.push(field_name);
-                }
-            }
-        };
-
-        Query_Runner.prototype.normalize_union_fields_old = function (runner_parts) {
-            var parts_list = runner_parts.map(function (x) {
-                return x.parts;
-            });
-            var parts_list_length = parts_list.length;
-
-            for (var i = 0; i < parts_list_length; ++i) {
-                var parts = parts_list[i];
-                for (var a = 0; a < parts_list_length; ++a) {
-                    if (a == i)
-                        continue;
-
-                    var other = parts_list[a];
-
-                    for (var b in other.all_references) {
-                        var other_reference = other.all_references[b];
-                        if (!Ground.Embedded_Reference.has_reference(parts.all_references, other_reference)) {
-                            var fields = [parts.fields];
-                            for (var c in other_reference.properties) {
-                                var property = other_reference.properties[c];
-                                fields.push(other_reference.render_dummy_field(property));
-                            }
-                            parts.fields = fields.join(',\n');
-                            parts.dummy_references.push(other_reference);
-                        }
-                    }
-                }
+                parts.fields = field_names.map(function (name) {
+                    return alias_list[name] || 'NULL AS `' + name + '`';
+                }).join(',\n');
             }
         };
 
@@ -4661,6 +4631,13 @@ var Ground;
                 return this.source;
 
             return this.source.queries[row._query_id_];
+        };
+
+        Query_Runner.prototype.get_parts = function (row, render_result) {
+            if (this.source.type !== 'union')
+                return render_result.parts;
+
+            return render_result.parts_list[row._query_id_];
         };
 
         Query_Runner.prototype.run = function (query_result) {
@@ -4686,7 +4663,7 @@ var Ground;
 
                     return _this.paging(render_result, result).then(function (result) {
                         return when.all(result.objects.map(function (row) {
-                            return _this.process_row_step_one(row, _this.get_source(row), query_result, render_result.parts);
+                            return _this.process_row_step_one(row, _this.get_source(row), query_result, _this.get_parts(row, render_result));
                         })).then(function (rows) {
                             result.objects = rows;
                             result.query_stats = { count: query_result.query_count };

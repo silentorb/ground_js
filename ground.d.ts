@@ -751,6 +751,7 @@ declare module Ground {
         reference_hierarchy: Ground.Embedded_Reference[];
         dummy_references: Ground.Embedded_Reference[];
         field_list: Ground.Field_List;
+        query_id: number;
     }
     class Query_Renderer {
         public ground: Ground.Core;
@@ -805,8 +806,8 @@ declare module Ground {
         public render_union(parts: any): Promise;
         static hack_field_alias(field: string): string;
         public normalize_union_fields(runner_parts: any): void;
-        public normalize_union_fields_old(runner_parts: any): void;
         public get_source(row: any): Ground.Query_Builder;
+        public get_parts(row: any, render_result: any): Ground.Query_Parts;
         public run(query_result: Ground.Query_Result): Promise;
         public paging(render_result: any, result: any): Promise;
         public run_single(query_result: Ground.Query_Result): Promise;
