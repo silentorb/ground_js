@@ -4571,9 +4571,9 @@ var Ground;
                 }));
             });
             return sequence(promises).then(function () {
-                var parts_list = {};
-                for (var i in runner_parts) {
-                    parts_list[runner_parts[i].parts.query_id] = runner_parts[i].parts;
+                var parts_list = [];
+                for (var i = 0; i < runner_parts.length; ++i) {
+                    parts_list.push(runner_parts[i].parts);
                 }
                 return {
                     sql: _this.renderer.generate_union(parts, queries, _this.source),
@@ -4776,6 +4776,14 @@ var Ground;
 
         Embedded_Reference.prototype.cleanup_entity = function (source, target) {
             var primary_key = source[this.property.name];
+
+            if (primary_key === null || primary_key === undefined) {
+                var table = this.tables[this.property.other_trellis.name];
+                console.log('table', table);
+                var key = table.second.get_alias() + '_' + this.property.parent.primary_key;
+                primary_key = source[key];
+            }
+
             if (primary_key === null || primary_key === undefined) {
                 this.cleanup_empty(source);
                 source[this.property.name] = null;

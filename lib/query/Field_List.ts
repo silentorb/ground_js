@@ -63,12 +63,6 @@ module Ground {
       if (property.is_virtual)
         return property.query_virtual_field(table_name, this.get_field_name(property))
 
-      //var name = table_name + '.' + property.get_field_name()
-      //if (property.get_type() == 'guid')
-      //  name = property.format_guid(name)
-      //
-      //return name + ' AS ' + this.get_field_name(property)
-
       return property.get_field_query2(
         table_name + '.' + property.get_field_name(),
         this.get_field_name(property)
@@ -97,6 +91,14 @@ module Ground {
 
     cleanup_entity(source, target) {
       var primary_key = source[this.property.name]
+
+      if (primary_key === null || primary_key === undefined) {
+        var table = this.tables[this.property.other_trellis.name]
+        console.log('table', table)
+        var key = table.second.get_alias() + '_' + this.property.parent.primary_key
+        primary_key = source[key]
+      }
+
       if (primary_key === null || primary_key === undefined) {
         this.cleanup_empty(source)
         source[this.property.name] = null
@@ -163,6 +165,7 @@ module Ground {
           this.joins.push(join);
       }
     }
+
 
     private render_field(property:Property) {
       var sql = property.is_virtual

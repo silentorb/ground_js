@@ -379,10 +379,10 @@ module Ground {
       return sequence(promises)
         .then(()=> {
           //console.log('runner_parts', runner_parts.length)
-          //console.log('queries', queries)
-          var parts_list = {}
-          for (var i in runner_parts) {
-            parts_list[runner_parts[i].parts.query_id] = runner_parts[i].parts
+          var parts_list = []
+          for (var i = 0; i < runner_parts.length; ++i) {
+            //parts_list[runner_parts[i].parts.query_id] = runner_parts[i].parts
+            parts_list.push(runner_parts[i].parts)
           }
           return {
             sql: this.renderer.generate_union(parts, queries, this.source),
