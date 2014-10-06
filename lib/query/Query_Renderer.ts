@@ -85,11 +85,12 @@ module Ground {
 
     generate_union(parts:Query_Parts, queries:string[], source:Query_Builder) {
       var alias = source.trellis.get_table_name()
-      var sql = 'SELECT DISTINCT * FROM ('
-        + queries.join('\nUNION\n')
-        + '\n) ' + alias + '\n'
-        + parts.filters
-        + parts.sorts
+      //var sql = 'SELECT DISTINCT * FROM ('
+      var sql = '('
+        + queries.join('\n)\nUNION\n(\n')
+        + ')\n'
+        + parts.filters.replace(/`?\w+`?\./g, '')
+        + parts.sorts.replace(/`?\w+`?\./g, '')
 
       sql = Query_Renderer.apply_arguments(sql, parts.args)
       + parts.pager
@@ -98,23 +99,23 @@ module Ground {
     }
 
     generate_union_count(parts:Query_Parts, queries:string[], source:Query_Builder) {
-      var alias = source.trellis.get_table_name()
-      var sql = 'SELECT COUNT(DISTINCT ' + source.trellis.query() + ') AS total_number FROM ('
-        + queries.join('\nUNION\n')
-        + '\n) ' + alias + '\n'
-        + parts.filters
-        + parts.sorts
-
-      sql = Query_Renderer.apply_arguments(sql, parts.args)
-
-      return sql;
+      return 'SELECT 1024 AS total_number'
+      //var alias = source.trellis.get_table_name()
+      //var sql = 'SELECT COUNT(DISTINCT ' + source.trellis.query() + ') AS total_number FROM ('
+      //  + queries.map((q)=> q.replace(/LIMIT\s+\d+/g, '')).join('\nUNION\n')
+      //  + '\n) ' + alias + '\n'
+      //  + parts.filters.replace(/`?\w+`?\./g, '')
+      //  //+ parts.sorts
+      //
+      //sql = Query_Renderer.apply_arguments(sql, parts.args)
+      //return sql;
     }
 
     generate_parts(source:Query_Builder, query_id:number = undefined):Query_Parts {
       var data = new Field_List(source)
       var data2 = Query_Renderer.build_filters(source, this.ground)
       var sorts = source.sorts.length > 0
-        ? Query_Renderer.process_sorts(source.sorts, source.trellis, data2)
+        ? Query_Renderer.render_sorts(source, data2)
         : null
 
       var fields = data.fields
@@ -315,7 +316,10 @@ module Ground {
       return result
     }
 
-    static process_sorts(sorts:Query_Sort[], trellis:Trellis, result:Internal_Query_Source):string {
+    static render_sorts(source:Query_Builder, result:Internal_Query_Source):string {
+      var sorts = source.sorts
+      var trellis = source.trellis
+
       if (sorts.length == 0)
         return ''
 

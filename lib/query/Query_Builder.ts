@@ -108,6 +108,7 @@ module Ground {
     subqueries = {}
     map = {}
     queries:Query_Builder[] = undefined // used for Unions
+    optimized_union:boolean = false
     public static operators = generate_operator_map()
 
     filters:Query_Filter[] = []

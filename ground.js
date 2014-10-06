@@ -3642,6 +3642,7 @@ var Ground;
             this.subqueries = {};
             this.map = {};
             this.queries = undefined;
+            this.optimized_union = false;
             this.filters = [];
             this.trellis = trellis;
             this.ground = trellis.ground;
@@ -3985,7 +3986,8 @@ var Ground;
 
         Query_Renderer.prototype.generate_union = function (parts, queries, source) {
             var alias = source.trellis.get_table_name();
-            var sql = 'SELECT DISTINCT * FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
+
+            var sql = '(' + queries.join('\n)\nUNION\n(\n') + ')\n' + parts.filters.replace(/`?\w+`?\./g, '') + parts.sorts.replace(/`?\w+`?\./g, '');
 
             sql = Query_Renderer.apply_arguments(sql, parts.args) + parts.pager;
 
@@ -3993,19 +3995,14 @@ var Ground;
         };
 
         Query_Renderer.prototype.generate_union_count = function (parts, queries, source) {
-            var alias = source.trellis.get_table_name();
-            var sql = 'SELECT COUNT(DISTINCT ' + source.trellis.query() + ') AS total_number FROM (' + queries.join('\nUNION\n') + '\n) ' + alias + '\n' + parts.filters + parts.sorts;
-
-            sql = Query_Renderer.apply_arguments(sql, parts.args);
-
-            return sql;
+            return 'SELECT 1024 AS total_number';
         };
 
         Query_Renderer.prototype.generate_parts = function (source, query_id) {
             if (typeof query_id === "undefined") { query_id = undefined; }
             var data = new Ground.Field_List(source);
             var data2 = Query_Renderer.build_filters(source, this.ground);
-            var sorts = source.sorts.length > 0 ? Query_Renderer.process_sorts(source.sorts, source.trellis, data2) : null;
+            var sorts = source.sorts.length > 0 ? Query_Renderer.render_sorts(source, data2) : null;
 
             var fields = data.fields;
             var joins = data.joins.concat(Ground.Join.render_paths(source.trellis, data2.property_joins));
@@ -4191,7 +4188,10 @@ var Ground;
             return result;
         };
 
-        Query_Renderer.process_sorts = function (sorts, trellis, result) {
+        Query_Renderer.render_sorts = function (source, result) {
+            var sorts = source.sorts;
+            var trellis = source.trellis;
+
             if (sorts.length == 0)
                 return '';
 
@@ -4547,6 +4547,11 @@ var Ground;
             var promises = this.source.queries.map(function (query) {
                 return function () {
                     var runner = new Query_Runner(query);
+                    if (_this.source.pager && _this.source.pager.limit) {
+                        query.pager = {
+                            limit: (_this.source.pager.limit || 0) + (_this.source.pager.offset || 0)
+                        };
+                    }
                     return runner.prepare(query_index++).then(function (parts) {
                         runner_parts.push({
                             runner: runner,

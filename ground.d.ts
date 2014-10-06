@@ -684,6 +684,7 @@ declare module Ground {
         public subqueries: {};
         public map: {};
         public queries: Query_Builder[];
+        public optimized_union: boolean;
         static operators: {
             '=': any;
             'like': {
@@ -770,7 +771,7 @@ declare module Ground {
         private static build_filter(source, filter, ground);
         private static prepare_condition(source, condition, ground);
         static build_filters(source: Ground.Query_Builder, ground: Ground.Core): Internal_Query_Source;
-        static process_sorts(sorts: Ground.Query_Sort[], trellis: Ground.Trellis, result: Internal_Query_Source): string;
+        static render_sorts(source: Ground.Query_Builder, result: Internal_Query_Source): string;
         static render_pager(pager: Ground.IPager): string;
     }
 }

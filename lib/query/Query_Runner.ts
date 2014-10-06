@@ -355,6 +355,11 @@ module Ground {
       var runner_parts = []
       var promises = this.source.queries.map((query)=> ()=> {
         var runner = new Query_Runner(query)
+        if (this.source.pager && this.source.pager.limit) {
+          query.pager = {
+            limit: (this.source.pager.limit || 0) + (this.source.pager.offset || 0)
+          }
+        }
         return runner.prepare(query_index++)
           .then((parts)=> {
             runner_parts.push({
@@ -368,7 +373,6 @@ module Ground {
             return runner_part.runner.render(runner_part.parts)
               .then((render_result)=> {
                 queries.push(render_result.sql)
-                //return when.resolve()
               })
           })
         ))
