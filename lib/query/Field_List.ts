@@ -86,7 +86,6 @@ module Ground {
       for (var i = 0; i < this.children.length; ++i) {
         this.children[i].cleanup_empty(source)
       }
-
     }
 
     cleanup_entity(source, target) {
@@ -94,8 +93,7 @@ module Ground {
 
       if (primary_key === null || primary_key === undefined) {
         var table = this.tables[this.property.other_trellis.name]
-        console.log('table', table)
-        var key = table.second.get_alias() + '_' + this.property.parent.primary_key
+        var key = table.second.get_alias() + '_' + this.property.other_trellis.primary_key
         primary_key = source[key]
       }
 
