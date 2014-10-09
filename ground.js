@@ -97,7 +97,7 @@ var Ground;
             this.pool.query(sql, args, function (err, rows, fields) {
                 if (err) {
                     console.log('error', sql);
-                    throw err;
+                    def.reject(err);
                 }
 
                 def.resolve(rows, fields);
@@ -3687,28 +3687,31 @@ var Ground;
             this.filters.push(filter);
         };
 
-        Query_Builder.prototype.create_condition = function (source) {
+        Query_Builder.prototype.create_filter = function (source) {
             var _this = this;
             if (source.type == "or" || source.type == "and") {
                 return {
                     type: source.type,
-                    expressions: source.expressions.map(function (x) {
-                        return _this.create_condition(source);
+                    filters: source.filters.map(function (x) {
+                        return _this.create_filter(x);
                     })
                 };
             } else {
-                if (Query_Builder.operators[source.operator] === undefined)
-                    throw new Error("Invalid operator: '" + source.operator + "'.");
+                var operator = source.operator || '=';
+                if (Query_Builder.operators[operator] === undefined)
+                    throw new Error("Invalid operator: '" + operator + "'.");
 
                 if (source.value === undefined) {
                     throw new Error('Cannot add property filter where value is undefined; property = ' + this.trellis.name + '.' + source.path + '.');
                 }
 
-                return {
-                    path: Ground.Query_Renderer.get_chain(source.path, this.trellis),
+                var filter = {
+                    path: source.path,
                     value: source.value,
-                    operator: source.operator
+                    operator: operator
                 };
+
+                return filter;
             }
         };
 
@@ -3793,12 +3796,9 @@ var Ground;
             if (source.filters) {
                 for (i = 0; i < source.filters.length; ++i) {
                     var filter = source.filters[i];
-                    this.add_filter(filter.path || filter.property, filter.value, filter.operator);
-                }
-            }
 
-            if (source.condition) {
-                this.condition = this.create_condition(source.condition);
+                    this.filters.push(this.create_filter(filter));
+                }
             }
 
             if (source.sorts) {
@@ -4001,7 +4001,7 @@ var Ground;
         Query_Renderer.prototype.generate_parts = function (source, query_id) {
             if (typeof query_id === "undefined") { query_id = undefined; }
             var data = new Ground.Field_List(source);
-            var data2 = Query_Renderer.build_filters(source, this.ground);
+            var data2 = Query_Renderer.build_filters(source, source.filters, this.ground, true);
             var sorts = source.sorts.length > 0 ? Query_Renderer.render_sorts(source, data2) : null;
 
             var fields = data.fields;
@@ -4166,26 +4166,40 @@ var Ground;
             return result;
         };
 
-        Query_Renderer.build_filters = function (source, ground) {
+        Query_Renderer.build_filters = function (source, filters, ground, is_root, mode) {
+            if (typeof mode === "undefined") { mode = 'and'; }
             var result = {
                 filters: [],
                 arguments: {},
                 property_joins: []
             };
-            for (var i in source.filters) {
-                var filter = source.filters[i];
-                var additions = Query_Renderer.build_filter(source, filter, ground);
+            for (var i in filters) {
+                var filter = filters[i];
 
-                if (additions.filters.length)
-                    result.filters = result.filters.concat(additions.filters);
+                var additions = typeof filter.type == 'string' && (filter.type == 'and' || filter.type == 'or') ? Query_Renderer.build_filters(source, filter.filters, ground, false, filter.type) : Query_Renderer.build_filter(source, filter, ground);
 
-                if (additions.property_joins.length)
-                    result.property_joins = result.property_joins.concat(additions.property_joins);
-
-                if (Object.keys(additions.arguments).length)
-                    MetaHub.extend(result.arguments, additions.arguments);
+                Query_Renderer.merge_additions(result, additions);
             }
+
+            if (!is_root && result.filters.length > 0) {
+                var joiner = " " + mode.toUpperCase() + " ";
+                result.filters = ["(" + result.filters.join(joiner) + ")"];
+            }
+
             return result;
+        };
+
+        Query_Renderer.merge_additions = function (original, additions) {
+            if (additions.filters.length)
+                original.filters = original.filters.concat(additions.filters);
+
+            if (additions.property_joins.length)
+                original.property_joins = original.property_joins.concat(additions.property_joins);
+
+            if (Object.keys(additions.arguments).length)
+                MetaHub.extend(original.arguments, additions.arguments);
+
+            return original;
         };
 
         Query_Renderer.render_sorts = function (source, result) {

@@ -102,7 +102,7 @@ module Ground {
       this.pool.query(sql, args, (err, rows, fields) => {
         if (err) {
           console.log('error', sql)
-          throw err
+          def.reject(err)
         }
 //        console.log('sql', sql)
         def.resolve(rows, fields)

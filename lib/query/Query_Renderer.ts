@@ -113,7 +113,7 @@ module Ground {
 
     generate_parts(source:Query_Builder, query_id:number = undefined):Query_Parts {
       var data = new Field_List(source)
-      var data2 = Query_Renderer.build_filters(source, this.ground)
+      var data2 = Query_Renderer.build_filters(source, source.filters, this.ground, true)
       var sorts = source.sorts.length > 0
         ? Query_Renderer.render_sorts(source, data2)
         : null
@@ -144,6 +144,18 @@ module Ground {
         query_id: query_id
       }
     }
+
+    //static render_filter(filter) {
+    //  if (typeof filter == 'string') {
+    //    return filter
+    //  }
+    //
+    //  if (filter.type == 'or') {
+    //    return "(" + filter.filters.map((x)=> Query_Renderer.render_filter(x)).join(" OR ") + ")"
+    //  }
+    //
+    //  return "(" + filter.map((x)=> Query_Renderer.render_filter(x)).join(" AND ") + ")"
+    //}
 
     private static add_path(path, trellis:Trellis, result:Internal_Query_Source):any[] {
       var property_chain = Query_Renderer.get_chain(path, trellis)
@@ -294,26 +306,42 @@ module Ground {
       return result;
     }
 
-    static build_filters(source:Query_Builder, ground:Core):Internal_Query_Source {
+    static build_filters(source:Query_Builder, filters:Query_Filter[],ground:Core, is_root:boolean, mode:string = 'and'):Internal_Query_Source {
       var result = {
         filters: [],
         arguments: {},
         property_joins: []
       }
-      for (var i in source.filters) {
-        var filter = source.filters[i]
-        var additions = Query_Renderer.build_filter(source, filter, ground)
+      for (var i in filters) {
+        var filter = filters[i]
 
-        if (additions.filters.length)
-          result.filters = result.filters.concat(additions.filters)
+        var additions = typeof filter.type == 'string' && (filter.type == 'and' || filter.type == 'or')
+          ? Query_Renderer.build_filters(source, filter.filters, ground, false, filter.type)
+          : Query_Renderer.build_filter(source, filter, ground)
 
-        if (additions.property_joins.length)
-          result.property_joins = result.property_joins.concat(additions.property_joins)
-
-        if (Object.keys(additions.arguments).length)
-          MetaHub.extend(result.arguments, additions.arguments)
+        Query_Renderer.merge_additions(result, additions)
       }
+
+      if (!is_root && result.filters.length > 0) {
+        var joiner = " " + mode.toUpperCase() + " "
+        result.filters = [ "(" + result.filters.join(joiner) + ")" ]
+      }
+
       return result
+    }
+
+
+    static merge_additions(original:Internal_Query_Source, additions:Internal_Query_Source):Internal_Query_Source {
+      if (additions.filters.length)
+        original.filters = original.filters.concat(additions.filters)
+
+      if (additions.property_joins.length)
+        original.property_joins = original.property_joins.concat(additions.property_joins)
+
+      if (Object.keys(additions.arguments).length)
+        MetaHub.extend(original.arguments, additions.arguments)
+
+      return original
     }
 
     static render_sorts(source:Query_Builder, result:Internal_Query_Source):string {

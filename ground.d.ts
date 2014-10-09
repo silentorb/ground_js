@@ -641,26 +641,30 @@ declare module Ground {
         path?: string;
         value: any;
         operator?: string;
+        type?: string;
+        filters?: Query_Filter_Source[];
     }
     interface Query_Filter {
         path?: string;
         property?: Ground.Property;
-        value: any;
+        value?: any;
         operator?: string;
+        type?: string;
+        filters?: Query_Filter[];
     }
     interface Condition_Source {
         path?: string;
         value?: any;
         operator?: string;
         type?: string;
-        expressions?: Condition_Source[];
+        filters?: Condition_Source[];
     }
     interface Condition {
         path?: Ground.Property[];
         value?: any;
         operator?: string;
         type?: string;
-        expressions?: Condition[];
+        filters?: Condition[];
     }
     interface Query_Sort {
         property?: any;
@@ -714,7 +718,7 @@ declare module Ground {
         static create(ground: Ground.Core, source?: any): Query_Builder;
         static add_operator(symbol: string, action: any): void;
         public add_filter(path: string, value?: any, operator?: string): void;
-        public create_condition(source: Condition_Source): Condition;
+        public create_filter(source: Query_Filter_Source): Query_Filter;
         public add_key_filter(value: any): void;
         public add_sort(sort: Query_Sort): void;
         public add_map(target: string, source?: any): void;
@@ -770,7 +774,8 @@ declare module Ground {
         private static add_chain(property_chain, result);
         private static build_filter(source, filter, ground);
         private static prepare_condition(source, condition, ground);
-        static build_filters(source: Ground.Query_Builder, ground: Ground.Core): Internal_Query_Source;
+        static build_filters(source: Ground.Query_Builder, filters: Ground.Query_Filter[], ground: Ground.Core, is_root: boolean, mode?: string): Internal_Query_Source;
+        static merge_additions(original: Internal_Query_Source, additions: Internal_Query_Source): Internal_Query_Source;
         static render_sorts(source: Ground.Query_Builder, result: Internal_Query_Source): string;
         static render_pager(pager: Ground.IPager): string;
     }

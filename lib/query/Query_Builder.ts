@@ -17,14 +17,17 @@ module Ground {
     path?:string
     value
     operator?:string
-
+    type?:string
+    filters?:Query_Filter_Source[]
   }
 
   export interface Query_Filter {
     path?:string
     property?:Property
-    value
+    value?
     operator?:string
+    type?:string
+    filters?:Query_Filter[]
   }
 
   export interface Condition_Source {
@@ -33,7 +36,7 @@ module Ground {
     operator?:string
 
     type?:string
-    expressions?:Condition_Source[]
+    filters?:Condition_Source[]
   }
 
   export interface Condition {
@@ -42,7 +45,7 @@ module Ground {
     operator?:string
 
     type?:string
-    expressions?:Condition[]
+    filters?:Condition[]
   }
 
   export interface Query_Sort {
@@ -157,27 +160,30 @@ module Ground {
       this.filters.push(filter)
     }
 
-    create_condition(source:Condition_Source):Condition {
+    create_filter(source:Query_Filter_Source):Query_Filter {
       if (source.type == "or" || source.type == "and") {
         return {
           type: source.type,
-          expressions: source.expressions.map((x) => this.create_condition(source))
+          filters: source.filters.map((x) => this.create_filter(x))
         }
       }
       else {
-        if (Query_Builder.operators[source.operator] === undefined)
-          throw new Error("Invalid operator: '" + source.operator + "'.")
+        var operator = source.operator || '='
+        if (Query_Builder.operators[operator] === undefined)
+          throw new Error("Invalid operator: '" + operator + "'.")
 
         if (source.value === undefined) {
           throw new Error('Cannot add property filter where value is undefined; property = '
             + this.trellis.name + '.' + source.path + '.')
         }
 
-        return {
-          path: Query_Renderer.get_chain(source.path, this.trellis),
+        var filter = {
+          path: source.path, // Query_Renderer.get_chain(source.path, this.trellis),
           value: source.value,
-          operator: source.operator
+          operator: operator
         }
+
+        return filter
       }
     }
 
@@ -261,13 +267,14 @@ module Ground {
       if (source.filters) {
         for (i = 0; i < source.filters.length; ++i) {
           var filter = source.filters[i]
-          this.add_filter(filter.path || filter.property, filter.value, filter.operator)
+          //this.add_filter(filter.path || filter.property, filter.value, filter.operator)
+          this.filters.push(this.create_filter(filter))
         }
       }
 
-      if (source.condition) {
-        this.condition = this.create_condition(source.condition)
-      }
+      //if (source.condition) {
+      //  this.condition = this.create_condition(source.condition)
+      //}
 
       if (source.sorts) {
         for (i = 0; i < source.sorts.length; ++i) {
