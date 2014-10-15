@@ -1647,9 +1647,9 @@ var Ground;
                 var parent = types[info.parent];
                 MetaHub.extend(this, parent);
                 this.parent = parent;
-            } else {
-                this.field_type = info.field_type;
             }
+
+            this.field_type = info.field_type || null;
 
             this.name = name;
             this.property_class = 'Property';
