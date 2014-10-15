@@ -60,5 +60,9 @@
   },
   "json": {
     "field_type": "BLOB"
+  },
+  "bitcoin": {
+    "parent": "float",
+    "field_type": "DECIMAL(16,8)"
   }
 }
