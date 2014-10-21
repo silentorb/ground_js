@@ -3961,7 +3961,7 @@ var Ground;
         Query_Renderer.prototype.generate_sql = function (parts, source) {
             var sql = 'SELECT ' + parts.fields + parts.from + parts.joins + parts.filters;
 
-            sql += "\nGROUP BY " + source.trellis.query_primary_key();
+            sql += "\nGROUP BY " + this.get_group_keys(source.trellis);
 
             sql += parts.sorts;
 
@@ -3974,6 +3974,12 @@ var Ground;
             sql = Query_Renderer.apply_arguments(sql, parts.args) + parts.pager;
 
             return sql;
+        };
+
+        Query_Renderer.prototype.get_group_keys = function (trellis) {
+            return trellis.table && trellis.table.primary_keys && trellis.table.primary_keys.length > 1 ? trellis.table.primary_keys.map(function (k) {
+                return trellis.get_table_query() + '.' + k;
+            }).join(', ') : trellis.query_primary_key();
         };
 
         Query_Renderer.prototype.generate_count = function (parts) {

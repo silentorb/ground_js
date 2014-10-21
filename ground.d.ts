@@ -765,6 +765,7 @@ declare module Ground {
         static apply_arguments(sql: string, args: any): string;
         static generate_property_join(property: Ground.Property, seeds: any): string;
         public generate_sql(parts: Query_Parts, source: Ground.Query_Builder): string;
+        private get_group_keys(trellis);
         public generate_count(parts: Query_Parts): string;
         public generate_union(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;
         public generate_union_count(parts: Query_Parts, queries: string[], source: Ground.Query_Builder): string;

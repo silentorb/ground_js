@@ -56,7 +56,7 @@ module Ground {
         + parts.joins
         + parts.filters
 
-      sql += "\nGROUP BY " + source.trellis.query_primary_key()
+      sql += "\nGROUP BY " + this.get_group_keys(source.trellis)
 
       sql += parts.sorts
 
@@ -70,6 +70,12 @@ module Ground {
       + parts.pager
 
       return sql;
+    }
+
+    private get_group_keys(trellis:Trellis):string {
+      return trellis.table && trellis.table.primary_keys && trellis.table.primary_keys.length > 1
+        ? trellis.table.primary_keys.map((k)=> trellis.get_table_query() + '.' + k).join(', ')
+        : trellis.query_primary_key()
     }
 
     generate_count(parts:Query_Parts) {
@@ -306,7 +312,7 @@ module Ground {
       return result;
     }
 
-    static build_filters(source:Query_Builder, filters:Query_Filter[],ground:Core, is_root:boolean, mode:string = 'and'):Internal_Query_Source {
+    static build_filters(source:Query_Builder, filters:Query_Filter[], ground:Core, is_root:boolean, mode:string = 'and'):Internal_Query_Source {
       var result = {
         filters: [],
         arguments: {},
@@ -324,7 +330,7 @@ module Ground {
 
       if (!is_root && result.filters.length > 0) {
         var joiner = " " + mode.toUpperCase() + " "
-        result.filters = [ "(" + result.filters.join(joiner) + ")" ]
+        result.filters = ["(" + result.filters.join(joiner) + ")"]
       }
 
       return result
