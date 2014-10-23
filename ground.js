@@ -150,6 +150,7 @@ var Ground;
             this.name = null;
             this.primary_key = 'id';
             this.is_virtual = false;
+            this.children = [];
             this.properties = {};
             this.all_properties = null;
             this.core_properties = null;
@@ -409,6 +410,8 @@ var Ground;
 
         Trellis.prototype.set_parent = function (parent) {
             this.parent = parent;
+            if (parent.children.indexOf(this) == -1)
+                parent.children.push(this);
 
             if (!parent.primary_key)
                 throw new Error(parent.name + ' needs a primary key when being inherited by ' + this.name + '.');
@@ -3915,6 +3918,26 @@ var Ground;
             return result;
         };
 
+        Query_Builder.prototype.get_field_properties2 = function () {
+            var result = [];
+            var properties = this.get_properties();
+            for (var i in properties) {
+                var property = properties[i];
+                if (property.type == 'list')
+                    continue;
+
+                if (property.is_virtual) {
+                    var field = property.get_field_override();
+                    if (!field || typeof field.sql != 'string')
+                        continue;
+                }
+
+                result.push(property);
+            }
+
+            return result;
+        };
+
         Query_Builder.prototype.run = function (query_result) {
             if (typeof query_result === "undefined") { query_result = undefined; }
             if (!query_result)
@@ -4768,6 +4791,8 @@ var Ground;
 
         Embedded_Reference.prototype.render_field = function (property) {
             var table = this.get_table(property);
+            if (!table)
+                console.log('prop', property.fullname());
             var table_name = table.second.get_alias();
             if (property.is_virtual)
                 return property.query_virtual_field(table_name, this.get_field_name(property));
@@ -4836,7 +4861,9 @@ var Ground;
         return Embedded_Reference;
     })();
     Ground.Embedded_Reference = Embedded_Reference;
-
+})(Ground || (Ground = {}));
+var Ground;
+(function (Ground) {
     var Field_List = (function () {
         function Field_List(source) {
             this.fields = [];
@@ -4848,6 +4875,7 @@ var Ground;
             this.source = source;
 
             this.properties = source.get_field_properties();
+            this.derived_properties = Field_List.get_derived_properties(source.trellis);
             var name;
 
             if (source.map && Object.keys(source.map).length > 0) {
@@ -4882,11 +4910,13 @@ var Ground;
 
         Field_List.prototype.render_reference_fields = function (property, query, previous) {
             if (typeof previous === "undefined") { previous = undefined; }
-            var reference = new Embedded_Reference(property, ++this.reference_join_count, query.get_field_properties(), previous);
+            var properties = query.get_field_properties2().concat(Field_List.get_derived_properties(property.other_trellis));
+            var reference = new Ground.Embedded_Reference(property, ++this.reference_join_count, properties, previous);
             this.all_references.push(reference);
+            console.log('reference', property.fullname());
 
-            for (var i in reference.properties) {
-                var prop = reference.properties[i];
+            for (var i in properties) {
+                var prop = properties[i];
                 if (prop.type == 'list')
                     continue;
 
@@ -4897,8 +4927,8 @@ var Ground;
 
             this.joins.push(reference.render());
 
-            for (var i in reference.properties) {
-                var prop = reference.properties[i];
+            for (var i in properties) {
+                var prop = properties[i];
                 if (prop.type == 'reference' && query.subqueries[prop.name]) {
                     var child = this.render_reference_fields(prop, query.subqueries[prop.name], reference.tables[prop.parent.name].second);
                     reference.children.push(child);
@@ -4918,16 +4948,30 @@ var Ground;
             }
         };
 
+        Field_List.prototype.get_property = function (name) {
+            if (this.properties[name])
+                return this.properties[name];
+
+            for (var i = 0; i < this.derived_properties.length; ++i) {
+                var property = this.derived_properties[i];
+                if (property.name == name)
+                    return property;
+            }
+
+            return null;
+        };
+
         Field_List.prototype.map_field = function (name) {
             if (!name.match(/^[\w_]+$/))
                 throw new Error('Invalid field name for mapping: ' + name + '.');
 
             var expression = this.source.map[name];
             if (!expression.type) {
-                if (!this.properties[name])
+                var property = this.get_property(name);
+                if (!property)
                     return;
 
-                this.render_field(this.properties[name]);
+                this.render_field(property);
             } else if (expression.type == 'literal') {
                 var value = expression.value;
                 if (value === null) {
@@ -4946,13 +4990,32 @@ var Ground;
                 var sql = value + " AS " + name;
                 this.fields.push(sql);
             } else if (expression.type == 'reference') {
-                var property = this.properties[expression.path];
+                var property = this.get_property(expression.path);
                 if (!property)
                     return;
 
                 var sql = property.query() + " AS " + name;
                 this.fields.push(sql);
             }
+        };
+
+        Field_List.get_derived_properties = function (trellis) {
+            var result = [];
+            for (var i = 0; i < trellis.children.length; ++i) {
+                var child = trellis.children[i];
+                for (var p in child.properties) {
+                    if (p == child.primary_key)
+                        continue;
+
+                    var property = child.properties[p];
+                    if (property.type != 'list')
+                        result.push(property);
+                }
+
+                result = result.concat(Field_List.get_derived_properties(child));
+            }
+
+            return result;
         };
         return Field_List;
     })();

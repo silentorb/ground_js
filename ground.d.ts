@@ -37,6 +37,7 @@ declare module Ground {
         public name: string;
         public primary_key: string;
         public is_virtual: boolean;
+        public children: Trellis[];
         public properties: {
             [name: string]: Ground.Property;
         };
@@ -731,6 +732,7 @@ declare module Ground {
         public get_primary_key_value(): any;
         public get_properties(): any;
         public get_field_properties(): {};
+        public get_field_properties2(): Ground.Property[];
         public run(query_result?: Query_Result): Promise;
         public run_single(query_result?: Query_Result): Promise;
     }
@@ -823,10 +825,10 @@ declare module Ground {
 declare module Ground {
     class Embedded_Reference {
         public property: Ground.Property;
-        public properties: any[];
+        public properties: Ground.Property[];
         public tables: {};
         public children: Embedded_Reference[];
-        constructor(property: Ground.Property, id: number, properties: any, previous?: Ground.Join_Trellis);
+        constructor(property: Ground.Property, id: number, properties: Ground.Property[], previous?: Ground.Join_Trellis);
         public get_field_name(property: Ground.Property): string;
         private get_table(property);
         public render(): string;
@@ -836,20 +838,25 @@ declare module Ground {
         public cleanup_entity(source: any, target: any): void;
         static has_reference(list: Embedded_Reference[], reference: Embedded_Reference): boolean;
     }
+}
+declare module Ground {
     class Field_List implements Ground.Internal_Query_Source {
         public source: Ground.Query_Builder;
         public properties: any;
+        public derived_properties: any;
         public fields: any[];
         public joins: string[];
         public trellises: {};
-        public reference_hierarchy: Embedded_Reference[];
-        public all_references: Embedded_Reference[];
+        public reference_hierarchy: Ground.Embedded_Reference[];
+        public all_references: Ground.Embedded_Reference[];
         public reference_join_count: number;
         constructor(source: Ground.Query_Builder);
         private render_field(property);
         private render_reference_fields(property, query, previous?);
         private map_fields();
+        private get_property(name);
         private map_field(name);
+        static get_derived_properties(trellis: Ground.Trellis): any[];
     }
 }
 declare module "vineyard-ground" {

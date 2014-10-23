@@ -22,6 +22,7 @@
 /// <reference path="query/Query_Builder.ts"/>
 /// <reference path="query/Query_Renderer.ts"/>
 /// <reference path="query/Query_Runner.ts"/>
+/// <reference path="query/Embedded_Reference.ts"/>
 /// <reference path="query/Field_List.ts"/>
 
 //require('source-map-support').install();

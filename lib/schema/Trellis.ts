@@ -13,6 +13,7 @@ module Ground {
     name:string = null
     primary_key:string = 'id'
     is_virtual:boolean = false
+    children:Trellis[] = []
 
     // Property objects that are specific to this trellis and not inherited from a parent trellis
     properties:{
@@ -296,6 +297,8 @@ module Ground {
 
     set_parent(parent:Trellis) {
       this.parent = parent;
+      if (parent.children.indexOf(this) == -1)
+        parent.children.push(this)
 
       if (!parent.primary_key)
         throw new Error(parent.name + ' needs a primary key when being inherited by ' + this.name + '.');

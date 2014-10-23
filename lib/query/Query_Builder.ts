@@ -389,6 +389,26 @@ module Ground {
       return result
     }
 
+    get_field_properties2():Property[] {
+      var result = []
+      var properties = this.get_properties()
+      for (var i in properties) {
+        var property = properties[i]
+        if (property.type == 'list')
+          continue
+
+        if (property.is_virtual) {
+          var field = property.get_field_override()
+          if (!field || typeof field.sql != 'string')
+            continue
+        }
+
+        result.push(property)
+      }
+
+      return result
+    }
+
     run(query_result:Query_Result = undefined):Promise {
       if (!query_result)
         query_result = { query_count: 0 }

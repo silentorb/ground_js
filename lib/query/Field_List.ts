@@ -5,134 +5,11 @@
 
 module Ground {
 
-  export class Embedded_Reference {
-    property:Property
-    properties = []
-    tables = {}
-    children:Embedded_Reference[] = []
-
-    constructor(property:Property, id:number, properties, previous:Join_Trellis = undefined) {
-      if (!previous)
-        previous = new Join_Trellis_Wrapper(property.parent)
-
-      this.property = property
-      var trellises = {}
-      for (var i in properties) {
-        var prop = properties[i]
-        trellises[prop.parent.name] = prop.parent
-      }
-
-      for (var i in trellises) {
-        var trellis = trellises[i]
-        this.tables[i] = new Reference_Join(
-          Join_Property.create_from_property(property),
-          previous,
-          new Join_Trellis_Wrapper(trellis, trellis.get_table_name() + '_' + id)
-        )
-      }
-
-      this.properties = properties
-    }
-
-    get_field_name(property:Property):string {
-      var table = this.get_table(property)
-      return table.second.get_alias() + '_' + property.name
-    }
-
-    private get_table(property:Property):Reference_Join {
-      return this.tables[property.parent.name]
-    }
-
-    //render_join():string {
-    //  return 'JOIN ' + this.trellis.get_table_query() + ' ' + this.alias
-    //    + ' ON ' + this.property.query() + ' = ' + this.alias + '.' + this.trellis.get_primary_keys()[0].get_field_name()
-    //}
-
-    render():string {
-      var joins = []
-      for (var i in this.tables) {
-        joins.push(this.tables[i].render())
-      }
-
-      return joins.join("\n")
-    }
-
-    render_field(property:Property):string {
-      var table = this.get_table(property)
-      var table_name = table.second.get_alias()
-      if (property.is_virtual)
-        return property.query_virtual_field(table_name, this.get_field_name(property))
-
-      return property.get_field_query2(
-        table_name + '.' + property.get_field_name(),
-        this.get_field_name(property)
-      )
-    }
-
-    render_dummy_field(property:Property):string {
-      return 'NULL AS ' + this.get_field_name(property)
-    }
-
-    cleanup_empty(source) {
-      for (var p in this.properties) {
-        var property = this.properties[p]
-        var field_name = this.get_field_name(property)
-        if (source[field_name] === undefined)
-          continue
-
-        delete source[field_name]
-      }
-
-      for (var i = 0; i < this.children.length; ++i) {
-        this.children[i].cleanup_empty(source)
-      }
-    }
-
-    cleanup_entity(source, target) {
-      var primary_key = source[this.property.name]
-
-      if (primary_key === null || primary_key === undefined) {
-        var table = this.tables[this.property.other_trellis.name]
-        var key = table.second.get_alias() + '_' + this.property.other_trellis.primary_key
-        primary_key = source[key]
-      }
-
-      if (primary_key === null || primary_key === undefined) {
-        this.cleanup_empty(source)
-        source[this.property.name] = null
-        return
-      }
-
-      var child_entity = target[this.property.name] = {}
-      for (var p in this.properties) {
-        var property = this.properties[p]
-        var field_name = this.get_field_name(property)
-        if (source[field_name] === undefined)
-          continue
-
-        child_entity[property.name] = property.parent.ground.convert_value(source[field_name], property.type)
-        delete source[field_name]
-      }
-
-      for (var i = 0; i < this.children.length; ++i) {
-        this.children[i].cleanup_entity(source, child_entity)
-      }
-    }
-
-    static has_reference(list:Embedded_Reference[], reference:Embedded_Reference) {
-      for (var i = 0; i < list.length; ++i) {
-        if (list[i].property == reference.property)
-          return true
-      }
-
-      return false
-    }
-  }
-
   export class Field_List implements Internal_Query_Source {
 
     source:Query_Builder
     properties
+    derived_properties
     //all_properties
     fields:any[] = []
     joins:string[] = []
@@ -145,6 +22,7 @@ module Ground {
       this.source = source
       //this.all_properties = source.get_properties()
       this.properties = source.get_field_properties()
+      this.derived_properties = Field_List.get_derived_properties(source.trellis)
       var name
 
       if (source.map && Object.keys(source.map).length > 0) {
@@ -164,7 +42,6 @@ module Ground {
       }
     }
 
-
     private render_field(property:Property) {
       var sql = property.is_virtual
         ? property.query_virtual_field()
@@ -183,16 +60,18 @@ module Ground {
     }
 
     private render_reference_fields(property:Property, query:Query_Builder, previous:Join_Trellis = undefined):Embedded_Reference {
+      var properties = query.get_field_properties2().concat(Field_List.get_derived_properties(property.other_trellis))
       var reference = new Embedded_Reference(
         property,
         ++this.reference_join_count,
-        query.get_field_properties(),
+        properties,
         previous
       )
       this.all_references.push(reference)
+      console.log('reference', property.fullname())
 
-      for (var i in reference.properties) {
-        var prop = reference.properties[i]
+      for (var i in properties) {
+        var prop = properties[i]
         if (prop.type == 'list')
           continue
 
@@ -203,8 +82,8 @@ module Ground {
 
       this.joins.push(reference.render())
 
-      for (var i in reference.properties) {
-        var prop = reference.properties[i]
+      for (var i in properties) {
+        var prop = properties[i]
         if (prop.type == 'reference' && query.subqueries[prop.name]) {
           var child = this.render_reference_fields(prop, query.subqueries[prop.name], reference.tables[prop.parent.name].second)
           reference.children.push(child)
@@ -224,16 +103,31 @@ module Ground {
       }
     }
 
+    private get_property(name:string) {
+      if (this.properties[name])
+        return this.properties[name]
+
+      for (var i = 0; i < this.derived_properties.length; ++i) {
+        var property = this.derived_properties[i]
+        if (property.name == name)
+          return property
+      }
+
+      return null
+    }
+
     private map_field(name) {
       if (!name.match(/^[\w_]+$/))
         throw new Error('Invalid field name for mapping: ' + name + '.')
 
+
       var expression = this.source.map[name]
       if (!expression.type) {
-        if (!this.properties[name])
+        var property = this.get_property(name)
+        if (!property)
           return
 
-        this.render_field(this.properties[name])
+        this.render_field(property)
       }
       else if (expression.type == 'literal') {
         var value = expression.value
@@ -256,7 +150,7 @@ module Ground {
         this.fields.push(sql)
       }
       else if (expression.type == 'reference') {
-        var property = this.properties[expression.path]
+        var property = this.get_property(expression.path)
         if (!property)
           return
 
@@ -265,6 +159,25 @@ module Ground {
         var sql = property.query() + " AS " + name
         this.fields.push(sql)
       }
+    }
+
+    static get_derived_properties(trellis:Trellis) {
+      var result = []
+      for (var i = 0; i < trellis.children.length; ++i) {
+       var child = trellis.children[i]
+        for (var p in child.properties) {
+          if (p == child.primary_key)
+            continue
+
+          var property = child.properties[p]
+          if (property.type != 'list')
+            result.push(property)
+        }
+
+        result = result.concat(Field_List.get_derived_properties(child))
+      }
+
+      return result
     }
   }
 }
