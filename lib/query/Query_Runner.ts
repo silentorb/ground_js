@@ -239,7 +239,8 @@ module Ground {
         var subquery = query.subqueries[name]
         promises.push(()=>
             property.type == 'list'
-              ? subquery.run(query_result)
+              //? subquery.run(query_result)
+              ? Query_Runner.get_many_list(child, property, property.get_relationship(), subquery, query_result)
               .then((result)=> {
                 child[property.name] = result.objects
               })
@@ -468,7 +469,9 @@ module Ground {
         .then((render_result)=> {
           if (!render_result.sql)
             return when.resolve([])
-
+if (this.source.trellis.name == 'tag') {
+  console.log('tags', render_result.sql)
+}
           return this.ground.db.query(render_result.sql)
             .then((rows)=> {
               var result:IService_Response = {

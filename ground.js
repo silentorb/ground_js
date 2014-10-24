@@ -3563,7 +3563,7 @@ var Ground;
             this.second = second;
         }
         Reference_Join.prototype.render = function () {
-            return 'LEFT JOIN ' + this.second.get_table_name() + ' ' + this.second.get_alias() + ' ON ' + this.get_condition();
+            return 'LEFT JOIN `' + this.second.get_table_name() + '` ' + this.second.get_alias() + ' ON ' + this.get_condition();
         };
 
         Reference_Join.prototype.get_condition = function () {
@@ -3586,7 +3586,7 @@ var Ground;
             this.second = second;
         }
         Composite_Join.prototype.render = function () {
-            return 'LEFT JOIN ' + this.second.get_table_name() + ' ' + this.second.get_alias() + ' ON ' + this.get_condition();
+            return 'LEFT JOIN `' + this.second.get_table_name() + '` ' + this.second.get_alias() + ' ON ' + this.get_condition();
         };
 
         Composite_Join.prototype.get_condition = function () {
@@ -4468,7 +4468,7 @@ var Ground;
                 var property = query.trellis.get_property(name);
                 var subquery = query.subqueries[name];
                 promises.push(function () {
-                    return property.type == 'list' ? subquery.run(query_result).then(function (result) {
+                    return property.type == 'list' ? Query_Runner.get_many_list(child, property, property.get_relationship(), subquery, query_result).then(function (result) {
                         child[property.name] = result.objects;
                     }) : _this.process_reference_children(child[property.name], subquery, query_result);
                 });
@@ -4699,7 +4699,9 @@ var Ground;
             }).then(function (render_result) {
                 if (!render_result.sql)
                     return when.resolve([]);
-
+                if (_this.source.trellis.name == 'tag') {
+                    console.log('tags', render_result.sql);
+                }
                 return _this.ground.db.query(render_result.sql).then(function (rows) {
                     var result = {
                         objects: rows

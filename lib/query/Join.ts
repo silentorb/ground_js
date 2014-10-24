@@ -402,7 +402,7 @@ module Ground {
     }
 
     render():string {
-      return 'LEFT JOIN ' + this.second.get_table_name() + ' ' + this.second.get_alias()
+      return 'LEFT JOIN `' + this.second.get_table_name() + '` ' + this.second.get_alias()
         + ' ON ' + this.get_condition()
     }
 
@@ -428,7 +428,7 @@ module Ground {
     }
 
     render():string {
-      return 'LEFT JOIN ' + this.second.get_table_name() + ' ' + this.second.get_alias()
+      return 'LEFT JOIN `' + this.second.get_table_name() + '` ' + this.second.get_alias()
         + ' ON ' + this.get_condition()
     }
 
