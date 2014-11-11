@@ -12,14 +12,14 @@ module Ground {
     log_queries:boolean = false
     pool
     script_pool = null
-    active:boolean = true
+    active:boolean = false
 
     constructor(settings:{
     }, database:string) {
       this.settings = settings
       this.database = database
-      var mysql = require('mysql')
-      this.pool = mysql.createPool(this.settings[this.database])
+      //this.pool = mysql.createPool(this.settings[this.database])
+      this.start()
     }
 
     add_table_to_database(table:Table, ground:Core):Promise {
@@ -47,19 +47,26 @@ module Ground {
 
       this.pool = mysql.createPool(this.settings[this.database])
       this.active = true
-      console.log('db-started.')
+      console.log('DB connection pool created.')
     }
 
     close() {
       if (this.pool) {
-        this.pool.end()
+        this.pool.end((error)=> {
+          if (error)
+            console.log('Error closing main db pool:', error)
+        })
         this.pool = null
       }
       if (this.script_pool) {
-        this.script_pool.end()
+        this.script_pool.end((error)=> {
+          if (error)
+            console.log('Error closing script db pool:', error)
+        })
         this.script_pool = null
       }
       this.active = false
+      console.log('DB connection pool closed.')
     }
 
     create_table(trellis:Trellis):Promise {

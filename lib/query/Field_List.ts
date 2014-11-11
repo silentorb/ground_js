@@ -68,7 +68,6 @@ module Ground {
         previous
       )
       this.all_references.push(reference)
-      console.log('reference', property.fullname())
 
       for (var i in properties) {
         var prop = properties[i]

@@ -7,11 +7,11 @@ var Ground;
         function Database(settings, database) {
             this.log_queries = false;
             this.script_pool = null;
-            this.active = true;
+            this.active = false;
             this.settings = settings;
             this.database = database;
-            var mysql = require('mysql');
-            this.pool = mysql.createPool(this.settings[this.database]);
+
+            this.start();
         }
         Database.prototype.add_table_to_database = function (table, ground) {
             var sql = table.create_sql(ground);
@@ -38,19 +38,26 @@ var Ground;
 
             this.pool = mysql.createPool(this.settings[this.database]);
             this.active = true;
-            console.log('db-started.');
+            console.log('DB connection pool created.');
         };
 
         Database.prototype.close = function () {
             if (this.pool) {
-                this.pool.end();
+                this.pool.end(function (error) {
+                    if (error)
+                        console.log('Error closing main db pool:', error);
+                });
                 this.pool = null;
             }
             if (this.script_pool) {
-                this.script_pool.end();
+                this.script_pool.end(function (error) {
+                    if (error)
+                        console.log('Error closing script db pool:', error);
+                });
                 this.script_pool = null;
             }
             this.active = false;
+            console.log('DB connection pool closed.');
         };
 
         Database.prototype.create_table = function (trellis) {
@@ -1970,9 +1977,7 @@ var Ground;
         };
 
         Core.prototype.stop = function () {
-            console.log('Closing database connections.');
             this.db.close();
-            console.log('Finished closing database.');
         };
 
         Core.to_bool = function (input) {
@@ -4699,9 +4704,7 @@ var Ground;
             }).then(function (render_result) {
                 if (!render_result.sql)
                     return when.resolve([]);
-                if (_this.source.trellis.name == 'tag') {
-                    console.log('tags', render_result.sql);
-                }
+
                 return _this.ground.db.query(render_result.sql).then(function (rows) {
                     var result = {
                         objects: rows
@@ -4915,7 +4918,6 @@ var Ground;
             var properties = query.get_field_properties2().concat(Field_List.get_derived_properties(property.other_trellis));
             var reference = new Ground.Embedded_Reference(property, ++this.reference_join_count, properties, previous);
             this.all_references.push(reference);
-            console.log('reference', property.fullname());
 
             for (var i in properties) {
                 var prop = properties[i];
