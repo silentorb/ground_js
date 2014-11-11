@@ -34,12 +34,18 @@ module Ground {
         }
       }
 
+      this.generate_ancestor_joins(source)
+    }
+
+    private generate_ancestor_joins(source) {
+      var ancestor_joins = []
       for (name in this.trellises) {
         var trellis = this.trellises[name];
         var join = source.trellis.get_ancestor_join(trellis);
         if (join)
-          this.joins.push(join);
+          ancestor_joins.push(join);
       }
+      this.joins = ancestor_joins.concat(this.joins)
     }
 
     private render_field(property:Property) {
