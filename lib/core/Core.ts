@@ -7,6 +7,19 @@
 /// <reference path="../../defs/node.d.ts"/>
 
 module Ground {
+  export class InputError {
+    name = "InputError"
+    message
+    stack
+    status = 400
+    details
+    key
+
+    constructor(message:string, key = undefined) {
+      this.message = message
+      this.key = key
+    }
+  }
 
   export interface IProperty_Source {
     name?:string
@@ -109,9 +122,13 @@ module Ground {
     log_queries:boolean = false
     log_updates:boolean = false
     hub
+    query_schema
+    update_schema
 
     constructor(config, db_name:string) {
       super();
+      this.query_schema = Core.load_relative_json_file('validation/query.json')
+      this.update_schema = Core.load_relative_json_file('validation/update.json')
       this.db = new Database(config, db_name);
       var path = require('path');
       var filename = path.resolve(__dirname, 'property_types.json');
@@ -124,6 +141,12 @@ module Ground {
         var MetaHub3 = require(metahub3_path)
         this.hub = new MetaHub3.Hub()
       }
+    }
+
+    private static load_relative_json_file(path) {
+      var Path = require('path');
+      var fs = require('fs')
+      return JSON.parse(fs.readFileSync(Path.resolve(__dirname, path), 'ascii'))
     }
 
     add_trellis(name:string, source:ITrellis_Source, initialize_parent = true):Trellis {

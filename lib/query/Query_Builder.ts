@@ -155,6 +155,10 @@ module Ground {
       if (path.indexOf('.') === -1) {
         var properties = this.trellis.get_all_properties()
         filter.property = properties[path]
+        if (!filter.property) {
+          throw new Ground.InputError('Invalid filter path.  Trellis ' + this.trellis.name
+            + ' does not have a property named "' + path + '.')
+        }
       }
 
       this.filters.push(filter)

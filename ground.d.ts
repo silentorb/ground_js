@@ -218,6 +218,15 @@ declare module Ground {
     }
 }
 declare module Ground {
+    class InputError {
+        public name: string;
+        public message: any;
+        public stack: any;
+        public status: number;
+        public details: any;
+        public key: any;
+        constructor(message: string, key?: any);
+    }
     interface IProperty_Source {
         name?: string;
         type: string;
@@ -275,7 +284,10 @@ declare module Ground {
         public log_queries: boolean;
         public log_updates: boolean;
         public hub: any;
+        public query_schema: any;
+        public update_schema: any;
         constructor(config: any, db_name: string);
+        private static load_relative_json_file(path);
         public add_trellis(name: string, source: ITrellis_Source, initialize_parent?: boolean): Ground.Trellis;
         public get_base_property_type(type: any): any;
         public get_identity(trellis: string, seed: any): any;

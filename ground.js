@@ -1630,6 +1630,18 @@ var __extends = this.__extends || function (d, b) {
 };
 var Ground;
 (function (Ground) {
+    var InputError = (function () {
+        function InputError(message, key) {
+            if (typeof key === "undefined") { key = undefined; }
+            this.name = "InputError";
+            this.status = 400;
+            this.message = message;
+            this.key = key;
+        }
+        return InputError;
+    })();
+    Ground.InputError = InputError;
+
     function path_to_array(path) {
         if (MetaHub.is_array(path))
             return path;
@@ -1688,6 +1700,8 @@ var Ground;
             this.property_types = [];
             this.log_queries = false;
             this.log_updates = false;
+            this.query_schema = Core.load_relative_json_file('validation/query.json');
+            this.update_schema = Core.load_relative_json_file('validation/update.json');
             this.db = new Ground.Database(config, db_name);
             var path = require('path');
             var filename = path.resolve(__dirname, 'property_types.json');
@@ -1701,6 +1715,12 @@ var Ground;
                 this.hub = new MetaHub3.Hub();
             }
         }
+        Core.load_relative_json_file = function (path) {
+            var Path = require('path');
+            var fs = require('fs');
+            return JSON.parse(fs.readFileSync(Path.resolve(__dirname, path), 'ascii'));
+        };
+
         Core.prototype.add_trellis = function (name, source, initialize_parent) {
             if (typeof initialize_parent === "undefined") { initialize_parent = true; }
             var trellis = this.trellises[name];
@@ -3685,6 +3705,9 @@ var Ground;
             if (path.indexOf('.') === -1) {
                 var properties = this.trellis.get_all_properties();
                 filter.property = properties[path];
+                if (!filter.property) {
+                    throw new Ground.InputError('Invalid filter path.  Trellis ' + this.trellis.name + ' does not have a property named "' + path + '.');
+                }
             }
 
             this.filters.push(filter);

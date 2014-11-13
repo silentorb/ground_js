@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "properties": {
+    "trellis": {
+      "description": "Name of the main trellis being queried",
+      "type": "string"
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/new_filter" },
+          { "$ref": "#/definitions/old_filter" }
+        ]
+      }
+    }
+  },
+  "required": [ "trellis" ],
+  "definitions": {
+    "old_filter": {
+      "type": "object",
+      "properties": {
+        "property": {
+          "type": "string"
+        },
+        "value": {
+        }
+      },
+      "required": [ "property", "value" ]
+    },
+    "new_filter": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "value": {
+        }
+      },
+      "required": [ "path", "value" ]
+    }
+  }
+}
