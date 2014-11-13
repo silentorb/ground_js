@@ -863,6 +863,7 @@ declare module Ground {
         public all_references: Ground.Embedded_Reference[];
         public reference_join_count: number;
         constructor(source: Ground.Query_Builder);
+        private generate_ancestor_joins(source);
         private render_field(property);
         private render_reference_fields(property, query, previous?);
         private map_fields();

@@ -469,9 +469,7 @@ module Ground {
         .then((render_result)=> {
           if (!render_result.sql)
             return when.resolve([])
-if (this.source.trellis.name == 'tag') {
-  console.log('tags', render_result.sql)
-}
+
           return this.ground.db.query(render_result.sql)
             .then((rows)=> {
               var result:IService_Response = {

@@ -423,9 +423,7 @@ module Ground {
     }
 
     stop() {
-      console.log('Closing database connections.')
       this.db.close()
-      console.log('Finished closing database.')
     }
 
     static to_bool(input) {
