@@ -277,7 +277,8 @@ module Ground {
         || seed._deleted === 'true'
         || seed._deleted_ === true
         || seed._deleted_ === 'true'
-        || seed.__deleted__ === true)
+        || seed.__deleted__ === true
+        || seed.__deleted__ === 1)
         return new Delete(this, trellis, seed)
 
       var update = new Update(trellis, seed, this)
@@ -320,7 +321,9 @@ module Ground {
       // to delete which will be handled by Update.
       // If _delete is simply true then the seed itself is marked for deletion.
       if (seed._deleted === true || seed._deleted === 'true'
-        || seed._deleted_ === true || seed._deleted_ === 'true')
+        || seed._deleted_ === true || seed._deleted_ === 'true'
+        || seed.__deleted__ === true || seed.__deleted__ === 1
+        )
         return this.delete_object(trellis, seed);
 
       var update = new Update(trellis, seed, this);

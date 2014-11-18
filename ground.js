@@ -1850,7 +1850,7 @@ var Ground;
             if (typeof user === "undefined") { user = null; }
             trellis = this.sanitize_trellis_argument(trellis);
 
-            if (seed._deleted === true || seed._deleted === 'true' || seed._deleted_ === true || seed._deleted_ === 'true' || seed.__deleted__ === true)
+            if (seed._deleted === true || seed._deleted === 'true' || seed._deleted_ === true || seed._deleted_ === 'true' || seed.__deleted__ === true || seed.__deleted__ === 1)
                 return new Ground.Delete(this, trellis, seed);
 
             var update = new Ground.Update(trellis, seed, this);
@@ -1896,7 +1896,7 @@ var Ground;
             if (typeof as_service === "undefined") { as_service = false; }
             trellis = this.sanitize_trellis_argument(trellis);
 
-            if (seed._deleted === true || seed._deleted === 'true' || seed._deleted_ === true || seed._deleted_ === 'true')
+            if (seed._deleted === true || seed._deleted === 'true' || seed._deleted_ === true || seed._deleted_ === 'true' || seed.__deleted__ === true || seed.__deleted__ === 1)
                 return this.delete_object(trellis, seed);
 
             var update = new Ground.Update(trellis, seed, this);
