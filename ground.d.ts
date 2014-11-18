@@ -249,6 +249,8 @@ declare module Ground {
         _deleted?: any;
         _deleted_?: any;
         _removed_?: any;
+        __deleted__?: any;
+        __removed__?: any;
     }
     interface IUpdate {
         run: () => Promise;

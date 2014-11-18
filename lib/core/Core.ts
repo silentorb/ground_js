@@ -45,6 +45,8 @@ module Ground {
     _deleted?
     _deleted_?
     _removed_?
+    __deleted__?
+    __removed__?
   }
 
   export interface IUpdate {
@@ -274,7 +276,8 @@ module Ground {
       if (seed._deleted === true
         || seed._deleted === 'true'
         || seed._deleted_ === true
-        || seed._deleted_ === 'true')
+        || seed._deleted_ === 'true'
+        || seed.__deleted__ === true)
         return new Delete(this, trellis, seed)
 
       var update = new Update(trellis, seed, this)
