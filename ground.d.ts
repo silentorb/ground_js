@@ -211,7 +211,7 @@ declare module Ground {
         public get_access_name(): string;
         private delete_child(link, id, depth?);
         private delete_children(trellis, id, depth?);
-        public delete_record(trellis: Ground.Trellis, id: any): Promise;
+        public delete_record(trellis: Ground.Trellis, seed: any): Promise;
         private get_child_links(trellis);
         public run(depth?: number): Promise;
         private run_delete(trellis, seed, depth?);

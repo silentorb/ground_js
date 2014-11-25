@@ -26,7 +26,7 @@ module Ground {
     is_unique:boolean = false
     composite_properties:any[] = null
     access:string = 'auto' // 'auto' or 'manual'
-    allow_null:boolean
+    allow_null:boolean = false
 
     constructor(name:string, source:IProperty_Source, trellis:Trellis) {
       for (var i in source) {
@@ -36,7 +36,7 @@ module Ground {
       if (source['default'] !== undefined)
         this.default = source['default']
 
-      if (source['allow_null'] !== undefined)
+      if (typeof source['allow_null'] == 'boolean')
         this.allow_null = source['allow_null']
 
       if (source.trellis) {
@@ -170,22 +170,6 @@ module Ground {
 
       return property_type.get_field_type();
     }
-
-//    static get_field_value_sync(value) {
-//      if (typeof value === 'string') {
-//        value = value.replace(/'/g, "\\'", value);
-//        value = "'" + value.replace(/[\r\n]+/, "\n") + "'";
-////        console.log('value', value)
-//      }
-//      else if (value === true)
-//        value = 'TRUE';
-//      else if (value === false)
-//        value = 'FALSE';
-//      if (value === null || value === undefined)
-//        value = 'NULL';
-//
-//      return value;
-//    }
 
     get_seed_name():string {
       if (this.is_composite_sub)

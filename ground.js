@@ -1543,9 +1543,10 @@ var Ground;
             var other_property = link.get_other_property();
             var other_trellis = other_property.parent;
             var query = other_trellis.ground.create_query(other_trellis.name);
-            query.add_key_filter(id);
-            return query.run({ query_count: 0 }).then(function (objects) {
-                return when.all(objects.map(function (object) {
+            query.add_filter(other_property.name, id);
+            console.log('id', id);
+            return query.run({ query_count: 0 }).then(function (result) {
+                return when.all(result.objects.map(function (object) {
                     return _this.run_delete(other_trellis, object, depth + 1);
                 }));
             });
@@ -1560,8 +1561,17 @@ var Ground;
             }));
         };
 
-        Delete.prototype.delete_record = function (trellis, id) {
-            var sql = 'DELETE FROM `' + trellis.get_table_name() + '`' + "\nWHERE " + trellis.query_primary_key() + ' = ' + id;
+        Delete.prototype.delete_record = function (trellis, seed) {
+            var keys = trellis.get_primary_keys();
+            var filters = keys.map(function (property) {
+                var id = seed[property.name];
+                if (id === undefined || id === null)
+                    throw new Error("Cannot delete entity. Entity is missing " + property.fullname() + ".");
+
+                return property.query() + " = " + property.get_sql_value(id);
+            });
+
+            var sql = 'DELETE FROM `' + trellis.get_table_name() + '`' + "\nWHERE " + filters.join(' AND ');
 
             if (this.ground.log_updates)
                 console.log(sql);
@@ -1594,12 +1604,13 @@ var Ground;
             var _this = this;
             if (depth > this.max_depth)
                 throw new Error("Max depth of " + this.max_depth + " exceeded.  Possible infinite loop.");
-            console.log('deleting');
+
+            var pipeline = require('when/pipeline');
             var id = seed[trellis.primary_key];
+            console.log('deleting', id);
             if (id === null || id === undefined)
                 throw new Error("Object was tagged to be deleted but has no identity.");
 
-            id = trellis.properties[trellis.primary_key].get_sql_value(id);
             var property_names = MetaHub.map_to_array(trellis.get_all_properties(), function (x) {
                 return x.name;
             });
@@ -1612,17 +1623,27 @@ var Ground;
                     return _this.ground.invoke(trellis.name + '.delete', seed);
                 });
 
-                return when.all(invoke_promises).then(function () {
-                    return when.all(tree.map(function (trellis) {
-                        return _this.delete_record(trellis, id);
-                    }));
-                }).then(function () {
-                    return when.all(tree.map(function (trellis) {
-                        return _this.ground.invoke(trellis.name + '.deleted', seed);
-                    }));
-                }).then(function () {
-                    return _this.delete_children(trellis, id, depth);
-                });
+                return pipeline([
+                    function () {
+                        return when.all(invoke_promises);
+                    },
+                    function () {
+                        return _this.delete_children(trellis, id, depth);
+                    },
+                    function () {
+                        return when.all(tree.map(function (trellis) {
+                            return _this.delete_record(trellis, seed);
+                        }));
+                    },
+                    function () {
+                        return when.all(tree.map(function (trellis) {
+                            return _this.ground.invoke(trellis.name + '.deleted', seed);
+                        }));
+                    },
+                    function () {
+                        return [];
+                    }
+                ]);
             });
         };
         return Delete;
@@ -2555,6 +2576,7 @@ var Ground;
             this.is_unique = false;
             this.composite_properties = null;
             this.access = 'auto';
+            this.allow_null = false;
             for (var i in source) {
                 if (this.hasOwnProperty(i))
                     this[i] = source[i];
@@ -2562,7 +2584,7 @@ var Ground;
             if (source['default'] !== undefined)
                 this.default = source['default'];
 
-            if (source['allow_null'] !== undefined)
+            if (typeof source['allow_null'] == 'boolean')
                 this.allow_null = source['allow_null'];
 
             if (source.trellis) {
