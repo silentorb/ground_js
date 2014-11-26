@@ -10,7 +10,8 @@
       "items": {
         "oneOf": [
           { "$ref": "#/definitions/new_filter" },
-          { "$ref": "#/definitions/old_filter" }
+          { "$ref": "#/definitions/old_filter" },
+          { "$ref": "#/definitions/group_filter" }
         ]
       }
     }
@@ -24,6 +25,9 @@
           "type": "string"
         },
         "value": {
+        },
+        "operator": {
+          "type": "string"
         }
       },
       "required": [ "property", "value" ]
@@ -35,9 +39,30 @@
           "type": "string"
         },
         "value": {
+        },
+        "operator": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
         }
       },
       "required": [ "path", "value" ]
+    },
+    "group_filter": {
+      "type": "object",
+      "properties": {
+        "operator": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "filters": {
+          "type": "array"
+        }
+      },
+      "required": ["filters"]
     }
   }
 }
