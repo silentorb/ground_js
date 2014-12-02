@@ -157,7 +157,7 @@ module Ground {
         filter.property = properties[path]
         if (!filter.property) {
           throw new Ground.InputError('Invalid filter path.  Trellis ' + this.trellis.name
-            + ' does not have a property named "' + path + '.')
+          + ' does not have a property named "' + path + '.')
         }
       }
 
@@ -178,7 +178,7 @@ module Ground {
 
         if (source.value === undefined) {
           throw new Error('Cannot add property filter where value is undefined; property = '
-            + this.trellis.name + '.' + source.path + '.')
+          + this.trellis.name + '.' + source.path + '.')
         }
 
         var filter = {
@@ -218,7 +218,7 @@ module Ground {
       var property = properties[property_name]
       if (!property)
         throw new Error('Cannot create subquery. '
-          + this.trellis.name + ' does not have a property named ' + property_name + '.')
+        + this.trellis.name + ' does not have a property named ' + property_name + '.')
 
       if (!property.other_trellis)
         throw new Error('Cannot create a subquery from ' + property.fullname() + ' it does not reference another trellis.')
@@ -295,40 +295,8 @@ module Ground {
           this.add_query(source.queries[i])
         }
       }
-      else {
-        if (source.properties) {
-          var properties = this.trellis.get_all_properties()
-          this.properties = {}
-          for (var i in source.properties) {
-            var property = source.properties[i]
-            if (typeof property == 'string') {
-              if (!properties[property])
-                throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.')
-
-              this.properties[property] = {
-              }
-            }
-            else {
-              var name = property.name || i
-              if (!properties[name])
-                throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.')
-
-              if (property)
-                this.properties[name] = property
-            }
-          }
-
-          var identities = [ this.trellis.properties[this.trellis.primary_key] ]
-          if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
-            identities = identities.concat(identities[0].composite_properties)
-          }
-
-          for (var k in identities) {
-            var identity = identities[k]
-            if (!this.properties[identity.name])
-              this.properties[identity.name] = {}
-          }
-        }
+      else if (source.properties) {
+        this.add_properties(source.properties)
       }
 
       if (typeof source.subqueries == 'object') {
@@ -344,13 +312,50 @@ module Ground {
       }
 
       if (MetaHub.is_array(source.expansions)) {
-        for (i = 0; i < source.expansions.length; ++i) {
-          var expansion = source.expansions[i]
-          var tokens = expansion.split(/[\/\.]/g)
-          var subquery = this
-          for (var j = 0; j < tokens.length; ++j) {
-            subquery = subquery.add_subquery(tokens[j], {})
-          }
+        this.add_expansions(source.expansions)
+      }
+    }
+
+    add_properties(source_properties) {
+      var properties = this.trellis.get_all_properties()
+      this.properties = {}
+      for (var i in source_properties) {
+        var property = source_properties[i]
+        if (typeof property == 'string') {
+          if (!properties[property])
+            throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.')
+
+          this.properties[property] = {}
+        }
+        else {
+          var name = property.name || i
+          if (!properties[name])
+            throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.')
+
+          if (property)
+            this.properties[name] = property
+        }
+      }
+
+      var identities = [this.trellis.properties[this.trellis.primary_key]]
+      if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
+        identities = identities.concat(identities[0].composite_properties)
+      }
+
+      for (var k in identities) {
+        var identity = identities[k]
+        if (!this.properties[identity.name])
+          this.properties[identity.name] = {}
+      }
+    }
+
+    add_expansions(expansions) {
+      for (var i = 0; i < expansions.length; ++i) {
+        var expansion = expansions[i]
+        var tokens = expansion.split(/[\/\.]/g)
+        var subquery = this
+        for (var j = 0; j < tokens.length; ++j) {
+          subquery = subquery.add_subquery(tokens[j], {})
         }
       }
     }
@@ -415,7 +420,7 @@ module Ground {
 
     run(query_result:Query_Result = undefined):Promise {
       if (!query_result)
-        query_result = { query_count: 0 }
+        query_result = {query_count: 0}
 //console.log('query-count', this.trellis.name, query_result.query_count)
       ++query_result.query_count
       var runner = new Query_Runner(this)

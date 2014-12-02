@@ -743,6 +743,8 @@ declare module Ground {
         public create_runner(): Ground.Query_Runner;
         static create_join_filter(property: Ground.Property, seed: any): Query_Filter;
         public extend(source: any): void;
+        public add_properties(source_properties: any): void;
+        public add_expansions(expansions: any): void;
         public get_primary_key_value(): any;
         public get_properties(): any;
         public get_field_properties(): {};

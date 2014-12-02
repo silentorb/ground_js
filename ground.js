@@ -3868,38 +3868,8 @@ var Ground;
                 for (i = 0; i < source.queries.length; ++i) {
                     this.add_query(source.queries[i]);
                 }
-            } else {
-                if (source.properties) {
-                    var properties = this.trellis.get_all_properties();
-                    this.properties = {};
-                    for (var i in source.properties) {
-                        var property = source.properties[i];
-                        if (typeof property == 'string') {
-                            if (!properties[property])
-                                throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.');
-
-                            this.properties[property] = {};
-                        } else {
-                            var name = property.name || i;
-                            if (!properties[name])
-                                throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.');
-
-                            if (property)
-                                this.properties[name] = property;
-                        }
-                    }
-
-                    var identities = [this.trellis.properties[this.trellis.primary_key]];
-                    if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
-                        identities = identities.concat(identities[0].composite_properties);
-                    }
-
-                    for (var k in identities) {
-                        var identity = identities[k];
-                        if (!this.properties[identity.name])
-                            this.properties[identity.name] = {};
-                    }
-                }
+            } else if (source.properties) {
+                this.add_properties(source.properties);
             }
 
             if (typeof source.subqueries == 'object') {
@@ -3915,13 +3885,49 @@ var Ground;
             }
 
             if (MetaHub.is_array(source.expansions)) {
-                for (i = 0; i < source.expansions.length; ++i) {
-                    var expansion = source.expansions[i];
-                    var tokens = expansion.split(/[\/\.]/g);
-                    var subquery = this;
-                    for (var j = 0; j < tokens.length; ++j) {
-                        subquery = subquery.add_subquery(tokens[j], {});
-                    }
+                this.add_expansions(source.expansions);
+            }
+        };
+
+        Query_Builder.prototype.add_properties = function (source_properties) {
+            var properties = this.trellis.get_all_properties();
+            this.properties = {};
+            for (var i in source_properties) {
+                var property = source_properties[i];
+                if (typeof property == 'string') {
+                    if (!properties[property])
+                        throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + property + '.');
+
+                    this.properties[property] = {};
+                } else {
+                    var name = property.name || i;
+                    if (!properties[name])
+                        throw new Error('Error with overriding query properties: ' + this.trellis.name + ' does not have a property named ' + name + '.');
+
+                    if (property)
+                        this.properties[name] = property;
+                }
+            }
+
+            var identities = [this.trellis.properties[this.trellis.primary_key]];
+            if (identities[0].composite_properties && identities[0].composite_properties.length > 0) {
+                identities = identities.concat(identities[0].composite_properties);
+            }
+
+            for (var k in identities) {
+                var identity = identities[k];
+                if (!this.properties[identity.name])
+                    this.properties[identity.name] = {};
+            }
+        };
+
+        Query_Builder.prototype.add_expansions = function (expansions) {
+            for (var i = 0; i < expansions.length; ++i) {
+                var expansion = expansions[i];
+                var tokens = expansion.split(/[\/\.]/g);
+                var subquery = this;
+                for (var j = 0; j < tokens.length; ++j) {
+                    subquery = subquery.add_subquery(tokens[j], {});
                 }
             }
         };
