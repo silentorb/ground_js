@@ -3863,6 +3863,12 @@ var Ground;
             if (source.pager) {
                 this.pager = source.pager;
             }
+            if (source.range) {
+                this.pager = {
+                    offset: source.range.start,
+                    limit: source.range.length
+                };
+            }
 
             if (source.type === 'union') {
                 for (i = 0; i < source.queries.length; ++i) {
