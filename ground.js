@@ -461,7 +461,7 @@ var Ground;
             query.extend({
                 properties: required_properties
             });
-            return query.run_single({ query_count: 0 });
+            return query.run_single(null);
         };
 
         Trellis.prototype.export_schema = function () {
@@ -1545,7 +1545,7 @@ var Ground;
             var query = other_trellis.ground.create_query(other_trellis.name);
             query.add_filter(other_property.name, id);
             console.log('id', id);
-            return query.run({ query_count: 0 }).then(function (result) {
+            return query.run(null).then(function (result) {
                 return when.all(result.objects.map(function (object) {
                     return _this.run_delete(other_trellis, object, depth + 1);
                 }));
@@ -2929,7 +2929,19 @@ var Ground;
             if (typeof table_name === "undefined") { table_name = null; }
             table_name = table_name || this.parent.get_table_query();
             var field = this.get_field_override();
-            return field && typeof field.sql == 'string' ? field.sql.replace(/@trellis@/g, table_name) : null;
+            if (field) {
+                var sql = null;
+                if (MetaHub.is_array(field.sql))
+                    var sql = field['sql'].join("\n");
+
+                if (typeof field.sql == 'string')
+                    return sql = field.sql;
+
+                if (sql)
+                    return sql.replace(/@trellis@/g, table_name);
+            }
+
+            return null;
         };
 
         Property.prototype.query_virtual_field = function (table_name, output_name) {
@@ -3897,7 +3909,7 @@ var Ground;
 
         Query_Builder.prototype.add_properties = function (source_properties) {
             var properties = this.trellis.get_all_properties();
-            this.properties = {};
+            this.properties = this.properties || {};
             for (var i in source_properties) {
                 var property = source_properties[i];
                 if (typeof property == 'string') {
@@ -4000,10 +4012,10 @@ var Ground;
             return result;
         };
 
-        Query_Builder.prototype.run = function (query_result) {
-            if (typeof query_result === "undefined") { query_result = undefined; }
+        Query_Builder.prototype.run = function (user, query_result) {
+            if (typeof query_result === "undefined") { query_result = null; }
             if (!query_result)
-                query_result = { query_count: 0 };
+                query_result = { query_count: 0, user: user };
 
             ++query_result.query_count;
             var runner = new Ground.Query_Runner(this);
@@ -4011,9 +4023,9 @@ var Ground;
             return runner.run(query_result);
         };
 
-        Query_Builder.prototype.run_single = function (query_result) {
-            if (typeof query_result === "undefined") { query_result = undefined; }
-            return this.run(query_result).then(function (result) {
+        Query_Builder.prototype.run_single = function (user, query_result) {
+            if (typeof query_result === "undefined") { query_result = null; }
+            return this.run(user, query_result).then(function (result) {
                 return result.objects[0];
             });
         };
@@ -4390,7 +4402,7 @@ var Ground;
             var query = Query_Runner.create_sub_query(other_property.parent, property, source);
 
             query.add_filter(other_property.name, id);
-            return query.run(query_result);
+            return query.run(query_result.user, query_result);
         };
 
         Query_Runner.get_reference_object = function (row, property, source, query_result) {
@@ -4400,7 +4412,7 @@ var Ground;
                 return when.resolve(value);
 
             query.add_key_filter(value);
-            return query.run(query_result).then(function (result) {
+            return query.run(query_result.user, query_result).then(function (result) {
                 return result.objects[0];
             });
         };
@@ -4439,7 +4451,7 @@ var Ground;
                 if (source.map)
                     query.map = source.map;
 
-                return query.run_single(query_result).then(function (row) {
+                return query.run_single(query_result.user, query_result).then(function (row) {
                     return _this.process_row_step_two(row, source, trellis, query_result, parts);
                 });
             } else {
@@ -4504,17 +4516,20 @@ var Ground;
                 }
 
                 return null;
-            }).concat(cache.tree.map(function (trellis) {
-                return function () {
-                    return _this.ground.invoke(trellis.name + '.queried', row, _this);
-                };
-            }));
+            });
 
             if (typeof source.map === 'object' && Object.keys(source.map).length > 0) {
                 replacement = this.process_map(row, source, cache.links, query_result);
             }
 
+            var sequence = require('when/sequence');
             return when.all(promises).then(function () {
+                return sequence(cache.tree.map(function (trellis) {
+                    return function () {
+                        return _this.ground.invoke(trellis.name + '.queried', row, _this, query_result);
+                    };
+                }));
+            }).then(function () {
                 return replacement === undefined ? row : replacement;
             });
         };

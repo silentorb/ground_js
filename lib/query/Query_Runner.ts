@@ -72,7 +72,7 @@ module Ground {
 //        query.add_filter(other_property.name, id)
 
       query.add_filter(other_property.name, id)
-      return query.run(query_result);
+      return query.run(query_result.user, query_result);
     }
 
 //    private static get_path(...args:string[]):string {
@@ -91,7 +91,7 @@ module Ground {
         return when.resolve(value)
 
       query.add_key_filter(value);
-      return query.run(query_result)
+      return query.run(query_result.user, query_result)
         .then((result) => result.objects[0])
     }
 
@@ -147,7 +147,7 @@ module Ground {
         if (source.map)
           query.map = source.map
 
-        return query.run_single(query_result)
+        return query.run_single(query_result.user, query_result)
           .then((row)=> this.process_row_step_two(row, source, trellis, query_result, parts))
       }
       else {
@@ -197,7 +197,7 @@ module Ground {
       var cache = Query_Runner.get_trellis_cache(trellis)
 //      var links = trellis.get_all_links((p)=> !p.is_virtual);
 //      var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
-
+//console.log('k', cache.tree.map((t)=> t.name))
       var promises = MetaHub.map_to_array(cache.links, (property, name) => {
         if (property.is_composite_sub)
           return null
@@ -217,13 +217,14 @@ module Ground {
 
         return null
       })
-        .concat(cache.tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this)))
 
       if (typeof source.map === 'object' && Object.keys(source.map).length > 0) {
         replacement = this.process_map(row, source, cache.links, query_result)
       }
 
+      var sequence:any = require('when/sequence')
       return when.all(promises)
+        .then(() => sequence(cache.tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this, query_result))))
 //        .then(()=> this.ground.invoke(trellis.name + '.queried', row, this))
         .then(()=> replacement === undefined ? row : replacement)
     }

@@ -5,6 +5,7 @@ module Ground {
   export interface Query_Result {
     query_count:number
     return_sql?:boolean
+    user
   }
 
   export interface IPager {
@@ -324,7 +325,7 @@ module Ground {
 
     add_properties(source_properties) {
       var properties = this.trellis.get_all_properties()
-      this.properties = {}
+      this.properties = this.properties || {}
       for (var i in source_properties) {
         var property = source_properties[i]
         if (typeof property == 'string') {
@@ -424,9 +425,9 @@ module Ground {
       return result
     }
 
-    run(query_result:Query_Result = undefined):Promise {
+    run(user, query_result:Query_Result = null):Promise {
       if (!query_result)
-        query_result = {query_count: 0}
+        query_result = {query_count: 0, user: user}
 //console.log('query-count', this.trellis.name, query_result.query_count)
       ++query_result.query_count
       var runner = new Query_Runner(this)
@@ -434,8 +435,8 @@ module Ground {
       return runner.run(query_result)
     }
 
-    run_single(query_result:Query_Result = undefined):Promise {
-      return this.run(query_result)
+    run_single(user, query_result:Query_Result = null):Promise {
+      return this.run(user, query_result)
         .then((result)=> result.objects[0])
     }
   }

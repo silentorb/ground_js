@@ -328,7 +328,7 @@ declare module Ground {
         share?: string;
         other_table?: string;
         other_field?: string;
-        sql?: string;
+        sql?: any;
     }
     enum Link_Field_Type {
         identity = 0,
@@ -646,6 +646,7 @@ declare module Ground {
     interface Query_Result {
         query_count: number;
         return_sql?: boolean;
+        user: any;
     }
     interface IPager {
         limit?: any;
@@ -749,8 +750,8 @@ declare module Ground {
         public get_properties(): any;
         public get_field_properties(): {};
         public get_field_properties2(): Ground.Property[];
-        public run(query_result?: Query_Result): Promise;
-        public run_single(query_result?: Query_Result): Promise;
+        public run(user: any, query_result?: Query_Result): Promise;
+        public run_single(user: any, query_result?: Query_Result): Promise;
     }
 }
 declare module Ground {

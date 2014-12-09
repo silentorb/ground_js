@@ -437,9 +437,20 @@ module Ground {
     query_virtual(table_name:string = null):string {
       table_name = table_name || this.parent.get_table_query()
       var field = this.get_field_override()
-      return field && typeof field.sql == 'string'
-        ? field.sql.replace(/@trellis@/g, table_name)
-        : null
+      if (field) {
+        var sql = null
+        if (MetaHub.is_array(field.sql))
+          var sql = field['sql'].join("\n")
+
+        if (typeof field.sql == 'string')
+          return sql = field.sql
+
+        if (sql)
+          return sql
+            .replace(/@trellis@/g, table_name)
+      }
+
+      return null
     }
 
     query_virtual_field(table_name:string = null, output_name:string = null):string {

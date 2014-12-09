@@ -1,3 +1,18 @@
 {
-  "type": "object"
+  "type": "object",
+  "properties": {
+    "objects": {
+      "description": "A list of objects to create/edit",
+      "type": "array",
+      "items": {
+        "properties": {
+          "trellis": {
+            "type": "string"
+          }
+        },
+        "required": ["trellis"]
+      }
+    }
+  },
+  "required": ["objects"]
 }

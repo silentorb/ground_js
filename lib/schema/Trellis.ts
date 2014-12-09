@@ -343,7 +343,7 @@ module Ground {
       query.extend({
         properties: required_properties
       })
-      return query.run_single({ query_count: 0 })
+      return query.run_single(null)
     }
 
     export_schema():ITrellis_Source {
