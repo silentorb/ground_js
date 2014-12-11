@@ -1221,6 +1221,9 @@ var Ground;
                 var add_fields = function (properties, seed) {
                     for (var name in properties) {
                         var property = properties[name];
+                        if (property.is_virtual)
+                            continue;
+
                         var seed_name = property.get_seed_name();
                         if (seed[seed_name] === undefined && !_this.is_create_property(property))
                             continue;

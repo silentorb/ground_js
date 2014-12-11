@@ -130,6 +130,9 @@ module Ground {
           var add_fields = (properties, seed) => {
             for (var name in properties) {
               var property = properties[name];
+							if (property.is_virtual)
+								continue
+
               var seed_name = property.get_seed_name()
               if (seed[seed_name] === undefined && !this.is_create_property(property))
                 continue
