@@ -2938,7 +2938,7 @@ var Ground;
                     var sql = field['sql'].join("\n");
 
                 if (typeof field.sql == 'string')
-                    return sql = field.sql;
+                    sql = field.sql;
 
                 if (sql)
                     return sql.replace(/@trellis@/g, table_name);
