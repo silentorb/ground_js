@@ -442,25 +442,43 @@ var Ground;
         };
 
         Trellis.prototype.seed_has_properties = function (seed, properties) {
-            for (var i in properties) {
-                var name = properties[i];
-                if (seed[name] === undefined)
-                    return false;
-            }
+            return properties.every(function (name) {
+                if (seed.indexOf('.') > -1) {
+                    var current = seed;
+                    return seed.split('.').every(function (token) {
+                        if (current[token] === undefined)
+                            return false;
 
-            return true;
+                        current = current[token];
+                        return true;
+                    });
+                }
+
+                return seed[name] !== undefined;
+            });
         };
 
         Trellis.prototype.assure_properties = function (seed, required_properties) {
-            if (this.seed_has_properties(seed, required_properties)) {
+            if (this.seed_has_properties(seed, required_properties))
                 return when.resolve(seed);
+
+            var properties = [], expansions = [];
+            for (var i = 0; i < required_properties.length; ++i) {
+                var property = required_properties[i];
+                if (property.indexOf('.') == -1)
+                    properties.push(property);
+                else {
+                }
+                properties.push(property.split('.').slice(0, -1).join('/'));
             }
 
             var query = this.ground.create_query(this.name);
             query.add_key_filter(this.get_identity2(seed));
             query.extend({
-                properties: required_properties
+                properties: properties
             });
+            query.add_expansions(expansions);
+
             return query.run_single(null);
         };
 
@@ -2938,7 +2956,7 @@ var Ground;
                     var sql = field['sql'].join("\n");
 
                 if (typeof field.sql == 'string')
-                    return sql = field.sql;
+                    sql = field.sql;
 
                 if (sql)
                     return sql.replace(/@trellis@/g, table_name);

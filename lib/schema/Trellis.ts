@@ -324,25 +324,42 @@ module Ground {
     }
 
     private seed_has_properties(seed, properties:string[]):boolean {
-      for (var i in properties) {
-        var name = properties[i]
-        if (seed[name] === undefined)
-          return false
-      }
+      return properties.every((name)=> {
+        if (seed.indexOf('.') > -1) {
+          var current = seed
+          return seed.split('.').every((token)=> {
+            if (current[token] === undefined)
+              return false
 
-      return true
+            current = current[token]
+            return true
+          })
+        }
+
+        return seed[name] !== undefined
+      })
     }
 
     assure_properties(seed, required_properties:string[]):Promise {
-      if (this.seed_has_properties(seed, required_properties)) {
+      if (this.seed_has_properties(seed, required_properties))
         return when.resolve(seed)
+
+      var properties = [], expansions = []
+      for (var i = 0; i < required_properties.length; ++i) {
+        var property = required_properties[i]
+        if (property.indexOf('.') == -1)
+          properties.push(property)
+        else {}
+          properties.push(property.split('.').slice(0, -1).join('/'))
       }
 
       var query = this.ground.create_query(this.name)
       query.add_key_filter(this.get_identity2(seed))
       query.extend({
-        properties: required_properties
+        properties: properties
       })
+      query.add_expansions(expansions)
+
       return query.run_single(null)
     }
 
