@@ -325,10 +325,10 @@ module Ground {
 
     private seed_has_properties(seed, properties:string[]):boolean {
       return properties.every((name)=> {
-        if (seed.indexOf('.') > -1) {
+        if (name.indexOf('.') > -1) {
           var current = seed
-          return seed.split('.').every((token)=> {
-            if (current[token] === undefined)
+          return name.split('.').every((token)=> {
+            if (typeof current !== 'object' || current[token] === undefined)
               return false
 
             current = current[token]
@@ -346,11 +346,15 @@ module Ground {
 
       var properties = [], expansions = []
       for (var i = 0; i < required_properties.length; ++i) {
-        var property = required_properties[i]
-        if (property.indexOf('.') == -1)
+        var property:string = required_properties[i]
+        if (property.indexOf('.') == -1) {
           properties.push(property)
-        else {}
-          properties.push(property.split('.').slice(0, -1).join('/'))
+        }
+        else {
+          var tokens = property.split('.')
+          expansions.push(tokens.slice(0, -1).join('/'))
+          properties.push(tokens[0])
+        }
       }
 
       var query = this.ground.create_query(this.name)

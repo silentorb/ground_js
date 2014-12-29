@@ -443,10 +443,10 @@ var Ground;
 
         Trellis.prototype.seed_has_properties = function (seed, properties) {
             return properties.every(function (name) {
-                if (seed.indexOf('.') > -1) {
+                if (name.indexOf('.') > -1) {
                     var current = seed;
-                    return seed.split('.').every(function (token) {
-                        if (current[token] === undefined)
+                    return name.split('.').every(function (token) {
+                        if (typeof current !== 'object' || current[token] === undefined)
                             return false;
 
                         current = current[token];
@@ -465,11 +465,13 @@ var Ground;
             var properties = [], expansions = [];
             for (var i = 0; i < required_properties.length; ++i) {
                 var property = required_properties[i];
-                if (property.indexOf('.') == -1)
+                if (property.indexOf('.') == -1) {
                     properties.push(property);
-                else {
+                } else {
+                    var tokens = property.split('.');
+                    expansions.push(tokens.slice(0, -1).join('/'));
+                    properties.push(tokens[0]);
                 }
-                properties.push(property.split('.').slice(0, -1).join('/'));
             }
 
             var query = this.ground.create_query(this.name);

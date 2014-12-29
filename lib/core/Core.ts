@@ -479,5 +479,4 @@ module Ground {
   }
 }
 
-module.
-  exports = Ground
+module.exports = Ground
