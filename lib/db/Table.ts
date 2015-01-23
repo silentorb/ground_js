@@ -10,6 +10,12 @@ module Ground {
     sql?
   }
 
+  export interface Index {
+    name:string
+    fields:string[]
+    is_unique?:boolean
+  }
+
   export enum Link_Field_Type {
     identity,
     reference
@@ -310,12 +316,12 @@ module Ground {
       return value;
     }
 
-    static generate_index_sql(index) {
+    static generate_index_sql(index:Index) {
       var name = index.name || ''
       var name_string, index_fields = index.fields.join('`, `');
       var result = '';
 
-      if (index.unique) {
+      if (index.is_unique) {
         result += 'UNIQUE ';
         name_string = '';
       }

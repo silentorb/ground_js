@@ -330,6 +330,11 @@ declare module Ground {
         other_field?: string;
         sql?: any;
     }
+    interface Index {
+        name: string;
+        fields: string[];
+        is_unique?: boolean;
+    }
     enum Link_Field_Type {
         identity = 0,
         reference = 1,
@@ -365,7 +370,7 @@ declare module Ground {
         public create_sql_from_trellis(trellis: Ground.Trellis): string;
         private get_primary_keys(trellis);
         static format_value(value: any): any;
-        static generate_index_sql(index: any): string;
+        static generate_index_sql(index: Index): string;
         public load_from_schema(source: any): void;
     }
 }
