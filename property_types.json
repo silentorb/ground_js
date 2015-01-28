@@ -28,6 +28,14 @@
     "default": 0,
     "parent": "int"
   },
+  "datetime_old": {
+    "field_type": "INT(11)",
+    "default": 0,
+    "parent": "int"
+  },
+  "datetime2": {
+    "field_type": "DATETIME"
+  },
   "date": {
     "parent": "datetime"
   },

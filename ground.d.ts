@@ -306,7 +306,6 @@ declare module Ground {
         static is_private_or_readonly(property: Ground.Property): boolean;
         public update_object(trellis: any, seed?: ISeed, user?: Ground.IUser, as_service?: boolean): Promise;
         static load_json_from_file(filename: string): any;
-        public load_metahub_file(filename: string): void;
         public load_property_types(filename: string): void;
         public load_schema_from_file(filename: string): void;
         public load_tables(tables: any[]): void;

@@ -1762,14 +1762,6 @@ var Ground;
             var path = require('path');
             var filename = path.resolve(__dirname, 'property_types.json');
             this.load_property_types(filename);
-            var path = require('path');
-            var fs = require('fs');
-            var metahub_path = path.dirname(require.resolve('vineyard-metahub'));
-            var metahub3_path = path.join(metahub_path, 'metahub3.js');
-            if (fs.existsSync(metahub3_path)) {
-                var MetaHub3 = require(metahub3_path);
-                this.hub = new MetaHub3.Hub();
-            }
         }
         Core.load_relative_json_file = function (path) {
             var Path = require('path');
@@ -1964,15 +1956,6 @@ var Ground;
             return JSON.parse(json);
         };
 
-        Core.prototype.load_metahub_file = function (filename) {
-            var fs = require('fs');
-            var code = fs.readFileSync(filename, { encoding: 'ascii' });
-            var match = this.hub.parse_code(code);
-            var block = match.get_data();
-
-            Ground.Logic.load2(this, block.expressions);
-        };
-
         Core.prototype.load_property_types = function (filename) {
             var property_types = Core.load_json_from_file(filename);
             for (var name in property_types) {
@@ -1985,10 +1968,6 @@ var Ground;
         Core.prototype.load_schema_from_file = function (filename) {
             var data = Core.load_json_from_file(filename);
             this.parse_schema(data);
-
-            if (this.hub) {
-                this.hub.load_schema_from_file(filename);
-            }
         };
 
         Core.prototype.load_tables = function (tables) {
@@ -2337,8 +2316,11 @@ var Ground;
                     return trellis.properties[name].get_field_name();
                 });
             }
+            var key = trellis.properties[trellis.primary_key];
+            if (!key)
+                throw new Error("Trellis " + trellis.name + " is missing primary key " + trellis.primary_key);
 
-            return [trellis.properties[trellis.primary_key].get_field_name()];
+            return [key.get_field_name()];
         };
 
         Table.format_value = function (value) {

@@ -296,8 +296,11 @@ module Ground {
           return trellis.properties[name].get_field_name();
         });
       }
+      var key = trellis.properties[trellis.primary_key]
+      if (!key)
+        throw new Error("Trellis " + trellis.name + " is missing primary key " + trellis.primary_key)
 
-      return [ trellis.properties[trellis.primary_key].get_field_name() ];
+      return [key.get_field_name() ];
     }
 
     static format_value(value) {
