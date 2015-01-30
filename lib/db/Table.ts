@@ -170,7 +170,7 @@ module Ground {
         var type = field.type;
 
         if (!type) {
-          console.log('source', table_name, source)
+          console.error('source', table_name, source)
           throw new Error('Field ' + name + ' is missing a type.');
         }
 

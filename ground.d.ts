@@ -3,26 +3,32 @@
 
 declare var when: any;
 declare var mysql: any;
+declare var sequence: any;
 declare module Ground {
     class Database {
         public settings: any;
-        public database: string;
         public log_queries: boolean;
-        public pool: any;
-        public script_pool: any;
-        public active: boolean;
-        constructor(settings: {}, database: string);
+        private database;
+        private pool;
+        private script_pool;
+        private active;
+        private active_query_count;
+        private on_final_query;
+        constructor(settings: any, database: string);
         public add_table_to_database(table: Ground.Table, ground: Ground.Core): Promise;
         public add_non_trellis_tables_to_database(tables: Ground.Table[], ground: Ground.Core): Promise;
         public start(): void;
-        public close(): void;
+        public close(immediate?: boolean): Promise;
+        private wait_for_remaining_queries();
+        private close_all_pools();
+        private close_pool(pool, name);
         public create_table(trellis: Ground.Trellis): Promise;
         public create_trellis_tables(trellises: {
             [key: string]: Ground.Trellis;
         }): Promise;
         public drop_all_tables(): Promise;
         public get_tables(): Promise;
-        public query(sql: string, args?: any[]): Promise;
+        public query(sql: string, args?: any[], pool?: any): Promise;
         public query_single(sql: string, args?: any[]): Promise;
         public run_script(sql: string, args?: any[]): Promise;
     }

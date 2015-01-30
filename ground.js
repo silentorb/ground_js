@@ -1,5 +1,6 @@
 var MetaHub = require('vineyard-metahub');var when = require('when');
 var mysql = require('mysql');
+var sequence = require('when/sequence');
 
 var Ground;
 (function (Ground) {
@@ -8,9 +9,10 @@ var Ground;
             this.log_queries = false;
             this.script_pool = null;
             this.active = false;
+            this.active_query_count = 0;
+            this.on_final_query = null;
             this.settings = settings;
             this.database = database;
-
             this.start();
         }
         Database.prototype.add_table_to_database = function (table, ground) {
@@ -25,7 +27,6 @@ var Ground;
             var non_trellises = MetaHub.filter(tables, function (x) {
                 return !x.trellis;
             });
-
             var promises = MetaHub.map_to_array(non_trellises, function (table) {
                 return _this.add_table_to_database(table, ground);
             });
@@ -41,23 +42,70 @@ var Ground;
             console.log('DB connection pool created.');
         };
 
-        Database.prototype.close = function () {
-            if (this.pool) {
-                this.pool.end(function (error) {
-                    if (error)
-                        console.log('Error closing main db pool:', error);
+        Database.prototype.close = function (immediate) {
+            if (typeof immediate === "undefined") { immediate = false; }
+            var _this = this;
+            var actions = [];
+            if (!immediate)
+                actions.push(function () {
+                    return _this.wait_for_remaining_queries();
                 });
+
+            return sequence(actions.concat([
+                function () {
+                    return _this.close_all_pools();
+                },
+                function () {
+                    _this.active = false;
+                    console.log('Ground DB successfully shut down.');
+                }
+            ]));
+        };
+
+        Database.prototype.wait_for_remaining_queries = function () {
+            var _this = this;
+            if (this.active_query_count == 0)
+                return when.resolve();
+
+            var def = when.defer();
+
+            if (this.on_final_query)
+                throw new Error("wait_for_remaining_queries was called twice.");
+
+            this.on_final_query = function () {
+                _this.on_final_query = null;
+                def.resolve();
+            };
+
+            return def.promise;
+        };
+
+        Database.prototype.close_all_pools = function () {
+            var promises = [];
+            if (this.pool) {
+                promises.push(this.close_pool(this.pool, 'main'));
                 this.pool = null;
             }
             if (this.script_pool) {
-                this.script_pool.end(function (error) {
-                    if (error)
-                        console.log('Error closing script db pool:', error);
-                });
+                promises.push(this.close_pool(this.script_pool, 'script'));
                 this.script_pool = null;
             }
-            this.active = false;
-            console.log('DB connection pool closed.');
+
+            return when.all(promises);
+        };
+
+        Database.prototype.close_pool = function (pool, name) {
+            var def = when.defer();
+            pool.end(function (error) {
+                if (error) {
+                    console.error('Error closing ' + name + ' pool:', error);
+                    def.reject(error);
+                }
+
+                def.resolve();
+            });
+
+            return def.promise;
         };
 
         Database.prototype.create_table = function (trellis) {
@@ -95,15 +143,27 @@ var Ground;
             });
         };
 
-        Database.prototype.query = function (sql, args) {
+        Database.prototype.query = function (sql, args, pool) {
             if (typeof args === "undefined") { args = undefined; }
+            if (typeof pool === "undefined") { pool = undefined; }
+            var _this = this;
+            if (!pool)
+                pool = this.pool;
+
             var def = when.defer();
             if (this.log_queries)
                 console.log('start', sql);
 
             this.pool.query(sql, args, function (err, rows, fields) {
+                _this.active_query_count--;
+                if (_this.on_final_query) {
+                    console.log('remaining-queries:', _this.active_query_count);
+                    if (_this.active_query_count == 0)
+                        _this.on_final_query();
+                }
+
                 if (err) {
-                    console.log('error', sql);
+                    console.error('error', sql);
                     def.reject(err);
                 }
 
@@ -111,6 +171,8 @@ var Ground;
 
                 return null;
             });
+
+            this.active_query_count++;
 
             return def.promise;
         };
@@ -129,20 +191,7 @@ var Ground;
                 settings.multipleStatements = true;
                 this.script_pool = mysql.createPool(settings);
             }
-            var def = when.defer();
-            if (this.log_queries)
-                console.log('start', sql);
-
-            this.script_pool.query(sql, args, function (err, rows, fields) {
-                if (err) {
-                    console.log('error', sql);
-                    throw err;
-                }
-                def.resolve(rows, fields);
-                return null;
-            });
-
-            return def.promise;
+            return this.query(sql, args, this.script_pool);
         };
         return Database;
     })();
@@ -2200,7 +2249,7 @@ var Ground;
                 var type = field.type;
 
                 if (!type) {
-                    console.log('source', table_name, source);
+                    console.error('source', table_name, source);
                     throw new Error('Field ' + name + ' is missing a type.');
                 }
 
