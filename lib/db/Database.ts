@@ -140,6 +140,10 @@ module Ground {
 			});
 		}
 
+		is_active():boolean {
+			return this.active
+		}
+
 		query(sql:string, args:any[] = undefined, pool = undefined):Promise {
 			if (!pool)
 				pool = this.pool

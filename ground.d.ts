@@ -28,6 +28,7 @@ declare module Ground {
         }): Promise;
         public drop_all_tables(): Promise;
         public get_tables(): Promise;
+        public is_active(): boolean;
         public query(sql: string, args?: any[], pool?: any): Promise;
         public query_single(sql: string, args?: any[]): Promise;
         public run_script(sql: string, args?: any[]): Promise;

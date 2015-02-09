@@ -143,6 +143,10 @@ var Ground;
             });
         };
 
+        Database.prototype.is_active = function () {
+            return this.active;
+        };
+
         Database.prototype.query = function (sql, args, pool) {
             if (typeof args === "undefined") { args = undefined; }
             if (typeof pool === "undefined") { pool = undefined; }
