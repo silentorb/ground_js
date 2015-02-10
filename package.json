@@ -1,6 +1,6 @@
 {
   "name": "vineyard-ground",
-  "version": "0.1.75",
+  "version": "0.1.76",
   "description": "MySQL ORM for Vineyard / Node.js",
   "main": "ground.js",
   "repository": {
