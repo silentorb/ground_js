@@ -326,8 +326,12 @@ module Ground {
 
     get_many_list(seed, property:Property, relationship:Relationships):Promise {
       var id = seed[property.parent.primary_key]
-      if (id === undefined || id === null)
-        throw new Error('Cannot get many-to-many list when seed id is null.')
+      if (id === undefined || id === null) {
+        return when.resolve({
+          objects: []
+        })
+      }
+      //throw new Error('Cannot get many-to-many list when seed id is null.')
 
       var other_property = property.get_other_property();
       if (!other_property)

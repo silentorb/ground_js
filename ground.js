@@ -825,8 +825,11 @@ var Ground;
 
         Query.prototype.get_many_list = function (seed, property, relationship) {
             var id = seed[property.parent.primary_key];
-            if (id === undefined || id === null)
-                throw new Error('Cannot get many-to-many list when seed id is null.');
+            if (id === undefined || id === null) {
+                return when.resolve({
+                    objects: []
+                });
+            }
 
             var other_property = property.get_other_property();
             if (!other_property)
@@ -4455,8 +4458,11 @@ var Ground;
 
         Query_Runner.get_many_list = function (seed, property, relationship, source, query_result) {
             var id = seed[property.parent.primary_key];
-            if (id === undefined || id === null)
-                throw new Error('Cannot get many-to-many list when seed id is null for property ' + property.fullname());
+            if (id === undefined || id === null) {
+                return when.resolve({
+                    objects: []
+                });
+            }
 
             var other_property = property.get_other_property();
             if (!other_property)
