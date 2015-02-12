@@ -199,7 +199,7 @@ module Ground {
       if (property_type && property_type.parent)
         return this.get_sql_value(value, property_type.parent.name, is_reference);
 
-      if (this.parent.primary_key == this.name) {
+      if (this.parent.primary_key == this.name && this.type != 'reference') {
         value = this.parent.get_identity2(value)
       }
 
