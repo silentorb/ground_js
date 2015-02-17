@@ -37,7 +37,10 @@
     "field_type": "DATETIME"
   },
   "date": {
-    "parent": "datetime"
+    "field_type": "DATE"
+  },
+  "time": {
+    "field_type": "TIME"
   },
   "float": {
     "field_type": "FLOAT",

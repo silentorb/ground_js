@@ -1889,6 +1889,9 @@ var Ground;
                 return this.convert_value(value, property_type.parent.name);
 
             switch (type) {
+                case 'date':
+                case 'time':
+                case 'datetime2':
                 case 'guid':
                     return value;
                 case 'list':
