@@ -203,7 +203,8 @@ module Ground {
         operator:string = filter.operator || '=',
         reference:string
 
-      var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++;
+      var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++
+
       if (Query_Renderer.counter > 10000)
         Query_Renderer.counter = 1
 

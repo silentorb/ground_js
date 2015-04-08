@@ -15,7 +15,7 @@ module Ground {
     type:string = null
     insert:string = null
     other_property:string = null
-  "default"
+    "default"
     other_trellis:Trellis = null
     other_trellis_name:string = null
     is_private:boolean = false
@@ -84,9 +84,9 @@ module Ground {
 
     get_composite() {
       if (this.composite_properties)
-        return [ this ].concat(this.composite_properties)
+        return [this].concat(this.composite_properties)
 
-      return [ this ]
+      return [this]
     }
 
     get_data():IProperty_Source {
@@ -258,6 +258,20 @@ module Ground {
         case 'money':
           if (typeof value !== 'number')
             return parseFloat(value.toString());
+
+        case 'date':
+        case 'time':
+          if (typeof value == 'string') {
+            var date = new Date(value)
+            //console.log('date or time 1', value, date.toISOString().slice(0, 19).replace('T', ' '))
+            return "'" + date.toISOString().slice(0, 19).replace('T', ' ') + "'"
+          }
+          else if (typeof value == 'number') {
+            var date = new Date(value * 1000)
+            //console.log('date or time 2', value, date.toISOString().slice(0, 19).replace('T', ' '))
+            return "'" + date.toISOString().slice(0, 19).replace('T', ' ') + "'"
+          }
+
       }
 
       throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')')
@@ -313,7 +327,7 @@ module Ground {
         var other_property = properties[this.other_property]
         if (!other_property) {
           throw new Error('Invalid other property in ' + this.get_field_name() + ": "
-            + this.other_trellis.name + '.' + this.other_property + ' does not exist.')
+          + this.other_trellis.name + '.' + this.other_property + ' does not exist.')
 
         }
         return other_property
@@ -409,7 +423,7 @@ module Ground {
     }
 
     format_guid(name:string):string {
-        return "INSERT(INSERT(INSERT(INSERT(HEX(" + name + ")"
+      return "INSERT(INSERT(INSERT(INSERT(HEX(" + name + ")"
         + ",9,0,'-')"
         + ",14,0,'-')"
         + ",19,0,'-')"

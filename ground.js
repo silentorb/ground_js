@@ -2855,6 +2855,18 @@ var Ground;
                 case 'money':
                     if (typeof value !== 'number')
                         return parseFloat(value.toString());
+
+                case 'date':
+                case 'time':
+                    if (typeof value == 'string') {
+                        var date = new Date(value);
+
+                        return "'" + date.toISOString().slice(0, 19).replace('T', ' ') + "'";
+                    } else if (typeof value == 'number') {
+                        var date = new Date(value * 1000);
+
+                        return "'" + date.toISOString().slice(0, 19).replace('T', ' ') + "'";
+                    }
             }
 
             throw new Error('Ground is not configured to process property types of ' + type + ' (' + this.type + ')');
@@ -4241,6 +4253,7 @@ var Ground;
             var value = filter.value, operator = filter.operator || '=', reference;
 
             var placeholder = ':' + filter.path.replace(/\./g, '_') + '_filter' + Query_Renderer.counter++;
+
             if (Query_Renderer.counter > 10000)
                 Query_Renderer.counter = 1;
 
