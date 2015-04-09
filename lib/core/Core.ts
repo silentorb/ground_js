@@ -227,6 +227,10 @@ module Ground {
 				case 'double':
 				case 'money':
 					return parseFloat(value.toString());
+        case 'json':
+          var bin = new Buffer(value, 'binary').toString()
+          var json = new Buffer(bin, 'base64').toString('ascii');
+          return JSON.parse(json);
 			}
 
 			throw new Error('Not sure how to convert sql type of ' + type + '.')

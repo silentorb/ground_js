@@ -1910,6 +1910,10 @@ var Ground;
                 case 'double':
                 case 'money':
                     return parseFloat(value.toString());
+                case 'json':
+                    var bin = new Buffer(value, 'binary').toString();
+                    var json = new Buffer(bin, 'base64').toString('ascii');
+                    return JSON.parse(json);
             }
 
             throw new Error('Not sure how to convert sql type of ' + type + '.');
@@ -4582,7 +4586,6 @@ var Ground;
             delete row['_query_id_'];
 
             var cache = Query_Runner.get_trellis_cache(trellis);
-
             var promises = MetaHub.map_to_array(cache.links, function (property, name) {
                 if (property.is_composite_sub)
                     return null;

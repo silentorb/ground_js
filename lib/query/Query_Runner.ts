@@ -190,7 +190,6 @@ module Ground {
 
       var dummy_references = parts.dummy_references
       if (dummy_references) {
-        //console.log('dummy', dummy_references)
         for (var i in dummy_references) {
           delete row[dummy_references[i]]
         }
@@ -199,9 +198,6 @@ module Ground {
       delete row['_query_id_']
 
       var cache = Query_Runner.get_trellis_cache(trellis)
-//      var links = trellis.get_all_links((p)=> !p.is_virtual);
-//      var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
-//console.log('k', cache.tree.map((t)=> t.name))
       var promises = MetaHub.map_to_array(cache.links, (property, name) => {
         if (property.is_composite_sub)
           return null
@@ -244,16 +240,11 @@ module Ground {
         var subquery = query.subqueries[name]
         promises.push(()=>
             property.type == 'list'
-              //? subquery.run(query_result)
               ? Query_Runner.get_many_list(child, property, property.get_relationship(), subquery, query_result)
               .then((result)=> {
                 child[property.name] = result.objects
               })
               : this.process_reference_children(child[property.name], subquery, query_result)
-              //: subquery.run_single(query_result)
-              //.then((row)=> {
-              //  child[property.name] = row
-              //})
         )
       }
 
