@@ -1,4 +1,3 @@
-/// <reference path="../references.ts"/>
 
 module Ground {
 
@@ -249,7 +248,7 @@ module Ground {
         }
         else {
           if (value !== null)
-            value = ground.convert_value(value, property.type);
+            value = ground.schema.convert_value(value, property.type);
           value = property.get_sql_value(value)
         }
       }
@@ -303,7 +302,7 @@ module Ground {
         }
         else {
           if (value !== null)
-            value = ground.convert_value(value, property.type);
+            value = ground.schema.convert_value(value, property.type);
           value = property.get_sql_value(value)
         }
       }

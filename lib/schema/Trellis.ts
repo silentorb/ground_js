@@ -1,6 +1,14 @@
-/// <reference path="../references.ts"/>
+/// <reference path="Schema.ts"/>
 
 module Ground {
+
+  export interface ITrellis_Source {
+    parent?:string
+    name?:string
+    primary_key?:string
+    properties?
+    is_virtual?:boolean
+  }
 
   export interface ITrellis {
 
@@ -8,7 +16,8 @@ module Ground {
 
   export class Trellis implements ITrellis {
     parent:Trellis = null
-    ground:Core
+    parent_name:string
+    schema:Schema
     table:Table = null
     name:string = null
     primary_key:string = 'id'
@@ -29,8 +38,8 @@ module Ground {
     // those are stored here
     type_property:Property
 
-    constructor(name:string, ground:Core) {
-      this.ground = ground;
+    constructor(name:string, schema:Schema) {
+      this.schema = schema;
       this.name = name;
     }
 
@@ -190,10 +199,10 @@ module Ground {
     }
 
     get_root_table():Table {
-      if (this.parent && this.ground.tables[this.parent.name])
+      if (this.parent && this.schema.tables[this.parent.name])
         return this.parent.get_root_table()
 
-      return this.ground.tables[this.name]
+      return this.schema.tables[this.name]
     }
 
     get_table_name():string {
@@ -243,11 +252,11 @@ module Ground {
     }
 
     initialize(all) {
-      if (typeof this.parent === 'string') {
-        if (!all[this.parent])
+      if (typeof this.parent_name === 'string') {
+        if (!all[this.parent_name])
           throw new Error(this.name + ' references a parent that does not exist: ' + this.parent + '.')
 
-        this.set_parent(all[this.parent])
+        this.set_parent(all[this.parent_name])
         this.check_primary_key()
       }
 
@@ -265,10 +274,13 @@ module Ground {
 
     load_from_object(source:ITrellis_Source) {
       for (var name in source) {
-        if (name != 'name' && name != 'properties' && this[name] !== undefined && source[name] !== undefined) {
+        if (name != 'name' && name != 'properties' && name != 'parent'
+          && this[name] !== undefined && source[name] !== undefined) {
           this[name] = source[name];
         }
       }
+
+      this.parent_name = source.parent
 
       for (name in source.properties) {
         this.add_property(name, source.properties[name]);
@@ -308,7 +320,7 @@ module Ground {
       if (parent.table && parent.table.primary_keys) {
         keys = parent.table.primary_keys;
         if (!this.table)
-          this.table = Table.create_from_trellis(this)
+          this.table = Table.create_from_trellis(this, this.schema)
 
         this.table.primary_keys = keys
 //        console.log('table', this.table)
@@ -323,7 +335,7 @@ module Ground {
       this.primary_key = parent.primary_key;
     }
 
-    private seed_has_properties(seed, properties:string[]):boolean {
+    seed_has_properties(seed, properties:string[]):boolean {
       return properties.every((name)=> {
         if (name.indexOf('.') > -1) {
           var current = seed
@@ -338,33 +350,6 @@ module Ground {
 
         return seed[name] !== undefined
       })
-    }
-
-    assure_properties(seed, required_properties:string[]):Promise {
-      if (this.seed_has_properties(seed, required_properties))
-        return when.resolve(seed)
-
-      var properties = [], expansions = []
-      for (var i = 0; i < required_properties.length; ++i) {
-        var property:string = required_properties[i]
-        if (property.indexOf('.') == -1) {
-          properties.push(property)
-        }
-        else {
-          var tokens = property.split('.')
-          expansions.push(tokens.slice(0, -1).join('/'))
-          properties.push(tokens[0])
-        }
-      }
-
-      var query = this.ground.create_query(this.name)
-      query.add_key_filter(this.get_identity2(seed))
-      query.extend({
-        properties: properties
-      })
-      query.add_expansions(expansions)
-
-      return query.run_single(null)
     }
 
     export_schema():ITrellis_Source {

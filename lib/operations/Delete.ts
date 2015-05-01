@@ -25,7 +25,7 @@ module Ground {
     private delete_child(link:Property, id, depth = 0):Promise {
       var other_property = link.get_other_property()
       var other_trellis = other_property.parent
-      var query = other_trellis.ground.create_query(other_trellis.name)
+      var query = this.ground.create_query(other_trellis.name)
       query.add_filter(other_property.name, id)
       console.log('id', id)
       return query.run(null)
@@ -102,7 +102,7 @@ module Ground {
 
       var property_names = MetaHub.map_to_array(trellis.get_all_properties(), (x)=> x.name)
 
-      return trellis.assure_properties(seed, property_names)
+      return this.ground.assure_properties(trellis, seed, property_names)
         .then((seed)=> {
           var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual)
           var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.delete', seed))

@@ -1,6 +1,18 @@
-/// <reference path="../references.ts"/>
+/// <reference path="Property_Type.ts"/>
 
 module Ground {
+
+  export interface IProperty_Source {
+    name?:string
+    type:string
+    insert?:string
+    is_virtual?:boolean
+    is_readonly?:boolean
+    is_private?:boolean
+    other_property?:string
+    trellis?:string
+    allow_null?:boolean
+  }
 
   export enum Relationships {
     none,
@@ -146,7 +158,7 @@ module Ground {
         if (!create_if_missing)
           return null;
 
-        table = Table.create_from_trellis(this.parent);
+        table = Table.create_from_trellis(this.parent, this.parent.schema);
       }
 
       if (table.properties[this.name] === undefined) {
@@ -187,7 +199,7 @@ module Ground {
         return "'" + bin + "'";
       }
 
-      var property_type = this.parent.ground.property_types[type];
+      var property_type = this.parent.schema.property_types[type];
       if (value === undefined || value === null) {
         value = this.get_default()
         if (value === undefined || value === null) {
@@ -371,7 +383,7 @@ module Ground {
     }
 
     get_property_type():Property_Type {
-      var types = this.parent.ground.property_types;
+      var types = this.parent.schema.property_types;
       if (types[this.type] !== undefined)
         return types[this.type];
 
@@ -503,7 +515,7 @@ module Ground {
     }
 
 //    get_referenced_trellis():Trellis {
-//      var other = this.parent.ground.trellises[this.trellis];
+//      var other = this.parent.schema.trellises[this.trellis];
 //      if (!other)
 //        throw new Error('Could not find reference to property ' + this.name + ' for ' + this.trellis + '.');
 //

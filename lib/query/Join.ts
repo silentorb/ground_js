@@ -1,4 +1,11 @@
-/// <reference path="../references.ts"/>
+/// <reference path="interfaces.ts"/>
+
+function get_link_sql_value(link:Link_Field, value) {
+  if (this.property)
+    return this.property.get_sql_value(value)
+
+  return this.other_property.property.get_other_property(true).get_sql_value(value)
+}
 
 module Ground {
 
@@ -150,8 +157,8 @@ module Ground {
     alias:string
     table:Table
 
-    constructor(property:Property, alias:string = null) {
-      this.table = Table.get_other_table(property)
+    constructor(property:Property, schema:Schema, alias:string = null) {
+      this.table = Table.get_other_table(property, schema)
       this.alias = alias
     }
 
@@ -168,8 +175,8 @@ module Ground {
       var identities = this.order_identities(property)
       var keys = identities.map((x)=> x.name)
       var values = [
-        SQL.get_link_sql_value(identities[0], owner),
-        SQL.get_link_sql_value(identities[1], other)
+        get_link_sql_value(identities[0], owner),
+        get_link_sql_value(identities[1], other)
       ]
 
       return 'REPLACE INTO ' + this.table.name + ' (`'

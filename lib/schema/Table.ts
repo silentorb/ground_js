@@ -1,4 +1,4 @@
-/// <reference path="../references.ts"/>
+/// <reference path="Trellis.ts"/>
 
 module Ground {
   export interface IField {
@@ -42,16 +42,16 @@ module Ground {
     name:string
     properties = {}
     indexes:any[]
-    ground:Core
+    schema:Schema
     db_name:string
     trellis:Trellis
     primary_keys:any[]
     query:string
     links = {}
 
-    constructor(name:string, ground:Core) {
+    constructor(name:string, schema:Schema) {
       this.name = name;
-      this.ground = ground;
+      this.schema = schema;
     }
 
     connect_trellis(trellis:Trellis) {
@@ -59,21 +59,18 @@ module Ground {
       trellis.table = this;
     }
 
-    static create_from_trellis(trellis:Trellis, ground:Core = null):Table {
+    static create_from_trellis(trellis:Trellis, schema:Schema):Table {
       if (trellis.table)
         return trellis.table;
 
-      ground = ground || trellis.ground;
-
-      var table = new Table(trellis.get_table_name(), ground);
+      var table = new Table(trellis.get_table_name(), schema);
       table.connect_trellis(trellis);
       return table;
     }
 
-    static get_other_table(property:Property):Table {
-      var ground = property.parent.ground
+    static get_other_table(property:Property, schema:Schema):Table {
       var name = Table.get_other_table_name(property)
-      return ground.tables[name]
+      return schema.tables[name]
     }
 
     static get_other_table_name(property:Property):string {
@@ -82,14 +79,20 @@ module Ground {
         return field.other_table
 
       if (property.get_relationship() === Relationships.many_to_many)
-        return Cross_Trellis.generate_name(property.parent, property.other_trellis)
+        return Table.generate_cross_name(property.parent, property.other_trellis)
 
       return property.other_trellis.name
     }
 
+    static generate_cross_name(first:Trellis, second:Trellis):string {
+      var names = [first.get_table_name(), second.get_table_name()]
+      var temp = names.sort()
+      return temp.join('_')
+    }
+
     create_link(property:Property) {
 
-      var other_table = Table.get_other_table(property)
+      var other_table = Table.get_other_table(property, this.schema)
       if (!other_table)
         throw new Error('Could not find other table for ' + property.fullname())
 
@@ -144,14 +147,14 @@ module Ground {
       this.links[link.name] = link
     }
 
-    create_sql(ground:Core) {
+    create_sql(schema:Schema) {
       var fields = [];
       for (var name in this.properties) {
         var property = this.properties[name]
 
         var field = {
           name: property.name || name,
-          type: ground.get_base_property_type(property.type).field_type,
+          type: schema.get_base_property_type(property.type).field_type,
           default: undefined
         }
 
@@ -339,8 +342,8 @@ module Ground {
     load_from_schema(source) {
       var name = this.name;
       MetaHub.extend(this, source);
-      if (this.ground.trellises[name]) {
-        this.trellis = this.ground.trellises[name];
+      if (this.schema.trellises[name]) {
+        this.trellis = this.schema.trellises[name];
         this.trellis.table = this;
         if (!source.name)
           this.name = this.trellis.name + 's';

@@ -21,7 +21,7 @@ module Ground {
 
     count(seed):Promise {
       var back_reference = this.child.get_reference_property(this.parent)
-      return this.child.assure_properties(seed, [back_reference.name])
+      return this.ground.assure_properties(this.child, seed, [back_reference.name])
         .then((seed)=> {
           var parent_key = back_reference.get_sql_value(seed[back_reference.name])
 
@@ -67,7 +67,7 @@ module Ground {
         key_name = property.name
       }
 
-      return property.parent.assure_properties(seed, [key_name])
+      return this.ground.assure_properties(property.parent, seed, [key_name])
         .then((seed)=> {
 
           var trellis = this.property.parent
@@ -103,7 +103,7 @@ module Ground {
     constructor(ground:Core, trellis:string, count_name, sources:MetaHub.Meta_Object[]) {
       super()
       this.ground = ground
-      this.trellis = ground.trellises[trellis]
+      this.trellis = ground.schema.trellises[trellis]
       this.count_name = count_name
       this.count_fields = sources.map((c)=> <string>c['count_name'])
       for (var i in sources) {

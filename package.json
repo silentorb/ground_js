@@ -2,7 +2,7 @@
   "name": "vineyard-ground",
   "version": "0.1.80",
   "description": "MySQL ORM for Vineyard / Node.js",
-  "main": "ground.js",
+  "main": "dist/ground.js",
   "repository": {
     "type": "git",
     "url": "git@github.com:silentorb/ground_js.git"

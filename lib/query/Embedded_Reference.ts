@@ -106,7 +106,7 @@ module Ground {
         if (source[field_name] === undefined)
           continue
 
-        child_entity[property.name] = property.parent.ground.convert_value(source[field_name], property.type)
+        child_entity[property.name] = property.parent.schema.convert_value(source[field_name], property.type)
         delete source[field_name]
       }
 

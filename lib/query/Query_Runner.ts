@@ -1,4 +1,4 @@
-/// <reference path="../references.ts"/>
+/// <reference path="Query_Builder.ts"/>
 
 module Ground {
 
@@ -21,14 +21,14 @@ module Ground {
     source:Query_Builder
     run_stack
     private row_cache
-    ground:Core
+    schema:Schema
     renderer:Query_Renderer
     static trellis_cache:any = {}
 
     constructor(source:Query_Builder) {
       this.source = source
-      this.ground = source.ground
-      this.renderer = new Query_Renderer(this.ground)
+      this.schema = source.schema
+      this.renderer = new Query_Renderer(this.schema)
     }
 
     private static generate_property_join(property:Property, seeds) {
@@ -37,7 +37,7 @@ module Ground {
     }
 
     private static create_sub_query(trellis:Trellis, property:Property, source:Query_Builder):Query_Builder {
-      var query = new Query_Builder(trellis)
+      var query = new Query_Builder(trellis, source.schema)
       var original_query = source.subqueries[property.name]
       if (original_query) {
         MetaHub.extend(query.subqueries, original_query.subqueries)
@@ -60,7 +60,7 @@ module Ground {
           objects: []
         })
       }
-        //throw new Error('Cannot get many-to-many list when seed id is null for property ' + property.fullname())
+      //throw new Error('Cannot get many-to-many list when seed id is null for property ' + property.fullname())
 
       var other_property = property.get_other_property();
       if (!other_property)
@@ -78,15 +78,6 @@ module Ground {
       query.add_filter(other_property.name, id)
       return query.run(query_result.user, query_result);
     }
-
-//    private static get_path(...args:string[]):string {
-//      var items:string[] = [];
-////      if (this.base_path)
-////        items.push(this.base_path);
-//
-//      items = items.concat(args);
-//      return items.join('/');
-//    }
 
     private static get_reference_object(row, property:Property, source:Query_Builder, query_result:Query_Result) {
       var query = Query_Runner.create_sub_query(property.other_trellis, property, source)
@@ -116,47 +107,35 @@ module Ground {
         if (value !== undefined)
           row[i] = value
       }
-//      MetaHub.map_to_array(links, (property, name) => {
-//        if (property.is_composite_sub)
-//          return null
-//
-////        var path = Query_Runner.get_path(property.name)
-//        var subquery = source.subqueries[property.name]
-//
-//        if (source.include_links || subquery) {
-//          return this.query_link_property(row, property, source, query_result).then((value) => {
-//            row[name] = value
-//            return row
-//          })
-//        }
-//
-//        return null
-//      })
-
       return replacement
     }
 
+    get_inherited_trellis(row, trellis:Trellis):Trellis {
+      var type_property = trellis.type_property
+
+      return type_property && row[type_property.name]
+        ? this.schema.sanitize_trellis_argument(row[type_property.name])
+        : trellis
+    }
+
+    query_inherited_row(row, source:Query_Builder, trellis:Trellis, query_result:Query_Result):Promise {
+      if (trellis == source.trellis)
+        return when.resolve(row)
+
+      var query = new Query_Builder(trellis, this.schema)
+      query.add_key_filter(trellis.get_identity2(row))
+      if (source.properties)
+        query.properties = source.properties
+      if (source.map)
+        query.map = source.map
+
+      return query.run_single(query_result.user, query_result)
+    }
+
     process_row_step_one(row, source:Query_Builder, query_result:Query_Result, parts:Query_Parts):Promise {
-      var type_property = source.trellis.type_property
-
-      var trellis = type_property && row[type_property.name]
-        ? this.ground.sanitize_trellis_argument(row[type_property.name])
-        : source.trellis
-
-      if (trellis != source.trellis) {
-        var query = new Query_Builder(trellis)
-        query.add_key_filter(trellis.get_identity2(row))
-        if (source.properties)
-          query.properties = source.properties
-        if (source.map)
-          query.map = source.map
-
-        return query.run_single(query_result.user, query_result)
-          .then((row)=> this.process_row_step_two(row, source, trellis, query_result, parts))
-      }
-      else {
-        return this.process_row_step_two(row, source, trellis, query_result, parts)
-      }
+      var trellis = this.get_inherited_trellis(row, source.trellis)
+      return this.query_inherited_row(row, source, trellis, query_result)
+        .then((row)=> this.process_row_step_two(row, source, trellis, query_result, parts))
     }
 
     process_row_step_two(row, source:Query_Builder, trellis:Trellis, query_result:Query_Result, parts:Query_Parts):Promise {
@@ -180,7 +159,7 @@ module Ground {
           }
         }
         else {
-          row[property.name] = this.ground.convert_value(value, property.type)
+          row[property.name] = this.schema.schema.convert_value(value, property.type)
         }
       }
 
@@ -190,8 +169,8 @@ module Ground {
 
       var dummy_references = parts.dummy_references
       if (dummy_references) {
-        for (var i in dummy_references) {
-          delete row[dummy_references[i]]
+        for (var j in dummy_references) {
+          delete row[dummy_references[j]]
         }
       }
 
@@ -224,8 +203,8 @@ module Ground {
 
       var sequence:any = require('when/sequence')
       return when.all(promises)
-        .then(() => sequence(cache.tree.map((trellis) => ()=> this.ground.invoke(trellis.name + '.queried', row, this, query_result))))
-//        .then(()=> this.ground.invoke(trellis.name + '.queried', row, this))
+        .then(() => sequence(cache.tree.map((trellis) => ()=> this.schema.invoke(trellis.name + '.queried', row, this, query_result))))
+//        .then(()=> this.schema.invoke(trellis.name + '.queried', row, this))
         .then(()=> replacement === undefined ? row : replacement)
     }
 
@@ -286,10 +265,10 @@ module Ground {
       if (this.row_cache)
         return when.resolve(this.row_cache)
 
-      var tree = source.trellis.get_tree().filter((t)=> this.ground['has_event'](t.name + '.query'))
-      var promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
-      if (this.ground['has_event']('*.query'))
-        promises = promises.concat(()=> this.ground.invoke('*.query', source))
+      var tree = source.trellis.get_tree().filter((t)=> this.schema['has_event'](t.name + '.query'))
+      var promises = tree.map((trellis:Trellis) => ()=> this.schema.invoke(trellis.name + '.query', source))
+      if (this.schema['has_event']('*.query'))
+        promises = promises.concat(()=> this.schema.invoke('*.query', source))
 
       var is_empty = false
 
@@ -324,7 +303,7 @@ module Ground {
         return when.resolve(null)
 
       var source = this.source
-      return this.ground.invoke(source.trellis.name + '.query.sql', parts, source)
+      return this.schema.invoke(source.trellis.name + '.query.sql', parts, source)
         .then(()=> source.type == 'union'
           ? this.render_union(parts)
           : when.resolve({sql: this.renderer.generate_sql(parts, source), queries: []})
@@ -333,7 +312,7 @@ module Ground {
           var sql = render_result.sql
 
           sql = sql.replace(/\r/g, "\n")
-          if (this.ground.log_queries)
+          if (this.schema.log_queries)
             console.log('\nquery', sql + '\n')
 
           return {
@@ -455,7 +434,7 @@ module Ground {
     }
 
     run(query_result:Query_Result):Promise {
-      if (this.ground.log_queries) {
+      if (this.schema.log_queries) {
         var temp = new Error()
         this.run_stack = temp['stack']
       }
@@ -466,7 +445,7 @@ module Ground {
           if (!render_result.sql)
             return when.resolve([])
 
-          return this.ground.db.query(render_result.sql)
+          return this.schema.db.query(render_result.sql)
             .then((rows)=> {
               var result:IService_Response = {
                 objects: rows
@@ -497,10 +476,10 @@ module Ground {
         : this.renderer.generate_union_count(render_result.parts,
         render_result.queries, this.source)
 
-      if (this.ground.log_queries)
+      if (this.schema.log_queries)
         console.log('\nquery', sql + '\n')
 
-      return this.ground.db.query_single(sql)
+      return this.schema.db.query_single(sql)
         .then((count)=> {
           result['total'] = count.total_number
           return result

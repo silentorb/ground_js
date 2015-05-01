@@ -1,4 +1,10 @@
-/// <reference path="../references.ts"/>
+
+/// <reference path="interfaces.ts"/>
+/// <reference path="Join.ts"/>
+/// <reference path="Query_Renderer.ts"/>
+/// <reference path="Query_Runner.ts"/>
+/// <reference path="Embedded_Reference.ts"/>
+/// <reference path="Field_List.ts"/>
 
 module Ground {
 
@@ -99,7 +105,7 @@ module Ground {
   }
 
   export class Query_Builder {
-    ground:Core
+    schema:Schema
     trellis:Trellis
     pager:IPager
     type:string = 'query'
@@ -117,15 +123,14 @@ module Ground {
 
     filters:Query_Filter[] = []
 
-    constructor(trellis:Trellis) {
+    constructor(trellis:Trellis, schema:Schema) {
       this.trellis = trellis
-      this.ground = trellis.ground
+      this.schema = schema
     }
 
-
-    public static create(ground:Core, source = null):Query_Builder {
-      var trellis = ground.sanitize_trellis_argument(source.trellis)
-      var result = new Query_Builder(trellis)
+    public static create(schema:Schema, source = null):Query_Builder {
+      var trellis = schema.get_trellis(source.trellis)
+      var result = new Query_Builder(trellis, schema)
       result.extend(source)
       return result
     }
@@ -205,8 +210,8 @@ module Ground {
     }
 
     add_query(source):Query_Builder {
-      var trellis = this.ground.sanitize_trellis_argument(source.trellis)
-      var query = new Query_Builder(trellis)
+      var trellis = this.schema.sanitize_trellis_argument(source.trellis)
+      var query = new Query_Builder(trellis, this.schema)
       this.queries = this.queries || []
       this.queries.push(query)
       query.extend(source)
@@ -226,7 +231,7 @@ module Ground {
 
       var query = this.subqueries[property_name]
       if (!query) {
-        query = new Query_Builder(property.other_trellis)
+        query = new Query_Builder(property.other_trellis, this.schema)
         query.include_links = false
         this.subqueries[property_name] = query
       }
@@ -441,3 +446,5 @@ module Ground {
     }
   }
 }
+
+module.exports = Ground.Query_Builder

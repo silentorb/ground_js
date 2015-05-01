@@ -23,15 +23,15 @@ module Ground {
 			this.start()
 		}
 
-		add_table_to_database(table:Table, ground:Core):Promise {
-			var sql = table.create_sql(ground)
+		add_table_to_database(table:Table, schema:Schema):Promise {
+			var sql = table.create_sql(schema)
 			return this.query(sql)
 				.then(()=>table)
 		}
 
-		add_non_trellis_tables_to_database(tables:Table[], ground:Core):Promise {
+		add_non_trellis_tables_to_database(tables:Table[], schema:Schema):Promise {
 			var non_trellises = MetaHub.filter(tables, (x)=> !x.trellis)
-			var promises = MetaHub.map_to_array(non_trellises, (table:Table)=> this.add_table_to_database(table, ground));
+			var promises = MetaHub.map_to_array(non_trellises, (table:Table)=> this.add_table_to_database(table, schema));
 			return when.all(promises)
 		}
 
@@ -108,22 +108,6 @@ module Ground {
 
 			return def.promise
 		}
-
-		create_table(trellis:Trellis):Promise {
-			if (!trellis)
-				throw new Error('Empty object was passed to create_table().')
-
-			var table = Table.create_from_trellis(trellis);
-			var sql = table.create_sql_from_trellis(trellis);
-			return this.query(sql)
-				.then(()=>table)
-		}
-
-		create_trellis_tables(trellises:{[key: string]: Trellis}):Promise {
-			var promises = MetaHub.map_to_array(trellises, (trellis:Trellis)=>this.create_table(trellis));
-			return when.all(promises)
-		}
-
 
 		drop_all_tables():Promise {
 			return when.map(this.get_tables(), (table) => {

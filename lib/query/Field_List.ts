@@ -146,7 +146,7 @@ module Ground {
           value = "'object'"
         }
         else {
-          value = this.source.ground.convert_value(expression.value, typeof expression.value)
+          value = this.source.schema.convert_value(expression.value, typeof expression.value)
           if (typeof value === 'string')
             value = "'" + value + "'"
         }

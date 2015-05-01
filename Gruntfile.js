@@ -7,9 +7,33 @@ module.exports = function (grunt) {
 
   grunt.initConfig({
     ts: {
+      schema: {                                 // a particular target
+        src: ["lib/schema/Schema.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
+        out: 'dist/schema.js',                // If specified, generate an out.js file which is the merged js file
+//        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
+        options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
+          target: 'es5',            // 'es3' (default) | 'es5'
+          module: 'commonjs',       // 'amd' (default) | 'commonjs'
+          sourcemap: true,          // true  (default) | false
+          declaration: true,       // true | false  (default)
+          verbose: true
+        }
+      },
+      miner: {                                 // a particular target
+        src: ["lib/query/Query_Builder.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
+        out: 'dist/miner.js',                // If specified, generate an out.js file which is the merged js file
+//        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
+        options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
+          target: 'es5',            // 'es3' (default) | 'es5'
+          module: 'commonjs',       // 'amd' (default) | 'commonjs'
+          sourcemap: true,          // true  (default) | false
+          declaration: true,       // true | false  (default)
+          verbose: true
+        }
+      },
       ground: {                                 // a particular target
         src: ["lib/export.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
-        out: 'ground.js',                // If specified, generate an out.js file which is the merged js file
+        out: 'dist/ground.js',                // If specified, generate an out.js file which is the merged js file
 //        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
         options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
           target: 'es5',            // 'es3' (default) | 'es5'
@@ -64,6 +88,6 @@ module.exports = function (grunt) {
     }
   })
 
-  grunt.registerTask('default', ['ts:ground', 'concat:ground', 'concat:ground-def', 'replace:ground-def']);
+  grunt.registerTask('default', ['ts', 'concat:ground', 'concat:ground-def', 'replace:ground-def']);
 
 }

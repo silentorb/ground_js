@@ -1,6 +1,6 @@
 /// <reference path="../references.ts"/>
 
-var uuid = require('node-uuid')
+var uuid:any = require('node-uuid')
 
 module Ground {
   export interface IUser {
@@ -19,7 +19,7 @@ module Ground {
     log_queries:boolean = false
     run_stack
 
-    constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
+    constructor(trellis:Trellis, seed:ISeed, ground:Core) {
       if (typeof seed !== 'object')
         throw new Error('Seed passed to ' + trellis.name + ' is a ' + (typeof seed) + ' when it should be an object.')
 
@@ -29,7 +29,7 @@ module Ground {
       this.seed = seed;
       this.trellis = trellis;
       this.main_table = this.trellis.get_table_name();
-      this.ground = ground || this.trellis.ground;
+      this.ground = ground;
       this.db = ground.db;
     }
 
@@ -102,13 +102,14 @@ module Ground {
         })
     }
 
-    private update_embedded_seeds(core_properties) {
+    private update_embedded_seeds(core_properties):Promise {
       var promises = [];
       for (var name in core_properties) {
         var property = core_properties[name];
         var value = this.seed[property.name]
-        if (property.type == 'reference' && value && typeof value === 'object') {
-          promises.push(this.update_embedded_seed(property, value));
+        if (property.type == 'reference' && value) {
+          if (typeof value === 'object')
+            promises.push(this.update_embedded_seed(property, value))
         }
       }
 
@@ -130,8 +131,8 @@ module Ground {
           var add_fields = (properties, seed) => {
             for (var name in properties) {
               var property = properties[name];
-							if (property.is_virtual)
-								continue
+              if (property.is_virtual)
+                continue
 
               var seed_name = property.get_seed_name()
               if (seed[seed_name] === undefined && !this.is_create_property(property))
@@ -408,7 +409,7 @@ module Ground {
     }
 
     public run():Promise {
-      var pipeline = require('when/pipeline')
+      var pipeline:any = require('when/pipeline')
 
       if (this.log_queries) {
         var temp = new Error()
