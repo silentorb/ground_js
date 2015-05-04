@@ -1,10 +1,6 @@
-
-/// <reference path="interfaces.ts"/>
-/// <reference path="Join.ts"/>
+/// <reference path="Miner.ts"/>
 /// <reference path="Query_Renderer.ts"/>
 /// <reference path="Query_Runner.ts"/>
-/// <reference path="Embedded_Reference.ts"/>
-/// <reference path="Field_List.ts"/>
 
 module Ground {
 

@@ -20,7 +20,7 @@ module.exports = function (grunt) {
         }
       },
       miner: {                                 // a particular target
-        src: ["lib/query/Query_Builder.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
+        src: ["lib/query/Miner.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
         out: 'dist/miner.js',                // If specified, generate an out.js file which is the merged js file
 //        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
         options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options

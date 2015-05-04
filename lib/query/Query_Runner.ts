@@ -20,15 +20,15 @@ module Ground {
   export class Query_Runner {
     source:Query_Builder
     run_stack
+    miner:Miner
     private row_cache
-    schema:Schema
     renderer:Query_Renderer
     static trellis_cache:any = {}
 
-    constructor(source:Query_Builder) {
+    constructor(source:Query_Builder, miner:Miner) {
       this.source = source
-      this.schema = source.schema
-      this.renderer = new Query_Renderer(this.schema)
+      this.miner = miner
+      this.renderer = new Query_Renderer(miner.schema)
     }
 
     private static generate_property_join(property:Property, seeds) {
@@ -114,7 +114,7 @@ module Ground {
       var type_property = trellis.type_property
 
       return type_property && row[type_property.name]
-        ? this.schema.sanitize_trellis_argument(row[type_property.name])
+        ? this.miner.schema.sanitize_trellis_argument(row[type_property.name])
         : trellis
     }
 
@@ -122,7 +122,7 @@ module Ground {
       if (trellis == source.trellis)
         return when.resolve(row)
 
-      var query = new Query_Builder(trellis, this.schema)
+      var query = new Query_Builder(trellis, this.miner.schema)
       query.add_key_filter(trellis.get_identity2(row))
       if (source.properties)
         query.properties = source.properties
@@ -159,7 +159,7 @@ module Ground {
           }
         }
         else {
-          row[property.name] = this.schema.schema.convert_value(value, property.type)
+          row[property.name] = this.miner.schema.schema.convert_value(value, property.type)
         }
       }
 
@@ -203,7 +203,7 @@ module Ground {
 
       var sequence:any = require('when/sequence')
       return when.all(promises)
-        .then(() => sequence(cache.tree.map((trellis) => ()=> this.schema.invoke(trellis.name + '.queried', row, this, query_result))))
+        .then(() => sequence(cache.tree.map((trellis) => ()=> this.miner.messenger.invoke(trellis.name + '.queried', row, this, query_result))))
 //        .then(()=> this.schema.invoke(trellis.name + '.queried', row, this))
         .then(()=> replacement === undefined ? row : replacement)
     }
@@ -265,10 +265,10 @@ module Ground {
       if (this.row_cache)
         return when.resolve(this.row_cache)
 
-      var tree = source.trellis.get_tree().filter((t)=> this.schema['has_event'](t.name + '.query'))
-      var promises = tree.map((trellis:Trellis) => ()=> this.schema.invoke(trellis.name + '.query', source))
-      if (this.schema['has_event']('*.query'))
-        promises = promises.concat(()=> this.schema.invoke('*.query', source))
+      var tree = source.trellis.get_tree().filter((t)=> this.miner.schema['has_event'](t.name + '.query'))
+      var promises = tree.map((trellis:Trellis) => ()=> this.miner.messenger.invoke(trellis.name + '.query', source))
+      if (this.miner.schema['has_event']('*.query'))
+        promises = promises.concat(()=> this.miner.messenger.invoke('*.query', source))
 
       var is_empty = false
 
@@ -303,7 +303,7 @@ module Ground {
         return when.resolve(null)
 
       var source = this.source
-      return this.schema.invoke(source.trellis.name + '.query.sql', parts, source)
+      return this.miner.messenger.invoke(source.trellis.name + '.query.sql', parts, source)
         .then(()=> source.type == 'union'
           ? this.render_union(parts)
           : when.resolve({sql: this.renderer.generate_sql(parts, source), queries: []})
@@ -312,8 +312,8 @@ module Ground {
           var sql = render_result.sql
 
           sql = sql.replace(/\r/g, "\n")
-          if (this.schema.log_queries)
-            console.log('\nquery', sql + '\n')
+          //if (this.schema.log_queries)
+          //  console.log('\nquery', sql + '\n')
 
           return {
             sql: sql,
@@ -330,7 +330,7 @@ module Ground {
       var query_index = 0
       var runner_parts = []
       var promises = this.source.queries.map((query)=> ()=> {
-        var runner = new Query_Runner(query)
+        var runner = new Query_Runner(query, this.miner.messenger)
         if (this.source.pager && this.source.pager.limit) {
           query.pager = {
             limit: (this.source.pager.limit || 0) + (this.source.pager.offset || 0)
@@ -434,7 +434,7 @@ module Ground {
     }
 
     run(query_result:Query_Result):Promise {
-      if (this.schema.log_queries) {
+      if (this.miner.schema.log_queries) {
         var temp = new Error()
         this.run_stack = temp['stack']
       }
@@ -445,14 +445,14 @@ module Ground {
           if (!render_result.sql)
             return when.resolve([])
 
-          return this.schema.db.query(render_result.sql)
+          return this.miner.db.query(render_result.sql)
             .then((rows)=> {
               var result:IService_Response = {
                 objects: rows
               }
               //this.row_cache = result
-              if (query_result.return_sql)
-                result.sql = render_result.sql
+              //if (query_result.return_sql)
+              //  result.sql = render_result.sql
 
               return this.paging(render_result, result)
                 .then((result) => when.all(result.objects.map(
@@ -476,10 +476,10 @@ module Ground {
         : this.renderer.generate_union_count(render_result.parts,
         render_result.queries, this.source)
 
-      if (this.schema.log_queries)
-        console.log('\nquery', sql + '\n')
+      //if (this.schema.log_queries)
+      //  console.log('\nquery', sql + '\n')
 
-      return this.schema.db.query_single(sql)
+      return this.miner.db.query_single(sql)
         .then((count)=> {
           result['total'] = count.total_number
           return result

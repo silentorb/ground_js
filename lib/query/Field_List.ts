@@ -1,7 +1,4 @@
-/**
- * User: Chris Johnson
- * Date: 10/2/2014
- */
+/// <reference path="Miner.ts"/>
 
 module Ground {
 

@@ -179,7 +179,6 @@ module Ground {
         this.trellises[i].harden()
       }
     }
-
   }
 }
 
