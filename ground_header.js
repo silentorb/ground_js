@@ -1,1 +1,0 @@
-var MetaHub = require('vineyard-metahub');

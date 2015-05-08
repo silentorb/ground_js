@@ -1,38 +1,39 @@
 module.exports = function (grunt) {
 
   grunt.loadNpmTasks('grunt-ts')
-  grunt.loadNpmTasks('grunt-contrib-concat')
   grunt.loadNpmTasks('grunt-contrib-watch')
   grunt.loadNpmTasks('grunt-text-replace')
 
   grunt.initConfig({
     ts: {
-      schema: {                                 // a particular target
-        src: ["lib/schema/Schema.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
-        out: 'dist/schema.js',                // If specified, generate an out.js file which is the merged js file
+      landscape: {                                 // a particular target
+        src: ["lib/landscape/Schema.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
+        out: 'dist/landscape.js',                // If specified, generate an out.js file which is the merged js file
 //        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
         options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
           target: 'es5',            // 'es3' (default) | 'es5'
           module: 'commonjs',       // 'amd' (default) | 'commonjs'
           sourcemap: true,          // true  (default) | false
           declaration: true,       // true | false  (default)
-          verbose: true
+          verbose: true,
+          removeComments: false
         }
       },
-      miner: {                                 // a particular target
-        src: ["lib/query/Miner.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
-        out: 'dist/miner.js',                // If specified, generate an out.js file which is the merged js file
+      mining: {                                 // a particular target
+        src: ["lib/mining/Miner.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
+        out: 'dist/mining.js',                // If specified, generate an out.js file which is the merged js file
 //        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
         options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
           target: 'es5',            // 'es3' (default) | 'es5'
           module: 'commonjs',       // 'amd' (default) | 'commonjs'
           sourcemap: true,          // true  (default) | false
           declaration: true,       // true | false  (default)
-          verbose: true
+          verbose: true,
+          removeComments: false
         }
       },
       ground: {                                 // a particular target
-        src: ["lib/export.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
+        src: ["lib/core/Core.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
         out: 'dist/ground.js',                // If specified, generate an out.js file which is the merged js file
 //        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
         options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
@@ -40,41 +41,61 @@ module.exports = function (grunt) {
           module: 'commonjs',       // 'amd' (default) | 'commonjs'
           sourcemap: true,          // true  (default) | false
           declaration: true,       // true | false  (default)
-          verbose: true
+          verbose: true,
+          removeComments: false
+        }
+      },
+      db: {                                 // a particular target
+        src: ["lib/db/Database.ts"],        // The source typescript files, http://gruntjs.com/configuring-tasks#files
+        out: 'dist/db.js',                // If specified, generate an out.js file which is the merged js file
+//        outDir: 'js',    // If specified, the generate javascript files are placed here. Only works if out is not specified
+        options: {                    // use to override the default options, http://gruntjs.com/configuring-tasks#options
+          target: 'es5',            // 'es3' (default) | 'es5'
+          module: 'commonjs',       // 'amd' (default) | 'commonjs'
+          sourcemap: true,          // true  (default) | false
+          declaration: true,       // true | false  (default)
+          verbose: true,
+          removeComments: false
         }
       }
     },
-    concat: {
-      options: {
-        separator: ''
-      },
-      ground: {
-        src: ['ground_header.js', 'ground.js'],
-        dest: 'ground.js'
-      },
-      "ground-def": {
-        src: [
-          'ground.d.ts',
-          'lib/ground_definition_footer'
-        ],
-        dest: 'ground.d.ts'
-      }
-    },
     replace: {
-      "ground-def": {
-        src: ["ground.d.ts"],
+      "ground": {
+        src: 'dist/ground.js',
         overwrite: true,
         replacements: [
           {
-            from: 'defs/',
+            from: '///***',
             to: ""
-          },
+          }
+        ]
+      },
+      "mining": {
+        src: 'dist/mining.js',
+        overwrite: true,
+        replacements: [
           {
-            from: '/// <reference path="mysql.d.ts" />',
+            from: '///***',
             to: ""
-          },
+          }
+        ]
+      },
+      "landscape": {
+        src: 'dist/landscape.js',
+        overwrite: true,
+        replacements: [
           {
-            from: '/// <reference path="node.d.ts" />',
+            from: '///***',
+            to: ""
+          }
+        ]
+      },
+      "db": {
+        src: 'dist/db.js',
+        overwrite: true,
+        replacements: [
+          {
+            from: '///***',
             to: ""
           }
         ]
@@ -82,12 +103,29 @@ module.exports = function (grunt) {
     },
     watch: {
       ground: {
-        files: 'lib/**/*.ts',
-        tasks: ['default']
+        files: ['lib/core/**/*.ts', 'lib/operations/**/*.ts'],
+        tasks: 'ground'
+      },
+      mining: {
+        files: 'lib/mining/**/*.ts',
+        tasks: 'mining'
+      },
+      landscape: {
+        files: 'lib/landscape/**/*.ts',
+        tasks: 'landscape'
+      },
+      db: {
+        files: 'lib/db/**/*.ts',
+        tasks: 'db'
       }
     }
   })
 
-  grunt.registerTask('default', ['ts', 'concat:ground', 'concat:ground-def', 'replace:ground-def']);
+  grunt.registerTask('ground', ['ts:ground', 'replace:ground',]);
+  grunt.registerTask('db', ['ts:db', 'replace:db']);
+  grunt.registerTask('mining', ['ts:mining', 'replace:mining']);
+  grunt.registerTask('landscape', ['ts:landscape', 'replace:landscape', 'mining']);
+
+  grunt.registerTask('default', 'landscape');
 
 }

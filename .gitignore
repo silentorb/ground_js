@@ -1,3 +1,6 @@
 tscommand.tmp.txt
 .tscache
 node_modules
+lib/db/Database.js
+lib/db/Database.js.map
+lib/db/Database.d.ts

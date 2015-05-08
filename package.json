@@ -10,6 +10,7 @@
   "author": "Christopher W. Johnson",
   "license": "MIT",
   "dependencies": {
+    "grunt-text-replace": "^0.4.0",
     "mysql": "2.x.x",
     "node-uuid": "~1.x.x"
   },
