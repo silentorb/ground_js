@@ -589,7 +589,7 @@ var Ground;
         };
         Core.prototype.export_schema = function () {
             return {
-                trellises: MetaHub.map(this.schema.trellises, function (trellis) { return trellis.export_schema(); })
+                objects: MetaHub.map(this.schema.trellises, function (trellis) { return trellis.export_schema(); })
             };
         };
         Core.perspective = function (seed, trellis, property) {

@@ -208,7 +208,7 @@ module Ground {
 
 		export_schema():landscape.ISchema_Source {
 			return {
-				trellises: MetaHub.map(this.schema.trellises, (trellis) => trellis.export_schema())
+				objects: MetaHub.map(this.schema.trellises, (trellis) => trellis.export_schema())
 			}
 		}
 
