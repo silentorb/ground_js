@@ -1,4 +1,4 @@
-var when = require('when');
+var MetaHub = require('vineyard-metahub');var when = require('when');
 var mysql = require('mysql');
 var sequence = require('when/sequence');
 var Ground;
