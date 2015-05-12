@@ -259,6 +259,7 @@ module Ground {
           if (typeof value !== 'number')
             return parseFloat(value.toString());
 
+        case 'datetime2':
         case 'date':
         case 'time':
           if (typeof value == 'string') {
