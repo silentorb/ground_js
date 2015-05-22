@@ -240,7 +240,7 @@ module Ground {
         var subquery = query.subqueries[name]
         promises.push(()=>
             property.type == 'list'
-              ? Query_Runner.get_many_list(child, property, property.get_relationship(), subquery, query_result)
+              ? Query_Runner.get_many_list(child, property, property.get_relationship(), query, query_result)
               .then((result)=> {
                 child[property.name] = result.objects
               })

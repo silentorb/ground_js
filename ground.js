@@ -1597,7 +1597,13 @@ var Ground;
         };
         Core.prototype.load_schema_from_file = function (filename) {
             var data = Core.load_json_from_file(filename);
-            this.parse_schema(data);
+            try {
+                this.parse_schema(data);
+            }
+            catch (ex) {
+                ex.message = "Error parsing " + filename + ": " + ex.message;
+                throw ex;
+            }
         };
         Core.prototype.load_tables = function (tables) {
             for (var name in tables) {
@@ -3726,7 +3732,7 @@ var Ground;
             for (name in query.subqueries) {
                 var property = query.trellis.get_property(name);
                 var subquery = query.subqueries[name];
-                promises.push(function () { return property.type == 'list' ? Query_Runner.get_many_list(child, property, property.get_relationship(), subquery, query_result).then(function (result) {
+                promises.push(function () { return property.type == 'list' ? Query_Runner.get_many_list(child, property, property.get_relationship(), query, query_result).then(function (result) {
                     child[property.name] = result.objects;
                 }) : _this.process_reference_children(child[property.name], subquery, query_result); });
             }

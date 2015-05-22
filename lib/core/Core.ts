@@ -362,7 +362,13 @@ module Ground {
 
 		load_schema_from_file(filename:string) {
 			var data = Core.load_json_from_file(filename);
-			this.parse_schema(data)
+      try {
+        this.parse_schema(data)
+      }
+      catch(ex) {
+        ex.message = "Error parsing "+ filename + ": " + ex.message
+        throw ex
+      }
 		}
 
 		load_tables(tables:any[]) {
