@@ -369,6 +369,8 @@ module Ground {
 
     export_schema():ITrellis_Source {
       var result:ITrellis_Source = {}
+      result.name = this.name
+
       if (this.parent)
         result.parent = this.parent.name
       else if (this.primary_key != 'id')

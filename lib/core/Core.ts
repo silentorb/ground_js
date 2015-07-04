@@ -440,7 +440,7 @@ module Ground {
 
 		export_schema():ISchema_Source {
 			return {
-				trellises: MetaHub.map(this.trellises, (trellis) => trellis.export_schema())
+				objects: MetaHub.map_to_array(this.trellises, (trellis) => trellis.export_schema())
 			}
 		}
 
