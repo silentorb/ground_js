@@ -35,6 +35,7 @@ module Ground {
 
 	export interface ITrellis_Source {
 		parent?:string
+    interfaces?:string[]
 		name?:string
 		primary_key?:string
 		properties?

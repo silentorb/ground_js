@@ -8,6 +8,7 @@ module Ground {
 
   export class Trellis implements ITrellis {
     parent:Trellis = null
+    mixins:Trellis[] = []
     ground:Core
     table:Table = null
     name:string = null
@@ -251,6 +252,17 @@ module Ground {
         this.check_primary_key()
       }
 
+      if (this.mixins) {
+        for (var i in this.mixins) {
+          var face = this.mixins[i]
+          if (!all[face])
+            throw new Error(this.name + ' interfaces a trellis that does not exist: ' + face + '.')
+
+          this.mix(all[face])
+          this.check_primary_key()
+        }
+      }
+
       for (var j in this.properties) {
         var property:Property = this.properties[j]
         if (property.other_trellis_name) {
@@ -321,6 +333,17 @@ module Ground {
         parent.clone_property(keys[i], this);
       }
       this.primary_key = parent.primary_key;
+    }
+
+    mix(mixin:Trellis) {
+      //if (parent.children.indexOf(this) == -1)
+      //  parent.children.push(this)
+
+       for (var i in mixin.properties) {
+         var property = mixin.properties[i]
+         this.add_property(property.name, property)
+      }
+      this.primary_key = mixin.primary_key;
     }
 
     private seed_has_properties(seed, properties:string[]):boolean {

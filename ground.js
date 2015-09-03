@@ -206,6 +206,7 @@ var Ground;
     var Trellis = (function () {
         function Trellis(name, ground) {
             this.parent = null;
+            this.mixins = [];
             this.table = null;
             this.name = null;
             this.primary_key = 'id';
@@ -424,6 +425,17 @@ var Ground;
                 this.check_primary_key();
             }
 
+            if (this.mixins) {
+                for (var i in this.mixins) {
+                    var face = this.mixins[i];
+                    if (!all[face])
+                        throw new Error(this.name + ' interfaces a trellis that does not exist: ' + face + '.');
+
+                    this.mix(all[face]);
+                    this.check_primary_key();
+                }
+            }
+
             for (var j in this.properties) {
                 var property = this.properties[j];
                 if (property.other_trellis_name) {
@@ -492,6 +504,14 @@ var Ground;
                 parent.clone_property(keys[i], this);
             }
             this.primary_key = parent.primary_key;
+        };
+
+        Trellis.prototype.mix = function (mixin) {
+            for (var i in mixin.properties) {
+                var property = mixin.properties[i];
+                this.add_property(property.name, property);
+            }
+            this.primary_key = mixin.primary_key;
         };
 
         Trellis.prototype.seed_has_properties = function (seed, properties) {

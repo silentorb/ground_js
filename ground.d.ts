@@ -39,6 +39,7 @@ declare module Ground {
     }
     class Trellis implements ITrellis {
         public parent: Trellis;
+        public mixins: Trellis[];
         public ground: Ground.Core;
         public table: Ground.Table;
         public name: string;
@@ -78,6 +79,7 @@ declare module Ground {
         public query_primary_key(): string;
         public sanitize_property(property: any): any;
         public set_parent(parent: Trellis): void;
+        public mix(mixin: Trellis): void;
         private seed_has_properties(seed, properties);
         public assure_properties(seed: any, required_properties: string[]): Promise;
         public export_schema(): Ground.ITrellis_Source;
@@ -247,6 +249,7 @@ declare module Ground {
     }
     interface ITrellis_Source {
         parent?: string;
+        interfaces?: string[];
         name?: string;
         primary_key?: string;
         properties?: any;
