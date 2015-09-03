@@ -144,7 +144,7 @@ module Ground {
       if (source.expression.type == 'function') {
         var func = <Function_Expression2>source.expression
         var target = source.path[0]
-        var trellis = <Ground.landscape.Trellis>scope._this
+        var trellis = <landscape.Trellis>scope._this
         var constraint
         if (func.name == 'count') {
           var reference = <Reference_Expression>func.inputs[0]

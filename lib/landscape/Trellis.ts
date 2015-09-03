@@ -2,6 +2,7 @@
 /// <reference path="ISchema.ts"/>
 /// <reference path="../db/Table.ts"/>
 /// <reference path="loader.ts"/>
+/// <reference path="../exporter/exporter.ts"/>
 
 module landscape {
 
@@ -12,7 +13,8 @@ module landscape {
   export class Trellis implements ITrellis {
     parent:Trellis = null
     mixins:Trellis[] = []
-    ground:ISchema
+    ground:Ground.Core
+    schema:ISchema
     table:Ground.Table = null
     name:string = null
     primary_key:string = 'id'
@@ -33,9 +35,10 @@ module landscape {
     // those are stored here
     type_property:Property
 
-    constructor(name:string, ground:ISchema) {
-      this.ground = ground;
-      this.name = name;
+    constructor(name:string, schema:Schema) {
+      this.schema = schema
+      this.ground = schema.ground
+      this.name = name
     }
 
     add_property(name:string, source):Property {
@@ -344,7 +347,6 @@ module landscape {
     mix(mixin:Trellis) {
       //if (parent.children.indexOf(this) == -1)
       //  parent.children.push(this)
-
       for (var i in mixin.properties) {
         var property = mixin.properties[i]
         this.add_property(property.name, property)

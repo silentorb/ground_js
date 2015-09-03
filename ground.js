@@ -872,33 +872,182 @@ var landscape;
     })();
     landscape.Property = Property;
 })(landscape || (landscape = {}));
-var landscape;
-(function (landscape) {
-    var loader;
-    (function (loader) {
-        function initialize_property(property, source) {
-            for (var i in source) {
-                if (property.hasOwnProperty(i))
-                    property[i] = source[i];
-            }
+var loader;
+(function (loader) {
+    function initialize_property(property, source) {
+        for (var i in source) {
+            if (property.hasOwnProperty(i))
+                property[i] = source[i];
+        }
 
-            if (source['default'] !== undefined)
-                property.default = source['default'];
+        if (source['default'] !== undefined)
+            property.default = source['default'];
 
-            if (typeof source['allow_null'] == 'boolean')
-                property.allow_null = source['allow_null'];
+        if (typeof source['allow_null'] == 'boolean')
+            property.allow_null = source['allow_null'];
 
-            if (source.trellis) {
-                property.other_trellis_name = source.trellis;
+        if (source.trellis) {
+            property.other_trellis_name = source.trellis;
+        }
+    }
+    loader.initialize_property = initialize_property;
+
+    function load_schema_from_file(schema, filename) {
+        var data = load_json_from_file(filename);
+        try  {
+            parse_schema(schema, data);
+        } catch (ex) {
+            ex.message = "Error parsing " + filename + ": " + ex.message;
+            throw ex;
+        }
+    }
+    loader.load_schema_from_file = load_schema_from_file;
+
+    function parse_schema(schema, data) {
+        var subset = null;
+        if (data.trellises)
+            subset = load_trellises(schema, data.trellises);
+
+        if (data.tables)
+            load_tables(schema, data.tables);
+
+        if (subset)
+            initialize_trellises(subset, schema.trellises);
+
+        create_remaining_tables(schema);
+        create_missing_table_links(schema);
+    }
+
+    function initialize_trellises(subset, all) {
+        if (typeof all === "undefined") { all = null; }
+        all = all || subset;
+
+        for (var i in subset) {
+            var trellis = subset[i];
+            trellis.initialize(all);
+        }
+    }
+
+    function create_remaining_tables(schema) {
+        for (var i in schema.trellises) {
+            var trellis = schema.trellises[i];
+            if (schema.tables[trellis.name])
+                continue;
+
+            var table = Ground.Table.create_from_trellis(trellis, schema.ground);
+            schema.tables[i] = table;
+        }
+    }
+
+    function create_missing_table_links(schema) {
+        for (var i in schema.trellises) {
+            var trellis = schema.trellises[i];
+            var table = schema.tables[trellis.name];
+            var links = trellis.get_all_links();
+            for (var p in links) {
+                if (!table.links[p])
+                    table.create_link(links[p]);
             }
         }
-        loader.initialize_property = initialize_property;
-    })(loader || (loader = {}));
-})(landscape || (landscape = {}));
+    }
+
+    function load_tables(schema, tables) {
+        for (var name in tables) {
+            var table = new Ground.Table(name, schema.ground);
+            table.load_from_schema(tables[name]);
+            schema.tables[name] = table;
+            schema.custom_tables[name] = table;
+        }
+    }
+
+    function load_trellises(schema, trellises) {
+        var subset = [];
+        for (var name in trellises) {
+            var trellis = schema.add_trellis(name, trellises[name], false);
+            subset[name] = trellis;
+        }
+
+        return subset;
+    }
+
+    function load_property_types(schema, property_types) {
+        for (var name in property_types) {
+            var info = property_types[name];
+            var type = new landscape.Property_Type(name, info, schema.property_types);
+            schema.property_types[name] = type;
+        }
+    }
+    loader.load_property_types = load_property_types;
+
+    function load_json_from_file(filename) {
+        var fs = require('fs');
+        var json = fs.readFileSync(filename, 'ascii');
+        if (!json)
+            throw new Error('Could not find file: ' + filename);
+
+        return JSON.parse(json);
+    }
+    loader.load_json_from_file = load_json_from_file;
+})(loader || (loader = {}));
+var exporter;
+(function (exporter) {
+    function get_property_data(property) {
+        var result = {
+            type: property.type
+        };
+
+        if (property.other_trellis_name)
+            result.trellis = property.other_trellis_name;
+
+        if (property.is_readonly)
+            result.is_readonly = property.is_readonly;
+
+        if (property.is_private)
+            result.is_private = property.is_private;
+
+        if (property.insert)
+            result.insert = property.insert;
+
+        if (property.other_property)
+            result.other_property = property.other_property;
+
+        return result;
+    }
+    exporter.get_property_data = get_property_data;
+
+    function property_export(property) {
+        var result = {
+            type: property.type
+        };
+        if (property.other_trellis)
+            result.trellis = property.other_trellis.name;
+
+        if (property.is_virtual)
+            result.is_virtual = true;
+
+        if (property.insert)
+            result.insert = property.insert;
+
+        if (property.is_readonly)
+            result.is_readonly = true;
+
+        if (property.default !== undefined)
+            result['default'] = property.default;
+
+        if (property.allow_null)
+            result.allow_null = true;
+
+        if (property.other_property)
+            result.other_property = property.other_property;
+
+        return result;
+    }
+    exporter.property_export = property_export;
+})(exporter || (exporter = {}));
 var landscape;
 (function (landscape) {
     var Trellis = (function () {
-        function Trellis(name, ground) {
+        function Trellis(name, schema) {
             this.parent = null;
             this.mixins = [];
             this.table = null;
@@ -909,7 +1058,8 @@ var landscape;
             this.properties = {};
             this.all_properties = null;
             this.core_properties = null;
-            this.ground = ground;
+            this.schema = schema;
+            this.ground = schema.ground;
             this.name = name;
         }
         Trellis.prototype.add_property = function (name, source) {
@@ -2312,7 +2462,7 @@ var Ground;
             if (typeof depth === "undefined") { depth = 0; }
             var other_property = link.get_other_property();
             var other_trellis = other_property.parent;
-            var query = other_trellis.ground.create_query(other_trellis.name);
+            var query = this.ground.create_query(other_trellis.name);
             query.add_filter(other_property.name, id);
             console.log('id', id);
             return query.run(null).then(function (result) {
@@ -2390,36 +2540,34 @@ var Ground;
                 return x.name;
             });
 
-            return trellis.assure_properties(seed, property_names).then(function (seed) {
-                var tree = trellis.get_tree().filter(function (t) {
-                    return !t.is_virtual;
-                });
-                var invoke_promises = tree.map(function (trellis) {
-                    return _this.ground.invoke(trellis.name + '.delete', seed);
-                });
-
-                return pipeline([
-                    function () {
-                        return when.all(invoke_promises);
-                    },
-                    function () {
-                        return _this.delete_children(trellis, id, depth);
-                    },
-                    function () {
-                        return when.all(tree.map(function (trellis) {
-                            return _this.delete_record(trellis, seed);
-                        }));
-                    },
-                    function () {
-                        return when.all(tree.map(function (trellis) {
-                            return _this.ground.invoke(trellis.name + '.deleted', seed);
-                        }));
-                    },
-                    function () {
-                        return [];
-                    }
-                ]);
+            var tree = trellis.get_tree().filter(function (t) {
+                return !t.is_virtual;
             });
+            var invoke_promises = tree.map(function (trellis) {
+                return _this.ground.invoke(trellis.name + '.delete', seed);
+            });
+
+            return pipeline([
+                function () {
+                    return when.all(invoke_promises);
+                },
+                function () {
+                    return _this.delete_children(trellis, id, depth);
+                },
+                function () {
+                    return when.all(tree.map(function (trellis) {
+                        return _this.delete_record(trellis, seed);
+                    }));
+                },
+                function () {
+                    return when.all(tree.map(function (trellis) {
+                        return _this.ground.invoke(trellis.name + '.deleted', seed);
+                    }));
+                },
+                function () {
+                    return [];
+                }
+            ]);
         };
         return Delete;
     })();
@@ -2469,10 +2617,21 @@ var landscape;
         function Schema() {
             this.property_types = [];
             this.trellises = {};
-            this.views = [];
             this.custom_tables = [];
             this.tables = [];
+            var path = require('path');
+            var filename = path.resolve(__dirname, 'property_types.json');
+            this.load_property_types(filename);
         }
+        Schema.prototype.load_property_types = function (filename) {
+            var property_types = loader.load_json_from_file(filename);
+            for (var name in property_types) {
+                var info = property_types[name];
+                var type = new landscape.Property_Type(name, info, this.property_types);
+                this.property_types[name] = type;
+            }
+        };
+
         Schema.prototype.get_base_property_type = function (type) {
             var property_type = this.property_types[type];
             if (property_type.parent)
@@ -2533,23 +2692,6 @@ var landscape;
             return !!input;
         };
 
-        Schema.prototype.load_property_types = function (property_types) {
-            for (var name in property_types) {
-                var info = property_types[name];
-                var type = new landscape.Property_Type(name, info, this.property_types);
-                this.property_types[name] = type;
-            }
-        };
-
-        Schema.load_json_from_file = function (filename) {
-            var fs = require('fs');
-            var json = fs.readFileSync(filename, 'ascii');
-            if (!json)
-                throw new Error('Could not find file: ' + filename);
-
-            return JSON.parse(json);
-        };
-
         Schema.prototype.add_trellis = function (name, source, initialize_parent) {
             if (typeof initialize_parent === "undefined") { initialize_parent = true; }
             var trellis = this.trellises[name];
@@ -2592,9 +2734,6 @@ var landscape;
             var subset = null;
             if (data.trellises)
                 subset = this.load_trellises(data.trellises);
-
-            if (data.views)
-                this.views = this.views.concat(data.views);
 
             if (data.tables)
                 ground.load_tables(data.tables);
@@ -2674,16 +2813,20 @@ var Ground;
             this.trellises = {};
             this.custom_tables = [];
             this.tables = [];
-            this.views = [];
             this.property_types = [];
             this.log_queries = false;
             this.log_updates = false;
+
+            this.schema = new landscape.Schema();
+            this.schema.ground = this;
+            this.property_types = this.schema.property_types;
+            this.trellises = this.schema.trellises;
+            this.tables = this.schema.tables;
+            this.custom_tables = this.schema.custom_tables;
+
             this.query_schema = Core.load_relative_json_file('validation/query.json');
             this.update_schema = Core.load_relative_json_file('validation/update.json');
             this.db = new Ground.Database(config, db_name);
-            var path = require('path');
-            var filename = path.resolve(__dirname, 'property_types.json');
-            this.load_property_types(filename);
         }
         Core.load_relative_json_file = function (path) {
             var Path = require('path');
@@ -2697,11 +2840,7 @@ var Ground;
         };
 
         Core.prototype.get_base_property_type = function (type) {
-            var property_type = this.property_types[type];
-            if (property_type.parent)
-                return this.get_base_property_type(property_type.parent.name);
-
-            return property_type;
+            return this.schema.get_base_property_type(type);
         };
 
         Core.prototype.get_identity = function (trellis, seed) {
@@ -2709,84 +2848,11 @@ var Ground;
         };
 
         Core.prototype.get_trellis = function (trellis) {
-            if (!trellis)
-                throw new Error('landscape.Trellis argument is empty');
-
-            if (typeof trellis === 'string') {
-                if (!this.trellises[trellis])
-                    throw new Error('Could not find trellis named: ' + trellis + '.');
-
-                return this.trellises[trellis];
-            }
-
-            return trellis;
+            return this.schema.get_trellis(trellis);
         };
 
         Core.prototype.convert_value = function (value, type) {
-            if (value === undefined || value === null || value === false) {
-                if (type == 'bool')
-                    return false;
-
-                return null;
-            }
-
-            var property_type = this.property_types[type];
-
-            if (property_type && property_type.parent)
-                return this.convert_value(value, property_type.parent.name);
-
-            switch (type) {
-                case 'date':
-                case 'time':
-                case 'datetime2':
-                case 'guid':
-                    return value;
-                case 'list':
-                case 'reference':
-                    return value;
-                case 'number':
-                case 'int':
-                    return Math.round(value);
-                case 'string':
-                case 'text':
-                    return value;
-                case 'boolean':
-                case 'bool':
-                    return Core.to_bool(value);
-                case 'float':
-                case 'double':
-                case 'money':
-                    return parseFloat(value.toString());
-                case 'json':
-                    var bin = new Buffer(value, 'binary').toString();
-                    var json = new Buffer(bin, 'base64').toString('ascii');
-                    return JSON.parse(json);
-            }
-
-            throw new Error('Not sure how to convert sql type of ' + type + '.');
-        };
-
-        Core.prototype.create_remaining_tables = function () {
-            for (var i in this.trellises) {
-                var trellis = this.trellises[i];
-                if (this.tables[trellis.name])
-                    continue;
-
-                var table = Ground.Table.create_from_trellis(trellis, this);
-                this.tables[i] = table;
-            }
-        };
-
-        Core.prototype.create_missing_table_links = function () {
-            for (var i in this.trellises) {
-                var trellis = this.trellises[i];
-                var table = this.tables[trellis.name];
-                var links = trellis.get_all_links();
-                for (var p in links) {
-                    if (!table.links[p])
-                        table.create_link(links[p]);
-                }
-            }
+            return this.schema.convert_value(value, type);
         };
 
         Core.prototype.create_query = function (trellis_name, base_path) {
@@ -2814,16 +2880,6 @@ var Ground;
             var trellis = this.sanitize_trellis_argument(trellis);
             var del = new Ground.Delete(this, trellis, seed);
             return del.run();
-        };
-
-        Core.prototype.initialize_trellises = function (subset, all) {
-            if (typeof all === "undefined") { all = null; }
-            all = all || subset;
-
-            for (var i in subset) {
-                var trellis = subset[i];
-                trellis.initialize(all);
-            }
         };
 
         Core.prototype.insert_object = function (trellis, seed, user, as_service) {
@@ -2866,64 +2922,8 @@ var Ground;
             return JSON.parse(json);
         };
 
-        Core.prototype.load_property_types = function (filename) {
-            var property_types = Core.load_json_from_file(filename);
-            for (var name in property_types) {
-                var info = property_types[name];
-                var type = new Property_Type(name, info, this.property_types);
-                this.property_types[name] = type;
-            }
-        };
-
         Core.prototype.load_schema_from_file = function (filename) {
-            var data = Core.load_json_from_file(filename);
-            try  {
-                this.parse_schema(data);
-            } catch (ex) {
-                ex.message = "Error parsing " + filename + ": " + ex.message;
-                throw ex;
-            }
-        };
-
-        Core.prototype.load_tables = function (tables) {
-            for (var name in tables) {
-                var table = new Ground.Table(name, this);
-                table.load_from_schema(tables[name]);
-                this.tables[name] = table;
-                this.custom_tables[name] = table;
-            }
-        };
-
-        Core.prototype.load_trellises = function (trellises) {
-            var subset = [];
-            for (var name in trellises) {
-                var trellis = this.add_trellis(name, trellises[name], false);
-                subset[name] = trellis;
-            }
-
-            return subset;
-        };
-
-        Core.prototype.parse_schema = function (data) {
-            var subset = null;
-            if (data.trellises)
-                subset = this.load_trellises(data.trellises);
-
-            if (data.views)
-                this.views = this.views.concat(data.views);
-
-            if (data.tables)
-                this.load_tables(data.tables);
-
-            if (subset)
-                this.initialize_trellises(subset, this.trellises);
-
-            if (MetaHub.is_array(data.logic) && data.logic.length > 0) {
-                Ground.Logic.load(this, data.logic);
-            }
-
-            this.create_remaining_tables();
-            this.create_missing_table_links();
+            loader.load_schema_from_file(this.schema, filename);
         };
 
         Core.remove_fields = function (object, trellis, filter) {
@@ -3218,6 +3218,32 @@ var Ground;
 })(Ground || (Ground = {}));
 var Ground;
 (function (Ground) {
+    function assure_properties(trellis, seed, required_properties) {
+        if (trellis.seed_has_properties(seed, required_properties))
+            return when.resolve(seed);
+
+        var properties = [], expansions = [];
+        for (var i = 0; i < required_properties.length; ++i) {
+            var property = required_properties[i];
+            if (property.indexOf('.') == -1) {
+                properties.push(property);
+            } else {
+                var tokens = property.split('.');
+                expansions.push(tokens.slice(0, -1).join('/'));
+                properties.push(tokens[0]);
+            }
+        }
+
+        var query = trellis.ground.create_query(trellis.name);
+        query.add_key_filter(trellis.get_identity2(seed));
+        query.extend({
+            properties: properties
+        });
+        query.add_expansions(expansions);
+
+        return query.run_single(null);
+    }
+
     var Record_Count = (function (_super) {
         __extends(Record_Count, _super);
         function Record_Count(ground, parent, property_name, count_name) {
@@ -3239,7 +3265,8 @@ var Ground;
         Record_Count.prototype.count = function (seed) {
             var _this = this;
             var back_reference = this.child.get_reference_property(this.parent);
-            return this.child.assure_properties(seed, [back_reference.name]).then(function (seed) {
+
+            return assure_properties(this.child, seed, [back_reference.name]).then(function (seed) {
                 var parent_key = back_reference.get_sql_value(seed[back_reference.name]);
 
                 var sql = "UPDATE " + _this.parent.get_table_name() + "\nSET " + _this.count_name + " =" + "\n(SELECT COUNT(*)" + "\nFROM " + _this.child.get_table_name() + " WHERE " + back_reference.query() + " = " + parent_key + ")" + "\nWHERE " + _this.parent.query_primary_key() + " = " + parent_key;
@@ -3282,7 +3309,7 @@ var Ground;
                 key_name = property.name;
             }
 
-            return property.parent.assure_properties(seed, [key_name]).then(function (seed) {
+            return assure_properties(property.parent, seed, [key_name]).then(function (seed) {
                 var trellis = _this.property.parent;
 
                 var initial_key_value = MetaHub.is_array(seed[key_name]) ? seed[key_name][0] : seed[key_name];

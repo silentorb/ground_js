@@ -4,8 +4,8 @@
 
 module exporter {
 
-  export function get_property_data(property:landscape.Property):landscape.loader.IProperty_Source {
-    var result:landscape.loader.IProperty_Source = {
+  export function get_property_data(property:landscape.Property):loader.IProperty_Source {
+    var result:loader.IProperty_Source = {
       type: property.type
     }
 
@@ -27,8 +27,8 @@ module exporter {
     return result
   }
 
-  export function property_export(property:landscape.Property):landscape.loader.IProperty_Source {
-    var result:landscape.loader.IProperty_Source = {
+  export function property_export(property:landscape.Property):loader.IProperty_Source {
+    var result:loader.IProperty_Source = {
       type: property.type
     }
     if (property.other_trellis)

@@ -16,7 +16,7 @@ module Ground {
     property:landscape.Property
   }
 
-  export class Link_Trellis implements ITrellis {
+  export class Link_Trellis implements landscape.ITrellis {
     properties
     seed
     table_name:string

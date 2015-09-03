@@ -1,6 +1,6 @@
 /// <reference path="../references.ts"/>
 
-var uuid = require('node-uuid')
+var uuid: any = require('node-uuid')
 
 module Ground {
   export interface IUser {

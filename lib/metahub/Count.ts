@@ -1,6 +1,34 @@
 /// <reference path="../references.ts"/>
 
 module Ground {
+
+  function assure_properties(trellis, seed, required_properties:string[]):Promise {
+    if (trellis.seed_has_properties(seed, required_properties))
+      return when.resolve(seed)
+
+    var properties = [], expansions = []
+    for (var i = 0; i < required_properties.length; ++i) {
+      var property:string = required_properties[i]
+      if (property.indexOf('.') == -1) {
+        properties.push(property)
+      }
+      else {
+        var tokens = property.split('.')
+        expansions.push(tokens.slice(0, -1).join('/'))
+        properties.push(tokens[0])
+      }
+    }
+
+    var query = trellis.ground.create_query(trellis.name)
+    query.add_key_filter(trellis.get_identity2(seed))
+    query.extend({
+      properties: properties
+    })
+    query.add_expansions(expansions)
+
+    return query.run_single(null)
+  }
+
   export class Record_Count extends MetaHub.Meta_Object {
     ground:Core
     parent:landscape.Trellis
@@ -21,7 +49,8 @@ module Ground {
 
     count(seed):Promise {
       var back_reference = this.child.get_reference_property(this.parent)
-      return this.child.assure_properties(seed, [back_reference.name])
+
+      return assure_properties(this.child, seed, [back_reference.name])
         .then((seed)=> {
           var parent_key = back_reference.get_sql_value(seed[back_reference.name])
 
@@ -67,7 +96,7 @@ module Ground {
         key_name = property.name
       }
 
-      return property.parent.assure_properties(seed, [key_name])
+      return assure_properties(property.parent, seed, [key_name])
         .then((seed)=> {
 
           var trellis = this.property.parent
@@ -81,11 +110,11 @@ module Ground {
 
           var sql =
             "UPDATE " + this.parent.get_table_name()
-              + "\nSET " + this.count_name + " ="
-              + "\n(SELECT COUNT(*)"
-              + "\nFROM " + this.link.get_table_name()
-              + "\nWHERE " + identities[0].query() + ' = ' + trellis.query_primary_key() + ")"
-              + "\nWHERE " + trellis.query_primary_key() + " = " + key
+            + "\nSET " + this.count_name + " ="
+            + "\n(SELECT COUNT(*)"
+            + "\nFROM " + this.link.get_table_name()
+            + "\nWHERE " + identities[0].query() + ' = ' + trellis.query_primary_key() + ")"
+            + "\nWHERE " + trellis.query_primary_key() + " = " + key
 
 //          console.log('update', sql)
           return this.ground.db.query(sql)

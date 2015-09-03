@@ -13,16 +13,30 @@ module landscape {
   export interface ISchema_Source {
     trellises?
     tables?
-    views?
     logic?
   }
 
   export class Schema implements ISchema {
     property_types:Property_Type[] = []
     trellises:{ [key: string]: Trellis} = {}
-    views:any[] = []
     custom_tables:Ground.Table[] = []
     tables:Ground.Table[] = []
+    ground: Ground.Core
+
+    constructor() {
+      var path = require('path');
+      var filename = path.resolve(__dirname, 'property_types.json');
+      this.load_property_types(filename)
+    }
+
+    load_property_types(filename:string) {
+      var property_types = loader.load_json_from_file(filename);
+      for (var name in property_types) {
+        var info = property_types[name];
+        var type = new landscape.Property_Type(name, info, this.property_types);
+        this.property_types[name] = type;
+      }
+    }
 
     get_base_property_type(type) {
       var property_type = this.property_types[type];
@@ -85,24 +99,6 @@ module landscape {
       return !!input;
     }
 
-    load_property_types(property_types) {
-      //var property_types = Schema.load_json_from_file(filename);
-      for (var name in property_types) {
-        var info = property_types[name];
-        var type = new Property_Type(name, info, this.property_types);
-        this.property_types[name] = type;
-      }
-    }
-
-    static load_json_from_file(filename:string) {
-      var fs = require('fs')
-      var json = fs.readFileSync(filename, 'ascii');
-      if (!json)
-        throw new Error('Could not find file: ' + filename)
-
-      return JSON.parse(json);
-    }
-
     add_trellis(name:string, source:loader.ITrellis_Source, initialize_parent = true):Trellis {
       var trellis = this.trellises[name]
 
@@ -145,9 +141,6 @@ module landscape {
       var subset:Trellis[] = null
       if (data.trellises)
         subset = this.load_trellises(data.trellises);
-
-      if (data.views)
-        this.views = this.views.concat(data.views);
 
       if (data.tables)
         ground.load_tables(data.tables);
