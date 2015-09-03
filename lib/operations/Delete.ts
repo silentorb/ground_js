@@ -8,11 +8,11 @@
 module Ground {
   export class Delete implements IUpdate {
     ground:Core
-    trellis:Trellis
+    trellis:landscape.Trellis
     seed
     max_depth = 20
 
-    constructor(ground:Core, trellis:Trellis, seed:ISeed) {
+    constructor(ground:Core, trellis:landscape.Trellis, seed:ISeed) {
       this.ground = ground
       this.trellis = trellis
       this.seed = seed
@@ -22,7 +22,7 @@ module Ground {
       return this.trellis + '.delete'
     }
 
-    private delete_child(link:Property, id, depth = 0):Promise {
+    private delete_child(link:landscape.Property, id, depth = 0):Promise {
       var other_property = link.get_other_property()
       var other_trellis = other_property.parent
       var query = other_trellis.ground.create_query(other_trellis.name)
@@ -35,14 +35,14 @@ module Ground {
       )
     }
 
-    private delete_children(trellis:Trellis, id, depth:number = 0):Promise {
+    private delete_children(trellis:landscape.Trellis, id, depth:number = 0):Promise {
       var links = this.get_child_links(trellis)
       return when.all(links.map(
         (link) => this.delete_child(link, id, depth)
       ))
     }
 
-    delete_record(trellis:Trellis, seed):Promise {
+    delete_record(trellis:landscape.Trellis, seed):Promise {
       var keys = trellis.get_primary_keys()
       var filters = keys.map((property) => {
           var id = seed[property.name]
@@ -66,7 +66,7 @@ module Ground {
       return this.ground.db.query(sql)
     }
 
-    private get_child_links(trellis:Trellis) {
+    private get_child_links(trellis:landscape.Trellis) {
       var result = [], links = trellis.get_links()
       for (var i in links) {
         var link = links[i]
@@ -90,7 +90,7 @@ module Ground {
       return this.run_delete(trellis, seed, depth)
     }
 
-    private run_delete(trellis:Trellis, seed:ISeed, depth:number = 0):Promise {
+    private run_delete(trellis:landscape.Trellis, seed:ISeed, depth:number = 0):Promise {
       if (depth > this.max_depth)
         throw new Error("Max depth of " + this.max_depth + " exceeded.  Possible infinite loop.")
 
@@ -104,14 +104,14 @@ module Ground {
 
       return trellis.assure_properties(seed, property_names)
         .then((seed)=> {
-          var tree = trellis.get_tree().filter((t:Trellis)=> !t.is_virtual)
-          var invoke_promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.delete', seed))
+          var tree = trellis.get_tree().filter((t:landscape.Trellis)=> !t.is_virtual)
+          var invoke_promises = tree.map((trellis:landscape.Trellis) => this.ground.invoke(trellis.name + '.delete', seed))
 
           return pipeline([
             ()=> when.all(invoke_promises),
             ()=> this.delete_children(trellis, id, depth),
-            ()=> when.all(tree.map((trellis:Trellis) => this.delete_record(trellis, seed))),
-            ()=> when.all(tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.deleted', seed))),
+            ()=> when.all(tree.map((trellis:landscape.Trellis) => this.delete_record(trellis, seed))),
+            ()=> when.all(tree.map((trellis:landscape.Trellis) => this.ground.invoke(trellis.name + '.deleted', seed))),
             ()=> []
           ])
         })

@@ -31,12 +31,12 @@ module Ground {
       this.renderer = new Query_Renderer(this.ground)
     }
 
-    private static generate_property_join(property:Property, seeds) {
+    private static generate_property_join(property:landscape.Property, seeds) {
       var join = Link_Trellis.create_from_property(property);
       return join.generate_join(seeds);
     }
 
-    private static create_sub_query(trellis:Trellis, property:Property, source:Query_Builder):Query_Builder {
+    private static create_sub_query(trellis:landscape.Trellis, property:landscape.Property, source:Query_Builder):Query_Builder {
       var query = new Query_Builder(trellis)
       var original_query = source.subqueries[property.name]
       if (original_query) {
@@ -53,7 +53,7 @@ module Ground {
       return query
     }
 
-    private static get_many_list(seed, property:Property, relationship:Relationships, source:Query_Builder, query_result:Query_Result):Promise {
+    private static get_many_list(seed, property:landscape.Property, relationship:landscape.Relationships, source:Query_Builder, query_result:Query_Result):Promise {
       var id = seed[property.parent.primary_key]
       if (id === undefined || id === null) {
         return when.resolve({
@@ -68,11 +68,11 @@ module Ground {
 //        return when.resolve()
 
       var query = Query_Runner.create_sub_query(other_property.parent, property, source);
-//      if (relationship === Relationships.many_to_many) {
+//      if (relationship === landscape.Relationships.many_to_many) {
 ////        query.filters.push(Query_Builder.create_join_filter(property, seed))
 //        query.add_filter(property.name, seed)
 //      }
-//      else if (relationship === Relationships.one_to_many)
+//      else if (relationship === landscape.Relationships.one_to_many)
 //        query.add_filter(other_property.name, id)
 
       query.add_filter(other_property.name, id)
@@ -88,7 +88,7 @@ module Ground {
 //      return items.join('/');
 //    }
 
-    private static get_reference_object(row, property:Property, source:Query_Builder, query_result:Query_Result) {
+    private static get_reference_object(row, property:landscape.Property, source:Query_Builder, query_result:Query_Result) {
       var query = Query_Runner.create_sub_query(property.other_trellis, property, source)
       var value = row[property.name]
       if (!value)
@@ -159,7 +159,7 @@ module Ground {
       }
     }
 
-    process_row_step_two(row, source:Query_Builder, trellis:Trellis, query_result:Query_Result, parts:Query_Parts):Promise {
+    process_row_step_two(row, source:Query_Builder, trellis:landscape.Trellis, query_result:Query_Result, parts:Query_Parts):Promise {
       var name, property, replacement = undefined
 
       var properties = trellis.get_core_properties()
@@ -257,7 +257,7 @@ module Ground {
       if (!cache) {
         Query_Runner.trellis_cache[trellis.name] = cache = {
           links: trellis.get_all_links((p)=> !p.is_virtual),
-          tree: trellis.get_tree().filter((t:Trellis)=> !t.is_virtual)
+          tree: trellis.get_tree().filter((t:landscape.Trellis)=> !t.is_virtual)
         }
       }
 
@@ -268,11 +268,11 @@ module Ground {
       var relationship = property.get_relationship()
 
       switch (relationship) {
-        case Relationships.one_to_one:
+        case landscape.Relationships.one_to_one:
           return Query_Runner.get_reference_object(seed, property, source, query_result)
           break
-        case Relationships.one_to_many:
-        case Relationships.many_to_many:
+        case landscape.Relationships.one_to_many:
+        case landscape.Relationships.many_to_many:
           return Query_Runner.get_many_list(seed, property, relationship, source, query_result)
             .then((result)=> result ? result.objects : [])
           break
@@ -287,7 +287,7 @@ module Ground {
         return when.resolve(this.row_cache)
 
       var tree = source.trellis.get_tree().filter((t)=> this.ground['has_event'](t.name + '.query'))
-      var promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
+      var promises = tree.map((trellis:landscape.Trellis) => ()=> this.ground.invoke(trellis.name + '.query', source))
       if (this.ground['has_event']('*.query'))
         promises = promises.concat(()=> this.ground.invoke('*.query', source))
 

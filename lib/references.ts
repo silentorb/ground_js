@@ -5,8 +5,8 @@
 /// <reference path="db/Link_Trellis.ts"/>
 /// <reference path="db/SQL.ts"/>
 
-/// <reference path="schema/Property.ts"/>
-/// <reference path="schema/Trellis.ts"/>
+/// <reference path="landscape/Property.ts"/>
+/// <reference path="landscape/Trellis.ts"/>
 
 /// <reference path="metahub/Expression.ts"/>
 /// <reference path="metahub/Count.ts"/>

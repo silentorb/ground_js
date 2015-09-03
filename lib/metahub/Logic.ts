@@ -104,7 +104,7 @@ module Ground {
           var reference = <Reference_Expression>func.arguments[0]
           var trellis = ground.sanitize_trellis_argument(source.trellis)
           var property = trellis.get_property(reference.path)
-          if (property.get_relationship() !== Relationships.many_to_many)
+          if (property.get_relationship() !== landscape.Relationships.many_to_many)
             return new Record_Count(ground, source.trellis, reference.path, source.property)
           else
             return new Join_Count(ground, property, source.property)
@@ -144,12 +144,12 @@ module Ground {
       if (source.expression.type == 'function') {
         var func = <Function_Expression2>source.expression
         var target = source.path[0]
-        var trellis = <Ground.Trellis>scope._this
+        var trellis = <Ground.landscape.Trellis>scope._this
         var constraint
         if (func.name == 'count') {
           var reference = <Reference_Expression>func.inputs[0]
           var property = trellis.get_property(reference.path[0])
-          if (property.get_relationship() !== Relationships.many_to_many)
+          if (property.get_relationship() !== landscape.Relationships.many_to_many)
             constraint = new Record_Count(ground, trellis, reference.path, target)
           else
             constraint = new Join_Count(ground, property, target)
@@ -188,7 +188,7 @@ module Ground {
 //      var reference = <Reference_Expression>func.arguments[0]
 //      var trellis = ground.sanitize_trellis_argument(source.trellis)
 //      var property = trellis.get_property(reference.path)
-//      if (property.get_relationship() !== Relationships.many_to_many)
+//      if (property.get_relationship() !== landscape.Relationships.many_to_many)
 //        return new Record_Count(ground, source.trellis, reference.path, source.property)
 //      else
 //        return new Join_Count(ground, property, source.property)

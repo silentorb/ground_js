@@ -1,11 +1,11 @@
 module Ground {
   export class Embedded_Reference {
-    property:Property
-    properties:Property[] = []
+    property:landscape.Property
+    properties:landscape.Property[] = []
     tables = {}
     children:Embedded_Reference[] = []
 
-    constructor(property:Property, id:number, properties:Property[], previous:Join_Trellis = undefined) {
+    constructor(property:landscape.Property, id:number, properties:landscape.Property[], previous:Join_Trellis = undefined) {
       if (!previous)
         previous = new Join_Trellis_Wrapper(property.parent)
 
@@ -28,12 +28,12 @@ module Ground {
       this.properties = properties
     }
 
-    get_field_name(property:Property):string {
+    get_field_name(property:landscape.Property):string {
       var table = this.get_table(property)
       return table.second.get_alias() + '_' + property.name
     }
 
-    private get_table(property:Property):Reference_Join {
+    private get_table(property:landscape.Property):Reference_Join {
       return this.tables[property.parent.name]
     }
 
@@ -51,7 +51,7 @@ module Ground {
       return joins.join("\n")
     }
 
-    render_field(property:Property):string {
+    render_field(property:landscape.Property):string {
       var table = this.get_table(property)
       if (!table)
         console.log('prop', property.fullname())
@@ -65,7 +65,7 @@ module Ground {
       )
     }
 
-    render_dummy_field(property:Property):string {
+    render_dummy_field(property:landscape.Property):string {
       return 'NULL AS ' + this.get_field_name(property)
     }
 

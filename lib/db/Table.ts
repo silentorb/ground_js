@@ -28,7 +28,7 @@ module Ground {
     type:Link_Field_Type
     other_link:Link_Field
     field:IField
-    property:Property
+    property:landscape.Property
 
     constructor(name:string, parent:Table, other_table:Table, type:Link_Field_Type) {
       this.name = name
@@ -44,7 +44,7 @@ module Ground {
     indexes:any[]
     ground:Core
     db_name:string
-    trellis:Trellis
+    trellis:landscape.Trellis
     primary_keys:any[]
     query:string
     links = {}
@@ -54,12 +54,12 @@ module Ground {
       this.ground = ground;
     }
 
-    connect_trellis(trellis:Trellis) {
+    connect_trellis(trellis:landscape.Trellis) {
       this.trellis = trellis;
       trellis.table = this;
     }
 
-    static create_from_trellis(trellis:Trellis, ground:Core = null):Table {
+    static create_from_trellis(trellis:landscape.Trellis, ground:Core = null):Table {
       if (trellis.table)
         return trellis.table;
 
@@ -70,24 +70,24 @@ module Ground {
       return table;
     }
 
-    static get_other_table(property:Property):Table {
+    static get_other_table(property:landscape.Property):Table {
       var ground = property.parent.ground
       var name = Table.get_other_table_name(property)
       return ground.tables[name]
     }
 
-    static get_other_table_name(property:Property):string {
+    static get_other_table_name(property:landscape.Property):string {
       var field = property.get_field_override()
       if (field && field.other_table)
         return field.other_table
 
-      if (property.get_relationship() === Relationships.many_to_many)
+      if (property.get_relationship() === landscape.Relationships.many_to_many)
         return Cross_Trellis.generate_name(property.parent, property.other_trellis)
 
       return property.other_trellis.name
     }
 
-    create_link(property:Property) {
+    create_link(property:landscape.Property) {
 
       var other_table = Table.get_other_table(property)
       if (!other_table)
@@ -211,7 +211,7 @@ module Ground {
       return sql;
     }
 
-    create_sql_from_trellis(trellis:Trellis):string {
+    create_sql_from_trellis(trellis:landscape.Trellis):string {
       if (!trellis) {
         if (!this.trellis)
           throw new Error('No valid trellis to generate sql from.');
@@ -275,7 +275,7 @@ module Ground {
       return Table.create_sql_from_array(this.name, fields, primary_keys, indexes);
     }
 
-    private get_primary_keys(trellis:Trellis):string[] {
+    private get_primary_keys(trellis:landscape.Trellis):string[] {
 
       // Inherit primary keys
       if (!this.primary_keys && trellis.parent) {
@@ -298,7 +298,7 @@ module Ground {
       }
       var key = trellis.properties[trellis.primary_key]
       if (!key)
-        throw new Error("Trellis " + trellis.name + " is missing primary key " + trellis.primary_key)
+        throw new Error("landscape.Trellis " + trellis.name + " is missing primary key " + trellis.primary_key)
 
       return [key.get_field_name() ];
     }

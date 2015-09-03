@@ -1,10 +1,11 @@
 /// <reference path="../references.ts"/>
 /// <reference path="../db/Database.ts"/>
-/// <reference path="../schema/Trellis.ts"/>
+/// <reference path="../landscape/Trellis.ts"/>
 /// <reference path="../query/Query.ts"/>
 /// <reference path="../operations/Update.ts"/>
 /// <reference path="../operations/Delete.ts"/>
 /// <reference path="../../defs/node.d.ts"/>
+/// <reference path="../landscape/Schema.ts"/>
 
 module Ground {
 	export class InputError {
@@ -19,27 +20,6 @@ module Ground {
 			this.message = message
 			this.key = key
 		}
-	}
-
-	export interface IProperty_Source {
-		name?:string
-		type:string
-		insert?:string
-		is_virtual?:boolean
-		is_readonly?:boolean
-		is_private?:boolean
-		other_property?:string
-		trellis?:string
-		allow_null?:boolean
-	}
-
-	export interface ITrellis_Source {
-		parent?:string
-    interfaces?:string[]
-		name?:string
-		primary_key?:string
-		properties?
-		is_virtual?:boolean
 	}
 
 	export interface ISeed {
@@ -74,48 +54,8 @@ module Ground {
 		return path.split(/[\/\.]/)
 	}
 
-	export class Property_Type {
-		name:string;
-		property_class;
-		field_type;
-		default_value;
-		parent:Property_Type;
-		db:Database;
-		allow_null:boolean = false
-
-		constructor(name:string, info, types:Property_Type[]) {
-			if (info.parent) {
-				var parent = types[info.parent];
-				MetaHub.extend(this, parent);
-				this.parent = parent;
-			}
-
-			this.field_type = info.field_type || null;
-
-			this.name = name
-			this.property_class = 'Property'
-			if (info.default !== undefined)
-				this.default_value = info.default
-
-			if (info.allow_null !== undefined)
-				this.allow_null = info.allow_null
-		}
-
-		get_field_type() {
-			if (this.field_type) {
-				return this.field_type;
-			}
-
-			if (this.parent) {
-				return this.parent.get_field_type();
-			}
-
-			throw new Error(this.name + " could not find valid field type.");
-		}
-	}
-
-	export class Core extends MetaHub.Meta_Object {
-		trellises:{ [key: string]: Trellis
+	export class Core extends MetaHub.Meta_Object implements landscape.ISchema {
+		trellises:{ [key: string]: landscape.Trellis
 		} = {}
 		custom_tables:Table[] = []
 		tables:Table[] = []
@@ -125,6 +65,7 @@ module Ground {
 		log_queries:boolean = false
 		log_updates:boolean = false
 		hub
+    schema: landscape.Schema
 		query_schema
 		update_schema
 
@@ -144,27 +85,9 @@ module Ground {
 			return JSON.parse(fs.readFileSync(Path.resolve(__dirname, path), 'ascii'))
 		}
 
-		add_trellis(name:string, source:ITrellis_Source, initialize_parent = true):Trellis {
-			var trellis = this.trellises[name]
+		add_trellis(name:string, source:ITrellis_Source, initialize_parent = true):landscape.Trellis {
+      return this.schema.add_trellis(name, source, initialize_parent)
 
-			if (trellis) {
-				trellis = this.trellises[name]
-				if (source)
-					trellis.load_from_object(source)
-
-				return trellis
-			}
-
-			trellis = new Trellis(name, this);
-			if (source)
-				trellis.load_from_object(source);
-
-			this.trellises[name] = trellis;
-
-			if (initialize_parent)
-				this.initialize_trellises([trellis], this.trellises);
-
-			return trellis;
 		}
 
 		get_base_property_type(type) {
@@ -179,9 +102,9 @@ module Ground {
 			return this.get_trellis(trellis).get_identity2(seed)
 		}
 
-		get_trellis(trellis):Trellis {
+		get_trellis(trellis):landscape.Trellis {
 			if (!trellis)
-				throw new Error('Trellis argument is empty');
+				throw new Error('landscape.Trellis argument is empty');
 
 			if (typeof trellis === 'string') {
 				if (!this.trellises[trellis])
@@ -287,13 +210,13 @@ module Ground {
 			return update
 		}
 
-		delete_object(trellis:Trellis, seed:ISeed):Promise {
+		delete_object(trellis:landscape.Trellis, seed:ISeed):Promise {
 			var trellis = this.sanitize_trellis_argument(trellis)
 			var del = new Delete(this, trellis, seed)
 			return del.run()
 		}
 
-		initialize_trellises(subset:Trellis[], all = null) {
+		initialize_trellises(subset:landscape.Trellis[], all = null) {
 			all = all || subset;
 
 			for (var i in subset) {
@@ -306,11 +229,11 @@ module Ground {
 			return this.update_object(trellis, seed, user, as_service);
 		}
 
-		static is_private(property:Property):boolean {
+		static is_private(property:landscape.Property):boolean {
 			return property.is_private;
 		}
 
-		static is_private_or_readonly(property:Property):boolean {
+		static is_private_or_readonly(property:landscape.Property):boolean {
 			return property.is_private || property.is_readonly;
 		}
 
@@ -381,7 +304,7 @@ module Ground {
 			}
 		}
 
-		load_trellises(trellises:ITrellis_Source[]):Trellis[] {
+		load_trellises(trellises:ITrellis_Source[]):landscape.Trellis[] {
 			var subset = [];
 			for (var name in trellises) {
 				var trellis = this.add_trellis(name, trellises[name], false);
@@ -392,7 +315,7 @@ module Ground {
 		}
 
 		private parse_schema(data:ISchema_Source) {
-			var subset:Trellis[] = null
+			var subset:landscape.Trellis[] = null
 			if (data.trellises)
 				subset = this.load_trellises(data.trellises);
 
@@ -413,7 +336,7 @@ module Ground {
 			this.create_missing_table_links()
 		}
 
-		static remove_fields(object, trellis:Trellis, filter) {
+		static remove_fields(object, trellis:landscape.Trellis, filter) {
 			for (var key in object) {
 				var property = trellis.properties[key];
 				if (property && filter(property))
@@ -423,7 +346,7 @@ module Ground {
 		}
 
 		// Deprecated in favor of get_trellis()
-		sanitize_trellis_argument(trellis):Trellis {
+		sanitize_trellis_argument(trellis):landscape.Trellis {
 			return this.get_trellis(trellis)
 		}
 
@@ -445,7 +368,7 @@ module Ground {
 			}
 		}
 
-		static perspective(seed, trellis:Trellis, property:Property) {
+		static perspective(seed, trellis:landscape.Trellis, property:landscape.Property) {
 			if (trellis === property.parent) {
 				return seed
 			}

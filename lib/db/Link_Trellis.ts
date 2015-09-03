@@ -6,26 +6,26 @@ module Ground {
   // Map an entity reference property to a 
   export interface Identity {
     name: string
-    trellis:Trellis
+    trellis:landscape.Trellis
     keys:Identity_Key[]
   }
 
   export interface Identity_Key {
     name: string
     type: string
-    property:Property
+    property:landscape.Property
   }
 
   export class Link_Trellis implements ITrellis {
     properties
     seed
     table_name:string
-    trellises:Trellis[] = []
+    trellises:landscape.Trellis[] = []
     trellis_dictionary = {} // Should contain the same values as trellises, just keyed by trellis name
     identities:Identity[]
     alias:string
 
-    constructor(trellises:Trellis[], table_name:string = null) {
+    constructor(trellises:landscape.Trellis[], table_name:string = null) {
       this.trellises = trellises
 
       for (var i = 0; i < trellises.length; ++i) {
@@ -39,7 +39,7 @@ module Ground {
       this.identities = trellises.map((x)=> this.create_identity(x))
     }
 
-    create_identity(trellis:Trellis):Identity {
+    create_identity(trellis:landscape.Trellis):Identity {
       var properties = [], property, name
       var keys = trellis.get_primary_keys()
       for (var i = 0; i < keys.length; ++i) {
@@ -59,7 +59,7 @@ module Ground {
       }
     }
 
-    static create_from_property(property:Property):Link_Trellis {
+    static create_from_property(property:landscape.Property):Link_Trellis {
       var field = property.get_field_override()
       var table_name = field ? field.other_table : null
 
@@ -69,7 +69,7 @@ module Ground {
       return new Link_Trellis(trellises, table_name)
     }
 
-    static create_reference(property:Property, name:string):Identity_Key {
+    static create_reference(property:landscape.Property, name:string):Identity_Key {
       return {
         name: name,
         type: property.type,
@@ -197,7 +197,7 @@ module Ground {
       return conditions
     }
 
-    get_identity_by_trellis(trellis:Trellis):Identity {
+    get_identity_by_trellis(trellis:landscape.Trellis):Identity {
       for (var i = 0; i < this.identities.length; ++i) {
         var identity = this.identities[i]
         if (identity.trellis === trellis)

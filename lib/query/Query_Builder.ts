@@ -24,7 +24,7 @@ module Ground {
 
   export interface Query_Filter {
     path?:string
-    property?:Property
+    property?:landscape.Property
     value?
     operator?:string
     type?:string
@@ -41,7 +41,7 @@ module Ground {
   }
 
   export interface Condition {
-    path?:Property[]
+    path?:landscape.Property[]
     value?
     operator?:string
 
@@ -64,7 +64,7 @@ module Ground {
     }
 
     var in_operator = {
-      "render": (result, filter, property:Property, data)=> {
+      "render": (result, filter, property:landscape.Property, data)=> {
         var values = data.value.map((v)=> property.get_sql_value(v))
         data.value = "(" + values.join(', ') + ")"
       },
@@ -100,7 +100,7 @@ module Ground {
 
   export class Query_Builder {
     ground:Core
-    trellis:Trellis
+    trellis:landscape.Trellis
     pager:IPager
     type:string = 'query'
     properties
@@ -117,7 +117,7 @@ module Ground {
 
     filters:Query_Filter[] = []
 
-    constructor(trellis:Trellis) {
+    constructor(trellis:landscape.Trellis) {
       this.trellis = trellis
       this.ground = trellis.ground
     }
@@ -157,7 +157,7 @@ module Ground {
         var properties = this.trellis.get_all_properties()
         filter.property = properties[path]
         if (!filter.property) {
-          throw new Ground.InputError('Invalid filter path.  Trellis ' + this.trellis.name
+          throw new Ground.InputError('Invalid filter path.  landscape.Trellis ' + this.trellis.name
           + ' does not have a property named "' + path + '.')
         }
       }
@@ -245,7 +245,7 @@ module Ground {
       return new Query_Runner(this)
     }
 
-    static create_join_filter(property:Property, seed):Query_Filter {
+    static create_join_filter(property:landscape.Property, seed):Query_Filter {
       var value = property.parent.get_identity(seed)
       if (value === undefined || value === null)
         throw new Error(property.fullname() + ' could not get a valid identity from the provided seed.')
@@ -405,7 +405,7 @@ module Ground {
       return result
     }
 
-    get_field_properties2():Property[] {
+    get_field_properties2():landscape.Property[] {
       var result = []
       var properties = this.get_properties()
       for (var i in properties) {

@@ -14,16 +14,16 @@ module Ground {
   }
 
   export class Join_Trellis_Wrapper implements Join_Trellis {
-    trellis:Trellis
+    trellis:landscape.Trellis
     alias:string
 
-    constructor(trellis:Trellis, alias:string = null) {
+    constructor(trellis:landscape.Trellis, alias:string = null) {
       this.trellis = trellis
       var trellis_table_name = trellis ? trellis.get_table_name() : null
       this.alias = alias || trellis_table_name
     }
 
-    static create_using_property(trellis:Trellis, property:Property):Join_Trellis_Wrapper {
+    static create_using_property(trellis:landscape.Trellis, property:landscape.Property):Join_Trellis_Wrapper {
       var alias = Join.generate_table_name(trellis, property)
       return new Join_Trellis_Wrapper(trellis, alias)
     }
@@ -51,7 +51,7 @@ module Ground {
     properties:Join_Property[]
     identities:Join_Property[]
 
-    constructor(property:Property) {
+    constructor(property:landscape.Property) {
       var field = property.get_field_override()
       this.name = field
         ? field.other_table
@@ -63,13 +63,13 @@ module Ground {
       this.identities = [ this.properties[1], this.properties[2] ]
     }
 
-    static generate_name(first:Trellis, second:Trellis):string {
+    static generate_name(first:landscape.Trellis, second:landscape.Trellis):string {
       var names = [first.get_table_name(), second.get_table_name()]
       var temp = names.sort()
       return temp.join('_')
     }
 
-    private static get_field_name(property:Property):string {
+    private static get_field_name(property:landscape.Property):string {
       var field = property.get_field_override()
       if (field && field.other_field)
         return field.other_field
@@ -81,8 +81,8 @@ module Ground {
       return this.identities
     }
 
-    private static create_properties(cross:Cross_Trellis, property:Property):Join_Property[] {
-      var other_property:Property = property.get_other_property(true)
+    private static create_properties(cross:Cross_Trellis, property:landscape.Property):Join_Property[] {
+      var other_property:landscape.Property = property.get_other_property(true)
 
       var result = [
         Join_Property.create_from_property(property, cross),
@@ -98,7 +98,7 @@ module Ground {
       return result
     }
 
-    generate_delete(property:Property, owner, other):string {
+    generate_delete(property:landscape.Property, owner, other):string {
       var identities = this.order_identities(property)
       var conditions = [
         identities[0].get_comparison(owner),
@@ -107,7 +107,7 @@ module Ground {
       return 'DELETE FROM ' + this.get_table_name() + ' WHERE ' + conditions.join(' AND ') + "\n"
     }
 
-    generate_insert(property:Property, owner, other):string {
+    generate_insert(property:landscape.Property, owner, other):string {
       var identities = this.order_identities(property)
       var keys = identities.map((x)=> x.field_name)
       var values = [
@@ -122,7 +122,7 @@ module Ground {
         + ');\n'
     }
 
-    order_identities(property:Property):Join_Property[] {
+    order_identities(property:landscape.Property):Join_Property[] {
       var first = this.identities.filter((x)=>x.other_property.name == property.name)[0]
       if (!first) {
         throw new Error('Could not insert into cross table ' + this.get_table_name()
@@ -150,12 +150,12 @@ module Ground {
     alias:string
     table:Table
 
-    constructor(property:Property, alias:string = null) {
+    constructor(property:landscape.Property, alias:string = null) {
       this.table = Table.get_other_table(property)
       this.alias = alias
     }
 
-//    generate_delete(property:Property, owner, other):string {
+//    generate_delete(property:landscape.Property, owner, other):string {
 //      var identities = this.order_identities(property)
 //      var conditions = [
 //        identities[0].get_comparison(owner),
@@ -164,7 +164,7 @@ module Ground {
 //      return 'DELETE FROM ' + this.get_table_name() + ' WHERE ' + conditions.join(' AND ') + "\n"
 //    }
 
-    generate_insert(property:Property, owner, other):string {
+    generate_insert(property:landscape.Property, owner, other):string {
       var identities = this.order_identities(property)
       var keys = identities.map((x)=> x.name)
       var values = [
@@ -179,7 +179,7 @@ module Ground {
         + ');\n'
     }
 
-    order_identities(property:Property):Link_Field[] {
+    order_identities(property:landscape.Property):Link_Field[] {
       var table = this.table
       var first = MetaHub.filter(table.links, (x)=>x.name == property.name)[0]
       if (!first) {
@@ -204,7 +204,7 @@ module Ground {
     type:string
     other_property:Join_Property
     name:string
-    property:Property
+    property:landscape.Property
 
     constructor(parent:Join_Trellis, other_trellis:Join_Trellis, name:string, type:string, field_name:string = null, other_property:Join_Property = null) {
       this.parent = parent
@@ -215,7 +215,7 @@ module Ground {
       this.other_property = other_property
     }
 
-    static create_from_property(property:Property, other_trellis:Join_Trellis = null, other_property:Join_Property = null):Join_Property {
+    static create_from_property(property:landscape.Property, other_trellis:Join_Trellis = null, other_property:Join_Property = null):Join_Property {
       var result = new Join_Property(
         new Join_Trellis_Wrapper(property.parent),
         other_trellis || new Join_Trellis_Wrapper(property.other_trellis),
@@ -252,16 +252,16 @@ module Ground {
   }
 
   export class Join_Tree {
-    property:Property
-    trellis:Trellis
+    property:landscape.Property
+    trellis:landscape.Trellis
     children:Join_Tree[] = []
 
-    constructor(property:Property, trellis:Trellis) {
+    constructor(property:landscape.Property, trellis:landscape.Trellis) {
       this.property = property
       this.trellis = trellis
     }
 
-    static get(tree:Join_Tree[], property:Property, next:Trellis):Join_Tree {
+    static get(tree:Join_Tree[], property:landscape.Property, next:landscape.Trellis):Join_Tree {
       for (var i = 0; i < tree.length; ++i) {
         var branch = tree[i]
         if (branch.property.name == property.name && branch.trellis.name === next.name)
@@ -273,11 +273,11 @@ module Ground {
 
   export class Join {
 
-    static generate_table_name(trellis:Trellis, property:Property):string {
+    static generate_table_name(trellis:landscape.Trellis, property:landscape.Property):string {
       return 'link_' +  trellis.name + '_' + property.get_field_name() + '_' + property.parent.name
     }
 
-    static get_last_reference(property_chain:Property[]):Property {
+    static get_last_reference(property_chain:landscape.Property[]):landscape.Property {
       var property = property_chain[property_chain.length - 1]
 
       // If the last property isn't a reference, the property before it must be a reference
@@ -286,8 +286,8 @@ module Ground {
         return property_chain[property_chain.length - 2]
     }
 
-    static paths_to_tree(base:Trellis, paths:any[]):Join_Tree[] {
-      var result:Join_Tree[] = [], target:Join_Tree[], path:Property[]
+    static paths_to_tree(base:landscape.Trellis, paths:any[]):Join_Tree[] {
+      var result:Join_Tree[] = [], target:Join_Tree[], path:landscape.Property[]
 
       for (var i = 0; i < paths.length; ++i) {
         var trellis = base
@@ -295,7 +295,7 @@ module Ground {
         target = result
         for (var x = 0; x < path.length - 1; ++x) {
           var property = path[x]
-          var next:Trellis = path[x + 1].parent
+          var next:landscape.Trellis = path[x + 1].parent
           var branch = Join_Tree.get(target, property, next)
           if (!branch) {
             branch = new Join_Tree(property, next)
@@ -310,7 +310,7 @@ module Ground {
 
     private static convert(branch:Join_Tree, previous:Join_Trellis, result:IJoin[]):Join_Trellis {
       var join_property:Join_Property, cross:Cross_Trellis, join_trellis
-      if (branch.property.get_relationship() == Relationships.many_to_many) {
+      if (branch.property.get_relationship() == landscape.Relationships.many_to_many) {
         cross = new Cross_Trellis(branch.property)
         result.push(new Reference_Join(cross.properties[0], previous, cross))
         previous = cross
@@ -356,13 +356,13 @@ module Ground {
       return result
     }
 
-    static render_paths(trellis:Trellis, paths:Property[][]):string[] {
+    static render_paths(trellis:landscape.Trellis, paths:landscape.Property[][]):string[] {
       var tree = Join.paths_to_tree(trellis, paths)
       var joins = Join.tree_to_joins(tree)
       return joins.map((join)=> join.render())
     }
 
-    static path_to_property_chain(base:Trellis, path):Property[] {
+    static path_to_property_chain(base:landscape.Trellis, path):landscape.Property[] {
       var parts = Ground.path_to_array(path)
       var trellis = base
       var result = []
@@ -378,9 +378,9 @@ module Ground {
       return result
     }
 
-    static get_end_query(property_chain:Property[]):string {
+    static get_end_query(property_chain:landscape.Property[]):string {
       var last_property = property_chain[property_chain.length - 1]
-      if (property_chain.length == 1 && last_property.get_relationship() != Relationships.many_to_many )
+      if (property_chain.length == 1 && last_property.get_relationship() != landscape.Relationships.many_to_many )
         return last_property.parent.get_table_name() + '.' + last_property.get_field_name()
 
       var last_reference = Join.get_last_reference(property_chain)

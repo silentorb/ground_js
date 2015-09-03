@@ -6,7 +6,7 @@ module Ground {
     fields?
     filters?:any[]
     joins?:string[]
-    property_joins?:Property[][]
+    property_joins?:landscape.Property[][]
     arguments?
     references?
   }
@@ -43,7 +43,7 @@ module Ground {
       return sql
     }
 
-    static generate_property_join(property:Property, seeds) {
+    static generate_property_join(property:landscape.Property, seeds) {
       var join = Link_Trellis.create_from_property(property);
       console.log('join', property.name, seeds)
       return join.generate_join(seeds);
@@ -72,7 +72,7 @@ module Ground {
       return sql;
     }
 
-    private get_group_keys(trellis:Trellis):string {
+    private get_group_keys(trellis:landscape.Trellis):string {
       return trellis.table && trellis.table.primary_keys && trellis.table.primary_keys.length > 1
         ? trellis.table.primary_keys.map((k)=> trellis.get_table_query() + '.' + k).join(', ')
         : trellis.query_primary_key()
@@ -163,12 +163,12 @@ module Ground {
     //  return "(" + filter.map((x)=> Query_Renderer.render_filter(x)).join(" AND ") + ")"
     //}
 
-    private static add_path(path, trellis:Trellis, result:Internal_Query_Source):any[] {
+    private static add_path(path, trellis:landscape.Trellis, result:Internal_Query_Source):any[] {
       var property_chain = Query_Renderer.get_chain(path, trellis)
       return Query_Renderer.add_chain(property_chain, result)
     }
 
-    public static get_chain(path, trellis:Trellis):Property[] {
+    public static get_chain(path, trellis:landscape.Trellis):landscape.Property[] {
       if (typeof path === 'string') {
         var parts = Ground.path_to_array(path)
         var property_chain = Join.path_to_property_chain(trellis, parts)
@@ -183,9 +183,9 @@ module Ground {
       }
     }
 
-    private static add_chain(property_chain, result:Internal_Query_Source):Property[] {
+    private static add_chain(property_chain, result:Internal_Query_Source):landscape.Property[] {
       var property = property_chain[property_chain.length - 1]
-      if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
+      if (property.get_relationship() == landscape.Relationships.many_to_many || property_chain.length > 1) {
         result.property_joins = result.property_joins || []
         result.property_joins.push(property_chain)
       }
@@ -215,7 +215,7 @@ module Ground {
         if (!reference)
           throw new Error("Cannot create filter with invalid virtual property: " + property.name + ".")
       }
-      else if (property.get_relationship() == Relationships.many_to_many || property_chain.length > 1) {
+      else if (property.get_relationship() == landscape.Relationships.many_to_many || property_chain.length > 1) {
         reference = Join.get_end_query(property_chain)
       }
       else {

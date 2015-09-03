@@ -3,8 +3,8 @@
 module Ground {
   export class Record_Count extends MetaHub.Meta_Object {
     ground:Core
-    parent:Trellis
-    child:Trellis
+    parent:landscape.Trellis
+    child:landscape.Trellis
     count_name:string
 
     constructor(ground:Core, parent, property_name:string, count_name:string) {
@@ -39,12 +39,12 @@ module Ground {
 
   export class Join_Count extends MetaHub.Meta_Object {
     ground:Core
-    parent:Trellis
+    parent:landscape.Trellis
     link:Cross_Trellis
     count_name:string
-    property:Property
+    property:landscape.Property
 
-    constructor(ground:Core, property:Property, count_name:string) {
+    constructor(ground:Core, property:landscape.Property, count_name:string) {
       super()
       this.ground = ground
       this.parent = property.parent
@@ -58,7 +58,7 @@ module Ground {
       this.listen(ground, table_name + '.removed', (seed, property) => this.count(seed, property))
     }
 
-    count(seed, property:Property):Promise {
+    count(seed, property:landscape.Property):Promise {
       var key_name
       if (property == this.property) {
         key_name = this.property.parent.primary_key
@@ -96,7 +96,7 @@ module Ground {
 
   export class Multi_Count extends MetaHub.Meta_Object {
     ground:Core
-    trellis:Trellis
+    trellis:landscape.Trellis
     count_name:string
     count_fields:string[]
 

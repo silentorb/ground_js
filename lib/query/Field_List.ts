@@ -48,7 +48,7 @@ module Ground {
       this.joins = ancestor_joins.concat(this.joins)
     }
 
-    private render_field(property:Property) {
+    private render_field(property:landscape.Property) {
       var sql = property.is_virtual
         ? property.query_virtual_field()
         : property.get_field_query()
@@ -65,7 +65,7 @@ module Ground {
       }
     }
 
-    private render_reference_fields(property:Property, query:Query_Builder, previous:Join_Trellis = undefined):Embedded_Reference {
+    private render_reference_fields(property:landscape.Property, query:Query_Builder, previous:Join_Trellis = undefined):Embedded_Reference {
       var properties = query.get_field_properties2().concat(Field_List.get_derived_properties(property.other_trellis))
       var reference = new Embedded_Reference(
         property,
@@ -166,7 +166,7 @@ module Ground {
       }
     }
 
-    static get_derived_properties(trellis:Trellis) {
+    static get_derived_properties(trellis:landscape.Trellis) {
       var result = []
       for (var i = 0; i < trellis.children.length; ++i) {
        var child = trellis.children[i]

@@ -1,6 +1,9 @@
 /// <reference path="../references.ts"/>
+/// <reference path="ISchema.ts"/>
+/// <reference path="../db/Table.ts"/>
+/// <reference path="loader.ts"/>
 
-module Ground {
+module landscape {
 
   export interface ITrellis {
 
@@ -9,8 +12,8 @@ module Ground {
   export class Trellis implements ITrellis {
     parent:Trellis = null
     mixins:Trellis[] = []
-    ground:Core
-    table:Table = null
+    ground:ISchema
+    table:Ground.Table = null
     name:string = null
     primary_key:string = 'id'
     is_virtual:boolean = false
@@ -30,13 +33,14 @@ module Ground {
     // those are stored here
     type_property:Property
 
-    constructor(name:string, ground:Core) {
+    constructor(name:string, ground:ISchema) {
       this.ground = ground;
       this.name = name;
     }
 
     add_property(name:string, source):Property {
-      var property = new Property(name, source, this)
+      var property = new Property(name, this)
+      loader.initialize_property(property, source)
       this.properties[name] = property
       if (property.insert == 'trellis' && !this.type_property)
         this.type_property = property
@@ -47,7 +51,9 @@ module Ground {
     check_primary_key() {
       if (!this.properties[this.primary_key] && this.parent) {
         var property = this.parent.properties[this.parent.primary_key];
-        this.properties[this.primary_key] = new Property(this.primary_key, property.get_data(), this);
+        var new_property = new Property(this.primary_key, this)
+        loader.initialize_property(new_property, exporter.get_property_data(property))
+        this.properties[this.primary_key] = new_property;
       }
     }
 
@@ -144,8 +150,8 @@ module Ground {
 //        return null;
 
       var conditions = this.get_primary_keys().map((property)=>
-          property.query() +
-            ' = ' + other.properties[property.name].query()
+        property.query() +
+        ' = ' + other.properties[property.name].query()
       )
 
       return 'JOIN ' + other.get_table_query() +
@@ -172,7 +178,7 @@ module Ground {
         return result
       }
 
-      return [ this.properties[this.primary_key] ]
+      return [this.properties[this.primary_key]]
     }
 
     get_primary_property():Property {
@@ -190,7 +196,7 @@ module Ground {
       return null
     }
 
-    get_root_table():Table {
+    get_root_table():Ground.Table {
       if (this.parent && this.ground.tables[this.parent.name])
         return this.parent.get_root_table()
 
@@ -270,12 +276,12 @@ module Ground {
           if (!other_trellis)
             throw new Error('Cannot find referenced trellis for ' + this.name + '.' + property.name + ': ' + property.other_trellis_name + '.')
 
-          property.initialize_composite_reference(other_trellis)
+          //property.initialize_composite_reference(other_trellis)
         }
       }
     }
 
-    load_from_object(source:ITrellis_Source) {
+    load_from_object(source:loader.ITrellis_Source) {
       for (var name in source) {
         if (name != 'name' && name != 'properties' && this[name] !== undefined && source[name] !== undefined) {
           this[name] = source[name];
@@ -320,13 +326,13 @@ module Ground {
       if (parent.table && parent.table.primary_keys) {
         keys = parent.table.primary_keys;
         if (!this.table)
-          this.table = Table.create_from_trellis(this)
+          this.table = Ground.Table.create_from_trellis(this)
 
         this.table.primary_keys = keys
 //        console.log('table', this.table)
       }
       else {
-        keys = [ parent.primary_key ]
+        keys = [parent.primary_key]
       }
 
       for (var i = 0; i < keys.length; ++i) {
@@ -339,9 +345,9 @@ module Ground {
       //if (parent.children.indexOf(this) == -1)
       //  parent.children.push(this)
 
-       for (var i in mixin.properties) {
-         var property = mixin.properties[i]
-         this.add_property(property.name, property)
+      for (var i in mixin.properties) {
+        var property = mixin.properties[i]
+        this.add_property(property.name, property)
       }
       this.primary_key = mixin.primary_key;
     }
@@ -363,35 +369,35 @@ module Ground {
       })
     }
 
-    assure_properties(seed, required_properties:string[]):Promise {
-      if (this.seed_has_properties(seed, required_properties))
-        return when.resolve(seed)
+    //assure_properties(seed, required_properties:string[]):Promise {
+    //  if (this.seed_has_properties(seed, required_properties))
+    //    return when.resolve(seed)
+    //
+    //  var properties = [], expansions = []
+    //  for (var i = 0; i < required_properties.length; ++i) {
+    //    var property:string = required_properties[i]
+    //    if (property.indexOf('.') == -1) {
+    //      properties.push(property)
+    //    }
+    //    else {
+    //      var tokens = property.split('.')
+    //      expansions.push(tokens.slice(0, -1).join('/'))
+    //      properties.push(tokens[0])
+    //    }
+    //  }
+    //
+    //  var query = this.ground.create_query(this.name)
+    //  query.add_key_filter(this.get_identity2(seed))
+    //  query.extend({
+    //    properties: properties
+    //  })
+    //  query.add_expansions(expansions)
+    //
+    //  return query.run_single(null)
+    //}
 
-      var properties = [], expansions = []
-      for (var i = 0; i < required_properties.length; ++i) {
-        var property:string = required_properties[i]
-        if (property.indexOf('.') == -1) {
-          properties.push(property)
-        }
-        else {
-          var tokens = property.split('.')
-          expansions.push(tokens.slice(0, -1).join('/'))
-          properties.push(tokens[0])
-        }
-      }
-
-      var query = this.ground.create_query(this.name)
-      query.add_key_filter(this.get_identity2(seed))
-      query.extend({
-        properties: properties
-      })
-      query.add_expansions(expansions)
-
-      return query.run_single(null)
-    }
-
-    export_schema():ITrellis_Source {
-      var result:ITrellis_Source = {}
+    export_schema():loader.ITrellis_Source {
+      var result:loader.ITrellis_Source = {}
       result.name = this.name
 
       if (this.parent)

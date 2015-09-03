@@ -11,7 +11,7 @@ module Ground {
     seed:ISeed;
     private fields:any[];
     override:boolean = true;
-    trellis:Trellis;
+    trellis:landscape.Trellis;
     main_table:string = 'node';
     ground:Core;
     db:Database;
@@ -19,7 +19,7 @@ module Ground {
     log_queries:boolean = false
     run_stack
 
-    constructor(trellis:Trellis, seed:ISeed, ground:Core = null) {
+    constructor(trellis:landscape.Trellis, seed:ISeed, ground:Core = null) {
       if (typeof seed !== 'object')
         throw new Error('Seed passed to ' + trellis.name + ' is a ' + (typeof seed) + ' when it should be an object.')
 
@@ -37,7 +37,7 @@ module Ground {
       return this.trellis + '.update'
     }
 
-    private generate_sql(trellis:Trellis):Promise {
+    private generate_sql(trellis:landscape.Trellis):Promise {
       var duplicate = '', primary_keys;
       var id = this.seed[trellis.primary_key];
       if (!id && id !== 0) {
@@ -115,7 +115,7 @@ module Ground {
       return when.all(promises)
     }
 
-    private create_record(trellis:Trellis):Promise {
+    private create_record(trellis:landscape.Trellis):Promise {
       var fields:string[] = [];
       var values = [];
       var core_properties = trellis.get_core_properties();
@@ -176,7 +176,7 @@ module Ground {
         })
     }
 
-    private update_record(trellis:Trellis, id, key_condition):Promise {
+    private update_record(trellis:landscape.Trellis, id, key_condition):Promise {
       var core_properties = MetaHub.filter(trellis.get_core_properties(), (p)=> this.is_update_property(p));
 
       return this.update_embedded_seeds(core_properties)
@@ -220,7 +220,7 @@ module Ground {
         });
     }
 
-    private apply_insert(property:Property, value) {
+    private apply_insert(property:landscape.Property, value) {
       if (property.insert == 'trellis')
         return this.trellis.name;
 
@@ -237,7 +237,7 @@ module Ground {
       return value
     }
 
-    is_create_property(property:Property):boolean {
+    is_create_property(property:landscape.Property):boolean {
       if (property.is_virtual)
         return false;
 
@@ -250,7 +250,7 @@ module Ground {
         || property.type == 'modified' || property.insert == 'author';
     }
 
-    private get_field_value(property:Property, seed) {
+    private get_field_value(property:landscape.Property, seed) {
       var name = property.get_seed_name()
       var value = seed[name];
       value = this.apply_insert(property, value);
@@ -259,7 +259,7 @@ module Ground {
       return property.get_sql_value(value);
     }
 
-    private is_update_property(property:Property):boolean {
+    private is_update_property(property:landscape.Property):boolean {
       if (property.is_virtual)
         return false;
 
@@ -274,7 +274,7 @@ module Ground {
       return this.seed[property.name] !== undefined || property.insert == 'trellis' || property.type == 'modified';
     }
 
-    private update_links(trellis:Trellis, id, create:boolean = false):Promise {
+    private update_links(trellis:landscape.Trellis, id, create:boolean = false):Promise {
       var links = trellis.get_links();
       var promises = [];
       for (var name in links) {
@@ -287,10 +287,10 @@ module Ground {
         // The updates are not wrapped in functions and fired sequentially
         // because they don't need to be fired in any particular order;
         switch (property.get_relationship()) {
-          case Relationships.one_to_many:
+          case landscape.Relationships.one_to_many:
             promises.push(this.update_one_to_many(property));
             break;
-          case Relationships.many_to_many:
+          case landscape.Relationships.many_to_many:
             promises.push(this.update_many_to_many(property, create));
             break;
         }
@@ -299,7 +299,7 @@ module Ground {
       return when.all(promises);
     }
 
-    private update_many_to_many(property:Property, create:boolean = false):Promise {
+    private update_many_to_many(property:landscape.Property, create:boolean = false):Promise {
       var list = this.seed[property.name];
       var row = this.seed
       if (!MetaHub.is_array(list))
@@ -359,7 +359,7 @@ module Ground {
       return when.all(list.map(update))
     }
 
-    private update_one_to_many(property:Property):Promise {
+    private update_one_to_many(property:landscape.Property):Promise {
       var seed = this.seed
       var list = seed[property.name]
       if (!MetaHub.is_array(list))
@@ -372,7 +372,7 @@ module Ground {
       return when.all(promises)
     }
 
-    private update_reference(property:Property, id):Promise {
+    private update_reference(property:landscape.Property, id):Promise {
       var item = this.seed[property.name]
       if (!item)
         return when.resolve()
@@ -380,7 +380,7 @@ module Ground {
       return this.update_reference_object(item, property)
     }
 
-    private update_reference_object(other, property:Property):Promise {
+    private update_reference_object(other, property:landscape.Property):Promise {
       if (typeof other !== 'object') {
         // Test if the value is a valid key.  An error will be thrown if it isn't
         property.get_sql_value(other)
@@ -415,14 +415,14 @@ module Ground {
         this.run_stack = temp['stack']
       }
 
-      var tree = this.trellis.get_tree().filter((t:Trellis)=> !t.is_virtual);
-      var invoke_promises = tree.map((trellis:Trellis) => ()=> this.ground.invoke(trellis.name + '.update', this.seed, this));
+      var tree = this.trellis.get_tree().filter((t:landscape.Trellis)=> !t.is_virtual);
+      var invoke_promises = tree.map((trellis:landscape.Trellis) => ()=> this.ground.invoke(trellis.name + '.update', this.seed, this));
 
       invoke_promises = invoke_promises.concat(()=> this.ground.invoke('*.update', this.seed, this))
 
       return pipeline(invoke_promises)
         .then(()=> {
-          var promises = tree.map((trellis:Trellis) => ()=> this.generate_sql(trellis));
+          var promises = tree.map((trellis:landscape.Trellis) => ()=> this.generate_sql(trellis));
           return pipeline(promises)
             .then(()=> {
               return this.seed

@@ -1,6 +1,6 @@
 /// <reference path="../references.ts"/>
 
-module Ground {
+module landscape {
 
   export enum Relationships {
     none,
@@ -28,43 +28,9 @@ module Ground {
     access:string = 'auto' // 'auto' or 'manual'
     allow_null:boolean = false
 
-    constructor(name:string, source:IProperty_Source, trellis:Trellis) {
-      for (var i in source) {
-        if (this.hasOwnProperty(i))
-          this[i] = source[i];
-      }
-      if (source['default'] !== undefined)
-        this.default = source['default']
-
-      if (typeof source['allow_null'] == 'boolean')
-        this.allow_null = source['allow_null']
-
-      if (source.trellis) {
-        this.other_trellis_name = source.trellis;
-      }
-
+    constructor(name:string, trellis:Trellis) {
       this.name = name;
       this.parent = trellis;
-    }
-
-    initialize_composite_reference(other_trellis:Trellis) {
-//      var table = other_trellis.table
-//      if (table && table.primary_keys && table.primary_keys.length > 1) {
-//        for (var i = 0; i < table.primary_keys.length; ++i) {
-//          var key = table.primary_keys[i]
-//          var name = other_trellis.name + '_' + key
-//          if (key != other_trellis.primary_key) {
-//            var other_property = other_trellis.properties[key]
-//            var new_property = this.parent.add_property(name, other_property.get_data())
-//            new_property.other_property = key
-//            new_property.other_trellis_name = this.parent.name
-//            new_property.other_trellis = this.parent
-//            new_property.is_composite_sub = true
-//            this.composite_properties = this.composite_properties || []
-//            this.composite_properties.push(new_property)
-//          }
-//        }
-//      }
     }
 
     fullname():string {
@@ -87,29 +53,6 @@ module Ground {
         return [this].concat(this.composite_properties)
 
       return [this]
-    }
-
-    get_data():IProperty_Source {
-      var result:IProperty_Source = {
-        type: this.type
-      };
-
-      if (this.other_trellis_name)
-        result.trellis = this.other_trellis_name;
-
-      if (this.is_readonly)
-        result.is_readonly = this.is_readonly;
-
-      if (this.is_private)
-        result.is_private = this.is_private;
-
-      if (this.insert)
-        result.insert = this.insert;
-
-      if (this.other_property)
-        result.other_property = this.other_property;
-
-      return result;
     }
 
     get_default():any {
@@ -140,13 +83,13 @@ module Ground {
       return this.name;
     }
 
-    get_field_override(create_if_missing:boolean = false):IField {
+    get_field_override(create_if_missing:boolean = false):Ground.IField {
       var table = this.parent.table;
       if (!table) {
         if (!create_if_missing)
           return null;
 
-        table = Table.create_from_trellis(this.parent);
+        table = Ground.Table.create_from_trellis(this.parent);
       }
 
       if (table.properties[this.name] === undefined) {
@@ -362,11 +305,12 @@ module Ground {
       // If there is no existing connection defined in this trellis, create a dummy
       // connection and assume that it is a list.  This means that implicit connections
       // are either one-to-many or many-to-many, never one-to-one.
-      var attributes:IProperty_Source = <IProperty_Source>{}
+      var attributes:loader.IProperty_Source = <loader.IProperty_Source>{}
       attributes.type = 'list'
       attributes.is_virtual = true
       attributes.trellis = this.parent.name
-      var result = new Property(this.other_trellis.name, attributes, this.other_trellis)
+      var result = new Property(this.other_trellis.name, this.other_trellis)
+      loader.initialize_property(result, attributes)
       result.other_trellis = this.parent
       return result
     }
@@ -383,32 +327,32 @@ module Ground {
       return this.other_trellis;
     }
 
-    get_relationship():Relationships {
+    get_relationship():landscape.Relationships {
       if (this.type != 'list' && this.type != 'reference')
-        return Relationships.none
+        return landscape.Relationships.none
 
       var field = this.get_field_override();
       if (field && field.relationship) {
-        return Relationships[field.relationship];
+        return landscape.Relationships[field.relationship];
       }
 
       var other_property = this.get_other_property();
       if (!other_property) {
         if (this.type == 'list')
-          return Relationships.one_to_many
+          return landscape.Relationships.one_to_many
         else
-          return Relationships.one_to_one
+          return landscape.Relationships.one_to_one
       }
 
 //        throw new Error(this.parent.name + '.' + this.name + ' does not have a reciprocal reference.');
 
       if (this.type == 'list') {
         if (other_property.type == 'list')
-          return Relationships.many_to_many;
+          return landscape.Relationships.many_to_many;
         else
-          return Relationships.one_to_many;
+          return landscape.Relationships.one_to_many;
       }
-      return Relationships.one_to_one;
+      return landscape.Relationships.one_to_one;
     }
 
     get_field_query():string {
@@ -473,34 +417,6 @@ module Ground {
       return field_sql != null
         ? field_sql + ' AS ' + (output_name || this.get_field_name())
         : null
-    }
-
-    export_schema():IProperty_Source {
-      var result:IProperty_Source = {
-        type: this.type
-      }
-      if (this.other_trellis)
-        result.trellis = this.other_trellis.name
-
-      if (this.is_virtual)
-        result.is_virtual = true
-
-      if (this.insert)
-        result.insert = this.insert
-
-      if (this.is_readonly)
-        result.is_readonly = true
-
-      if (this.default !== undefined)
-        result['default'] = this.default
-
-      if (this.allow_null)
-        result.allow_null = true
-
-      if (this.other_property)
-        result.other_property = this.other_property;
-
-      return result
     }
 
 //    get_referenced_trellis():Trellis {

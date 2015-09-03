@@ -5,8 +5,8 @@
 module Ground {
 
   interface ILink {
-    other:Trellis
-    property:Property
+    other:landscape.Trellis
+    property:landscape.Property
   }
 
   export interface IService_Response {
@@ -45,7 +45,7 @@ module Ground {
     joins:string[] = []
     post_clauses:any[] = []
     limit:string
-    trellis:Trellis
+    trellis:landscape.Trellis
     db:Database
     include_links:boolean = true
     fields:string[] = []
@@ -72,7 +72,7 @@ module Ground {
 
     private links:ILink[] = []
 
-    constructor(trellis:Trellis, base_path:string = null) {
+    constructor(trellis:landscape.Trellis, base_path:string = null) {
       this.trellis = trellis;
       this.ground = trellis.ground;
       this.db = this.ground.db;
@@ -163,7 +163,7 @@ module Ground {
       this.sorts.push(sort)
     }
 
-    static process_sorts(sorts:Query_Sort[], trellis:Trellis):string {
+    static process_sorts(sorts:Query_Sort[], trellis:landscape.Trellis):string {
       if (sorts.length == 0)
         return ''
 
@@ -260,14 +260,14 @@ module Ground {
 
       for (var pattern in args) {
         var value = args[pattern];
-//        sql = sql.replace(new RegExp(pattern), Property.get_sql_value(value));
+//        sql = sql.replace(new RegExp(pattern), landscape.Property.get_sql_value(value));
         sql = sql.replace(new RegExp(pattern), value);
       }
 
       return sql;
     }
 
-    get_fields_and_joins(properties:{ [name: string]: Property
+    get_fields_and_joins(properties:{ [name: string]: landscape.Property
     }, include_primary_key:boolean = true):Internal_Query_Source {
       var name, fields:string[] = [];
       var trellises = {};
@@ -307,12 +307,12 @@ module Ground {
       return undefined
     }
 
-    static generate_property_join(property:Property, seeds) {
+    static generate_property_join(property:landscape.Property, seeds) {
       var join = Link_Trellis.create_from_property(property);
       return join.generate_join(seeds);
     }
 
-    create_sub_query(trellis:Trellis, property:Property):Query {
+    create_sub_query(trellis:landscape.Trellis, property:landscape.Property):Query {
       var query = new Query(trellis, this.get_path(property.name));
       query.include_links = false;
       query.expansions = this.expansions;
@@ -324,7 +324,7 @@ module Ground {
       return query
     }
 
-    get_many_list(seed, property:Property, relationship:Relationships):Promise {
+    get_many_list(seed, property:landscape.Property, relationship:landscape.Relationships):Promise {
       var id = seed[property.parent.primary_key]
       if (id === undefined || id === null) {
         return when.resolve({
@@ -338,12 +338,12 @@ module Ground {
         return when.resolve()
 
       var query = this.create_sub_query(other_property.parent, property);
-      if (relationship === Relationships.many_to_many) {
+      if (relationship === landscape.Relationships.many_to_many) {
         var seeds = {}
         seeds[this.trellis.name] = seed
         query.add_join(Query.generate_property_join(property, seeds))
       }
-      else if (relationship === Relationships.one_to_many)
+      else if (relationship === landscape.Relationships.one_to_many)
         query.add_property_filter(other_property.name, id)
 
       return query.run();
@@ -358,7 +358,7 @@ module Ground {
       return items.join('/');
     }
 
-    get_reference_object(row, property:Property) {
+    get_reference_object(row, property:landscape.Property) {
       var query = this.create_sub_query(property.other_trellis, property)
       var value = row[property.name]
       if (!value)
@@ -426,11 +426,11 @@ module Ground {
       var relationship = property.get_relationship()
 
       switch (relationship) {
-        case Relationships.one_to_one:
+        case landscape.Relationships.one_to_one:
           return this.get_reference_object(seed, property)
           break
-        case Relationships.one_to_many:
-        case Relationships.many_to_many:
+        case landscape.Relationships.one_to_many:
+        case landscape.Relationships.many_to_many:
           return this.get_many_list(seed, property, relationship)
           break
       }
@@ -460,7 +460,7 @@ module Ground {
         throw new Error('Query property filter ' + placeholder + ' is null.')
       }
 
-      if (property.get_relationship() == Relationships.many_to_many) {
+      if (property.get_relationship() == landscape.Relationships.many_to_many) {
 //        throw new Error('Filtering many to many will need to be rewritten for the new Link_Trellis.');
         var join_seed = {}
         join_seed[property.other_trellis.name] = ':' + property.name + '_filter'
@@ -561,7 +561,7 @@ module Ground {
       }
 
       var tree = this.trellis.get_tree()
-      var promises = tree.map((trellis:Trellis) => this.ground.invoke(trellis.name + '.query', this))
+      var promises = tree.map((trellis:landscape.Trellis) => this.ground.invoke(trellis.name + '.query', this))
 
       return when.all(promises)
         .then(()=> {
@@ -592,7 +592,7 @@ module Ground {
 
     // The cross_property parameter is intended to override the normal trellis with a cross-table;
     // useful for optimizing joins.
-    static get_identity_sql(property:Property, cross_property:Property = null) {
+    static get_identity_sql(property:landscape.Property, cross_property:landscape.Property = null) {
       if (cross_property) {
         var join = Link_Trellis.create_from_property(cross_property)
         var identity = join.get_identity_by_trellis(cross_property.other_trellis)
@@ -610,7 +610,7 @@ module Ground {
 
     // The cross_property parameter is intended to override the normal trellis with a cross-table;
     // useful for optimizing joins.
-    static generate_join(property:Property, cross_property:Property = null):string {
+    static generate_join(property:landscape.Property, cross_property:landscape.Property = null):string {
       var other_property = property.get_other_property(true)
 //      if (!other_property)
 //        throw new Error('Could not find other property of ' + property.query())
@@ -620,8 +620,8 @@ module Ground {
       var relationship = property.get_relationship()
 
       switch (relationship) {
-        case Relationships.one_to_one:
-        case Relationships.one_to_many:
+        case landscape.Relationships.one_to_one:
+        case landscape.Relationships.one_to_many:
           var first_part, second_part
           if (property.type == 'list')
             first_part = other_property.query()
@@ -633,7 +633,7 @@ module Ground {
           return 'JOIN ' + other.get_table_query() +
             '\nON ' + first_part + ' = ' + second_part + '\n'
 
-        case Relationships.many_to_many:
+        case landscape.Relationships.many_to_many:
           var seeds = {}
 //          seeds[this.trellis.name] = seed
           var join = Link_Trellis.create_from_property(property)
@@ -656,9 +656,9 @@ module Ground {
       var sql = 'SELECT COUNT(*) AS total\n'
 
 //      var parts = Query.process_tokens(tokens, args, ground)
-      var cross_property:Property = null, first_trellis
+      var cross_property:landscape.Property = null, first_trellis
 
-      var trellis:Trellis = first_trellis = ground.sanitize_trellis_argument(parts[0])
+      var trellis:landscape.Trellis = first_trellis = ground.sanitize_trellis_argument(parts[0])
       sql += 'FROM `' + trellis.get_table_name() + '`\n'
 
       for (var i = 1; i < parts.length; ++i) {
@@ -668,7 +668,7 @@ module Ground {
           throw new Error('Could not find ' + trellis.name + '.' + parts[i] + '.')
 
         sql += Query.generate_join(property, cross_property)
-        cross_property = property.get_relationship() == Relationships.many_to_many ? property : null
+        cross_property = property.get_relationship() == landscape.Relationships.many_to_many ? property : null
         trellis = property.other_trellis
       }
 

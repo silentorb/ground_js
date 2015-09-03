@@ -109,7 +109,7 @@ module Ground {
 			return def.promise
 		}
 
-		create_table(trellis:Trellis):Promise {
+		create_table(trellis:landscape.Trellis):Promise {
 			if (!trellis)
 				throw new Error('Empty object was passed to create_table().')
 
@@ -119,8 +119,8 @@ module Ground {
 				.then(()=>table)
 		}
 
-		create_trellis_tables(trellises:{[key: string]: Trellis}):Promise {
-			var promises = MetaHub.map_to_array(trellises, (trellis:Trellis)=>this.create_table(trellis));
+		create_trellis_tables(trellises:{[key: string]: landscape.Trellis}):Promise {
+			var promises = MetaHub.map_to_array(trellises, (trellis:landscape.Trellis)=>this.create_table(trellis));
 			return when.all(promises)
 		}
 
